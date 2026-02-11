@@ -1,14 +1,22 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { DataTable } from '@/components/DataTable';
 import { StatusBadge } from '@/components/StatusBadge';
 import { usePeriod } from '@/contexts/PeriodContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { Upload, AlertTriangle, ChevronDown, ChevronUp, CheckCircle2, XCircle } from 'lucide-react';
+import { Upload, AlertTriangle, ChevronDown, ChevronUp, CheckCircle2, XCircle, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 
 const MESES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+const LOADING_MESSAGES = [
+  'Conectando ao servidor...',
+  'Lendo planilha...',
+  'Filtrando dados...',
+  'Calculando comissões...',
+  'Gravando resultados...',
+];
 
 const fmt = (v: number | null | undefined) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(v ?? 0));
@@ -25,9 +33,20 @@ export default function AdminImportar() {
   const [spreadsheetId, setSpreadsheetId] = useState('');
   const [sheetName, setSheetName] = useState('Pasta1');
   const [importing, setImporting] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [resultado, setResultado] = useState<any>(null);
+  const [erro, setErro] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [expandedLog, setExpandedLog] = useState<string | null>(null);
+  const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
+
+  // Cycle loading messages every 4s
+  useEffect(() => {
+    if (!importing) { setLoadingMsgIdx(0); return; }
+    const interval = setInterval(() => {
+      setLoadingMsgIdx(prev => (prev + 1) % LOADING_MESSAGES.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [importing]);
 
   const { data: logs = [], refetch: refetchLogs } = useQuery({
     queryKey: ['log_importacoes'],
@@ -44,32 +63,53 @@ export default function AdminImportar() {
   const doImport = async () => {
     setShowConfirm(false);
     setImporting(true);
-    setResult(null);
+    setResultado(null);
+    setErro(null);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 180000); // 3 min timeout
+
     try {
-      const res = await fetch('https://webhook.atacadaomaromba.com/webhook/importar-vendas', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          periodo_ano: ano,
-          periodo_mes: mes,
-          spreadsheet_id: spreadsheetId,
-          sheet_name: sheetName,
-        }),
-      });
-      const json = await res.json();
-      setResult(json);
-      if (res.ok) {
-        toast.success('Importação concluída');
-      } else {
-        toast.error('Erro na importação');
+      const response = await fetch(
+        'https://webhook.atacadaomaromba.com/webhook/importar-vendas',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            periodo_ano: parseInt(String(ano)),
+            periodo_mes: parseInt(String(mes)),
+            spreadsheet_id: spreadsheetId.trim(),
+            sheet_name: sheetName.trim() || 'Pasta1'
+          }),
+          signal: controller.signal
+        }
+      );
+
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        throw new Error(`Erro HTTP ${response.status}`);
       }
-      refetchLogs();
-    } catch (err: any) {
-      setResult({ error: err.message });
-      toast.error(`Erro: ${err.message}`);
+
+      const data = await response.json();
+      setResultado(data);
+      toast.success('Importação concluída');
+    } catch (error: any) {
+      clearTimeout(timeout);
+      if (error.name === 'AbortError') {
+        setErro('Timeout: a importação demorou mais de 3 minutos. Verifique o log.');
+      } else {
+        setErro(`Erro na importação: ${error.message}`);
+      }
     } finally {
       setImporting(false);
+      refetchLogs();
     }
+  };
+
+  const limparErro = () => {
+    setErro(null);
+    setResultado(null);
   };
 
   const logColumns = [
@@ -118,6 +158,10 @@ export default function AdminImportar() {
     },
   ];
 
+  const nomesNaoEncontrados = resultado?.nomes_nao_encontrados && Array.isArray(resultado.nomes_nao_encontrados)
+    ? resultado.nomes_nao_encontrados
+    : [];
+
   return (
     <AppShell title="Importar Dados">
       <div className="space-y-6">
@@ -128,7 +172,7 @@ export default function AdminImportar() {
         <div className="bg-card border border-border rounded-lg p-6 shadow-card space-y-4 max-w-2xl">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-sm text-secondary-foreground">Mês</label>
+              <label className="text-sm text-secondary-foreground">Período Mês</label>
               <select
                 value={mes}
                 onChange={e => setMes(parseInt(e.target.value))}
@@ -138,14 +182,13 @@ export default function AdminImportar() {
               </select>
             </div>
             <div>
-              <label className="text-sm text-secondary-foreground">Ano</label>
-              <select
+              <label className="text-sm text-secondary-foreground">Período Ano</label>
+              <input
+                type="number"
                 value={ano}
                 onChange={e => setAno(parseInt(e.target.value))}
                 className="w-full mt-1 px-3 py-2 rounded-md bg-secondary border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-              >
-                {[2026, 2025, 2024].map(a => <option key={a} value={a}>{a}</option>)}
-              </select>
+              />
             </div>
           </div>
 
@@ -154,9 +197,10 @@ export default function AdminImportar() {
             <input
               value={spreadsheetId}
               onChange={e => setSpreadsheetId(e.target.value)}
-              placeholder="Ex: 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
+              placeholder="Cole o ID do Google Sheets aqui"
               className="w-full mt-1 px-3 py-2 rounded-md bg-secondary border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
             />
+            <p className="text-xs text-muted-foreground mt-1">Encontre na URL: docs.google.com/spreadsheets/d/<span className="text-primary">{'{'}</span>ESTE_ID<span className="text-primary">{'}'}</span>/edit</p>
           </div>
 
           <div>
@@ -167,33 +211,77 @@ export default function AdminImportar() {
               placeholder="Pasta1"
               className="w-full mt-1 px-3 py-2 rounded-md bg-secondary border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
             />
+            <p className="text-xs text-muted-foreground mt-1">Nome exato da aba na planilha</p>
           </div>
 
           <button
             onClick={() => setShowConfirm(true)}
-            disabled={!spreadsheetId || importing}
+            disabled={!spreadsheetId.trim() || importing}
             className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-50 transition-colors"
           >
             <Upload className="h-4 w-4" />
-            {importing ? 'Importando...' : 'Importar'}
+            {importing ? '⏳ Importando... Aguarde' : 'Importar'}
           </button>
         </div>
 
-        {/* Import spinner */}
+        {/* Import spinner with animated messages */}
         {importing && (
-          <div className="bg-card border border-border rounded-lg p-8 shadow-card flex flex-col items-center gap-3">
-            <div className="animate-spin h-10 w-10 border-3 border-primary border-t-transparent rounded-full" />
-            <p className="text-sm text-secondary-foreground">Processando importação... Isso pode levar 1-2 minutos.</p>
+          <div className="bg-card border border-border rounded-lg p-8 shadow-card flex flex-col items-center gap-4">
+            <div className="animate-spin h-10 w-10 border-4 border-primary border-t-transparent rounded-full" />
+            <p className="text-sm text-secondary-foreground animate-pulse transition-all">
+              {LOADING_MESSAGES[loadingMsgIdx]}
+            </p>
           </div>
         )}
 
-        {/* Result */}
-        {result && !importing && (
-          <div className={`bg-card border rounded-lg p-5 shadow-card ${result.error ? 'border-destructive' : 'border-success'}`}>
-            <h4 className="font-semibold text-foreground mb-2">{result.error ? '❌ Erro' : '✅ Resultado'}</h4>
-            <pre className="text-xs text-secondary-foreground overflow-auto max-h-60 whitespace-pre-wrap">
-              {JSON.stringify(result, null, 2)}
-            </pre>
+        {/* Success Result */}
+        {resultado && !erro && !importing && (
+          <div className="bg-card border-l-4 border-l-success border border-border rounded-lg p-5 shadow-card space-y-4">
+            <h4 className="font-semibold text-foreground text-lg">✅ Importação concluída!</h4>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+              <span className="text-muted-foreground">Período:</span>
+              <span className="text-foreground font-medium">{resultado.periodo ?? `${MESES[mes]}/${ano}`}</span>
+              <span className="text-muted-foreground">Vendedores:</span>
+              <span className="text-foreground font-medium">{resultado.vendedores_processados ?? '—'}</span>
+              <span className="text-muted-foreground">Total Vendido:</span>
+              <span className="text-foreground font-medium">{fmt(resultado.total_vendido ?? resultado.total_geral_vendido)}</span>
+              <span className="text-muted-foreground">Total Comissões:</span>
+              <span className="text-foreground font-medium">{fmt(resultado.total_comissoes)}</span>
+              <span className="text-muted-foreground">Linhas processadas:</span>
+              <span className="text-foreground font-medium">{resultado.linhas_processadas ?? '—'}</span>
+              <span className="text-muted-foreground">Linhas ignoradas:</span>
+              <span className="text-foreground font-medium">{resultado.linhas_ignoradas ?? '—'}</span>
+            </div>
+
+            {nomesNaoEncontrados.length > 0 && (
+              <div className="bg-primary/10 border border-primary/30 rounded-lg p-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-semibold text-foreground">⚠️ Vendedores não encontrados:</span>
+                </div>
+                <ul className="list-disc list-inside text-sm text-secondary-foreground space-y-0.5">
+                  {nomesNaoEncontrados.map((n: string, i: number) => (
+                    <li key={i}>{n}</li>
+                  ))}
+                </ul>
+                <p className="text-xs text-muted-foreground">Cadastre esses vendedores para incluir suas vendas.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Error Result */}
+        {erro && !importing && (
+          <div className="bg-card border-l-4 border-l-destructive border border-border rounded-lg p-5 shadow-card space-y-3">
+            <h4 className="font-semibold text-foreground text-lg">❌ Erro na importação</h4>
+            <p className="text-sm text-destructive">{erro}</p>
+            <button
+              onClick={limparErro}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-secondary text-secondary-foreground text-sm hover:bg-secondary/80 transition-colors"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Tentar novamente
+            </button>
           </div>
         )}
 
