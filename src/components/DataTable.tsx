@@ -11,9 +11,10 @@ interface Column<T> {
 interface DataTableProps<T> {
   columns: Column<T>[];
   data: T[];
+  rowClassName?: (row: T) => string;
 }
 
-export function DataTable<T extends Record<string, any>>({ columns, data }: DataTableProps<T>) {
+export function DataTable<T extends Record<string, any>>({ columns, data, rowClassName }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<keyof T | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
@@ -56,7 +57,7 @@ export function DataTable<T extends Record<string, any>>({ columns, data }: Data
         </thead>
         <tbody>
           {sorted.map((row, i) => (
-            <tr key={i} className={`border-t border-border hover:bg-secondary/50 ${i % 2 === 0 ? 'bg-transparent' : 'bg-secondary/20'}`}>
+            <tr key={i} className={`border-t border-border hover:bg-secondary/50 ${rowClassName ? rowClassName(row) : (i % 2 === 0 ? 'bg-transparent' : 'bg-secondary/20')}`}>
               {columns.map((col) => (
                 <td
                   key={String(col.key)}
