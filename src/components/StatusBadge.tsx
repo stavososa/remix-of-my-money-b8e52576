@@ -31,6 +31,12 @@ export function StatusBadge({ status }: StatusBadgeProps) {
     calculada: { label: 'Calculada', className: 'bg-secondary text-secondary-foreground' },
     aprovada: { label: 'Aprovada', className: 'bg-success text-success-foreground' },
     paga: { label: 'Paga', className: 'bg-emerald-700 text-foreground' },
+    Matriz: { label: 'Matriz', className: 'bg-primary/20 text-primary' },
+    Filial: { label: 'Filial', className: 'bg-blue-500/20 text-blue-400' },
+    Franquia: { label: 'Franquia', className: 'bg-purple-500/20 text-purple-400' },
+    filial: { label: 'Filial', className: 'bg-blue-500/20 text-blue-400' },
+    matriz: { label: 'Matriz', className: 'bg-primary/20 text-primary' },
+    franquia: { label: 'Franquia', className: 'bg-purple-500/20 text-purple-400' },
   };
 
   const c = config[status] ?? { label: status, className: 'bg-secondary text-secondary-foreground' };
