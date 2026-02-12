@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import logoImg from '@/assets/logo-atacadao-maromba.png';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
@@ -29,7 +30,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #0A1628 0%, #0D1F3C 100%)' }}>
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-extrabold text-primary tracking-widest">ATACADÃO MAROMBA</h1>
+          <img src={logoImg} alt="Atacadão Maromba" className="h-14 w-auto mx-auto" />
           <p className="text-secondary-foreground text-sm">Painel de Comissões</p>
         </div>
 
