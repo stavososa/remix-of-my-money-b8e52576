@@ -78,3 +78,16 @@
     background-image: linear-gradient(135deg, hsl(38 90% 55%), hsl(40 95% 65%));
   }
 }
+
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(245, 166, 35, 0.3), 0 0 30px rgba(245, 166, 35, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(245, 166, 35, 0.5), 0 0 50px rgba(245, 166, 35, 0.2);
+  }
+}
+
+.glow-gold {
+  animation: glow-pulse 2s ease-in-out infinite;
+}

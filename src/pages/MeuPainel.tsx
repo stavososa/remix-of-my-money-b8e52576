@@ -4,8 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usePeriod } from '@/contexts/PeriodContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { DollarSign, Target, Percent, FileText, TrendingUp, Trophy, BarChart3 } from 'lucide-react';
-import { Progress } from '@/components/ui/progress';
+import { DollarSign, Target, Percent, FileText, TrendingUp, Trophy, Flame, BarChart3 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from 'recharts';
@@ -19,6 +19,48 @@ const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'O
 
 const mesNome = (m: number) =>
   ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'][m - 1] ?? '';
+
+const container = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.08 } },
+};
+
+const item = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' as const } },
+};
+
+function CircularGauge({ value, size = 140, strokeWidth = 12 }: { value: number; size?: number; strokeWidth?: number }) {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const clamped = Math.min(Math.max(value, 0), 100);
+  const offset = circumference - (clamped / 100) * circumference;
+  const color = value >= 60 ? 'hsl(160 100% 42%)' : value >= 50 ? 'hsl(38 90% 55%)' : 'hsl(348 100% 62%)';
+
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle
+          cx={size / 2} cy={size / 2} r={radius}
+          fill="none" stroke="hsl(215 40% 24%)" strokeWidth={strokeWidth}
+        />
+        <motion.circle
+          cx={size / 2} cy={size / 2} r={radius}
+          fill="none" stroke={color} strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          initial={{ strokeDashoffset: circumference }}
+          animate={{ strokeDashoffset: offset }}
+          transition={{ duration: 1.2, ease: 'easeOut', delay: 0.3 }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-2xl font-extrabold text-foreground">{fmtPct(value)}</span>
+        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Margem</span>
+      </div>
+    </div>
+  );
+}
 
 export default function MeuPainel() {
   const { vendedor_id, nome_completo, unidade_nome, regime } = useAuth();
@@ -62,25 +104,20 @@ export default function MeuPainel() {
   const posicao = meusDados?.posicao ?? null;
   const meuTotal = Number(meusDados?.total_vendido ?? 0);
 
-  // Ranking neighbours
   const acima = posicao && posicao > 1 ? ranking?.find(r => r.posicao === posicao - 1) : null;
   const abaixo = posicao === 1 && ranking && ranking.length > 1 ? ranking.find(r => r.posicao === 2) : null;
 
   const diffAcima = acima ? Number(acima.total_vendido ?? 0) - meuTotal : 0;
   const diffAbaixo = abaixo ? meuTotal - Number(abaixo.total_vendido ?? 0) : 0;
 
-  // Chart data
   const chartData = (historico ?? []).map(h => ({
     label: `${MESES[(h.periodo_mes ?? 1) - 1]}/${String(h.periodo_ano).slice(2)}`,
     vendido: Number(h.total_vendido ?? 0),
     comissao: Number(h.total_comissao ?? 0),
   }));
 
-  // Margin color
   const margem = Number(meusDados?.margem_media ?? 0);
-  const margemColor = margem >= 60 ? 'text-success' : margem >= 50 ? 'text-primary' : 'text-destructive';
 
-  // Comparison bar
   const barMax = Math.max(meuTotal, mediaTime, 1);
   const meuPct = (meuTotal / barMax) * 100;
   const mediaPct = (mediaTime / barMax) * 100;
@@ -98,59 +135,87 @@ export default function MeuPainel() {
 
   return (
     <AppShell title="Meu Painel">
-      <div className="space-y-6">
-        {/* SECTION 1: Header */}
-        <div className="bg-card border border-border rounded-lg p-5 shadow-card flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <h2 className="text-xl font-bold text-foreground">Olá, {primeiroNome}! 💪</h2>
-            <p className="text-sm text-secondary-foreground">{unidade_nome} • {regime}</p>
-            <p className="text-xs text-muted-foreground">{mesNome(periodoMes)}/{periodoAno}</p>
-          </div>
-          <div className="flex flex-col items-center">
-            <div
-              className={`text-3xl font-extrabold rounded-lg px-5 py-2 border ${
-                posicao && posicao <= 3
-                  ? 'text-primary border-primary bg-primary/10 shadow-[0_0_20px_rgba(245,166,35,0.3)]'
-                  : posicao && posicao <= 10
-                    ? 'text-secondary-foreground border-secondary-foreground/30 bg-secondary'
-                    : 'text-foreground border-border bg-secondary'
-              }`}
-            >
-              {posicao ? `#${posicao}` : '—'}
+      <motion.div
+        variants={container}
+        initial="hidden"
+        animate="show"
+        className="space-y-8"
+      >
+        {/* HEADER */}
+        <motion.div
+          variants={item}
+          className="relative overflow-hidden rounded-xl border border-border shadow-card"
+          style={{ background: 'linear-gradient(135deg, hsl(38 90% 55% / 0.05), hsl(216 40% 14%) 40%, hsl(216 40% 14%))' }}
+        >
+          <div className="p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
+            <div className="space-y-2">
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground">
+                Olá, {primeiroNome}! <span className="inline-block">💪</span>
+              </h2>
+              <p className="text-sm text-secondary-foreground">{unidade_nome} • {regime}</p>
+              <p className="text-xs text-muted-foreground">{mesNome(periodoMes)} / {periodoAno}</p>
+              <div className="h-0.5 w-16 bg-gradient-to-r from-primary to-primary/0 rounded-full mt-2" />
             </div>
-            <span className="text-xs text-muted-foreground mt-1">de {totalVendedores} vendedores</span>
+            <div className="flex flex-col items-center">
+              <div
+                className={`h-20 w-20 rounded-full flex items-center justify-center border-2 text-3xl font-black transition-all ${
+                  posicao && posicao <= 3
+                    ? 'text-primary border-primary bg-primary/10 glow-gold'
+                    : posicao && posicao <= 10
+                      ? 'text-secondary-foreground border-border bg-secondary'
+                      : 'text-foreground border-border bg-secondary'
+                }`}
+              >
+                {posicao ? `#${posicao}` : '—'}
+              </div>
+              <span className="text-[11px] text-muted-foreground mt-2">de {totalVendedores} vendedores</span>
+            </div>
           </div>
-        </div>
+        </motion.div>
 
-        {/* SECTION 2: KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <KPICard icon={DollarSign} label="Total Vendido" value={meusDados ? fmt(meusDados.total_vendido) : '—'} />
-          <KPICard icon={Target} label="Comissão" value={meusDados ? fmt(meusDados.total_comissao) : '—'} />
-          <KPICard icon={Percent} label="% Comissão" value={meusDados ? fmtPct(meusDados.percentual_aplicado) : '—'} />
-          <KPICard icon={FileText} label="Notas Fiscais" value={meusDados ? String(meusDados.qtd_notas ?? 0) : '—'} />
-        </div>
+        {/* KPI CARDS */}
+        <motion.div variants={item} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <KPICard icon={DollarSign} label="Total Vendido" value={meusDados ? fmt(meusDados.total_vendido) : '—'} accentColor="hsl(38 90% 55%)" />
+          <KPICard icon={Target} label="Comissão" value={meusDados ? fmt(meusDados.total_comissao) : '—'} accentColor="hsl(160 100% 42%)" />
+          <KPICard icon={Percent} label="% Comissão" value={meusDados ? fmtPct(meusDados.percentual_aplicado) : '—'} accentColor="hsl(210 80% 55%)" />
+          <KPICard icon={FileText} label="Notas Fiscais" value={meusDados ? String(meusDados.qtd_notas ?? 0) : '—'} accentColor="hsl(215 30% 50%)" />
+        </motion.div>
         {!meusDados && (
           <p className="text-sm text-muted-foreground text-center">Sem dados para este período</p>
         )}
 
-        {/* SECTION 3: Two columns */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Posição no ranking */}
-          <div className="bg-card border border-border rounded-lg p-6 shadow-card flex flex-col items-center text-center">
-            <p className="text-sm text-secondary-foreground mb-2">Sua Posição</p>
-            <span
-              className={`font-extrabold leading-none ${
-                posicao && posicao <= 3 ? 'text-primary' : 'text-foreground'
-              }`}
-              style={{ fontSize: '4rem' }}
-            >
-              {posicao ? `#${posicao}` : '—'}
-            </span>
-            <p className="text-sm text-muted-foreground mt-1">de {totalVendedores} vendedores</p>
+        {/* TWO COLUMNS */}
+        <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Posição */}
+          <div className="bg-card border border-border rounded-xl p-8 shadow-card flex flex-col items-center text-center relative overflow-hidden">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-4">Sua Posição</p>
+
+            <div className="relative">
+              {/* Halo SVG */}
+              {posicao && posicao <= 3 && (
+                <svg className="absolute inset-0 w-full h-full" viewBox="0 0 120 120">
+                  <circle cx="60" cy="60" r="55" fill="none" stroke="hsl(38 90% 55%)" strokeWidth="1" opacity="0.15" />
+                  <circle cx="60" cy="60" r="48" fill="none" stroke="hsl(38 90% 55%)" strokeWidth="0.5" opacity="0.1" />
+                </svg>
+              )}
+              <span
+                className={`font-black leading-none ${
+                  posicao && posicao <= 3 ? 'text-gradient-gold' : 'text-foreground'
+                }`}
+                style={{ fontSize: '5.5rem' }}
+              >
+                {posicao ?? '—'}
+              </span>
+            </div>
+
+            <p className="text-sm text-muted-foreground mt-2">de {totalVendedores} vendedores</p>
 
             {meusDados && posicao === 1 && (
-              <div className="mt-4 space-y-1">
-                <p className="text-primary font-semibold">🏆 Você é o Top Performer!</p>
+              <div className="mt-5 space-y-1">
+                <div className="flex items-center justify-center gap-2">
+                  <Trophy className="h-5 w-5 text-primary" />
+                  <p className="text-primary font-bold">Top Performer!</p>
+                </div>
                 {abaixo && (
                   <p className="text-xs text-secondary-foreground">
                     {fmt(diffAbaixo)} à frente de #{2} {abaixo.vendedor_nome}
@@ -160,17 +225,22 @@ export default function MeuPainel() {
             )}
 
             {meusDados && posicao && posicao > 1 && acima && (
-              <div className="mt-4 w-full space-y-2">
+              <div className="mt-5 w-full space-y-3">
                 <p className="text-sm text-secondary-foreground">
-                  Falta <span className="text-primary font-semibold">{fmt(diffAcima)}</span> para alcançar
+                  Falta <span className="text-primary font-bold">{fmt(diffAcima)}</span> para alcançar
                 </p>
                 <p className="text-xs text-muted-foreground">
                   #{posicao - 1} {acima.vendedor_nome}
                 </p>
-                <Progress
-                  value={Number(acima.total_vendido) > 0 ? (meuTotal / Number(acima.total_vendido)) * 100 : 0}
-                  className="h-2 bg-secondary"
-                />
+                <div className="h-2.5 rounded-full bg-secondary overflow-hidden">
+                  <motion.div
+                    className="h-full rounded-full"
+                    style={{ background: 'linear-gradient(90deg, hsl(38 90% 55%), hsl(40 95% 65%))' }}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Number(acima.total_vendido) > 0 ? (meuTotal / Number(acima.total_vendido)) * 100 : 0}%` }}
+                    transition={{ duration: 1, ease: 'easeOut', delay: 0.4 }}
+                  />
+                </div>
               </div>
             )}
 
@@ -180,81 +250,119 @@ export default function MeuPainel() {
           </div>
 
           {/* Você vs Média */}
-          <div className="bg-card border border-border rounded-lg p-6 shadow-card">
-            <p className="text-sm text-secondary-foreground mb-4">Você vs Média do Time</p>
+          <div className="bg-card border border-border rounded-xl p-8 shadow-card">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">Você vs Média do Time</p>
 
-            {/* My bar */}
-            <div className="space-y-3">
+            <div className="space-y-5">
               <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-foreground font-medium">Você</span>
-                  <span className="text-foreground font-semibold">{fmt(meuTotal)}</span>
+                <div className="flex justify-between text-xs mb-1.5">
+                  <span className="text-foreground font-semibold">Você</span>
+                  <span className="text-foreground font-bold">{fmt(meuTotal)}</span>
                 </div>
-                <div className="h-3 rounded-full bg-secondary overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${diffMedia >= 0 ? 'bg-primary' : 'bg-muted-foreground'}`}
-                    style={{ width: `${meuPct}%` }}
+                <div className="h-5 rounded-full bg-secondary overflow-hidden relative">
+                  <motion.div
+                    className="h-full rounded-full"
+                    style={{
+                      background: diffMedia >= 0
+                        ? 'linear-gradient(90deg, hsl(38 90% 55%), hsl(40 95% 65%))'
+                        : 'hsl(215 30% 40%)',
+                    }}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${meuPct}%` }}
+                    transition={{ duration: 0.8, ease: 'easeOut', delay: 0.3 }}
                   />
+                  {meuPct > 15 && (
+                    <span className="absolute inset-y-0 left-3 flex items-center text-[10px] font-bold text-primary-foreground">
+                      {fmt(meuTotal)}
+                    </span>
+                  )}
                 </div>
               </div>
 
               <div>
-                <div className="flex justify-between text-xs mb-1">
+                <div className="flex justify-between text-xs mb-1.5">
                   <span className="text-secondary-foreground">Média</span>
                   <span className="text-secondary-foreground">{fmt(mediaTime)}</span>
                 </div>
-                <div className="h-3 rounded-full bg-secondary overflow-hidden">
-                  <div className="h-full rounded-full bg-secondary-foreground/40 transition-all" style={{ width: `${mediaPct}%` }} />
+                <div className="h-5 rounded-full bg-secondary overflow-hidden relative">
+                  <motion.div
+                    className="h-full rounded-full bg-secondary-foreground/30"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${mediaPct}%` }}
+                    transition={{ duration: 0.8, ease: 'easeOut', delay: 0.5 }}
+                  />
                 </div>
               </div>
             </div>
 
-            <div className="mt-4">
+            <div className="mt-6 flex items-center gap-2">
               {diffMedia > 0 ? (
                 <>
-                  <p className="text-success font-semibold text-sm">🔥 Acima da média!</p>
-                  <p className="text-xs text-muted-foreground">{fmt(diffMedia)} acima</p>
+                  <Flame className="h-5 w-5 text-primary" />
+                  <div>
+                    <p className="text-success font-bold text-sm">Acima da média!</p>
+                    <p className="text-xs text-muted-foreground">{fmt(diffMedia)} acima</p>
+                  </div>
                 </>
               ) : diffMedia < 0 ? (
                 <>
+                  <Target className="h-5 w-5 text-primary" />
                   <p className="text-primary font-semibold text-sm">Falta {fmt(Math.abs(diffMedia))} para a média</p>
                 </>
               ) : (
-                <p className="text-secondary-foreground text-sm">📊 Na média do time</p>
+                <p className="text-secondary-foreground text-sm flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" /> Na média do time
+                </p>
               )}
             </div>
           </div>
-        </div>
+        </motion.div>
 
-        {/* SECTION 4: Margem */}
-        <div className="bg-card border border-border rounded-lg p-6 shadow-card">
-          <p className="text-sm text-secondary-foreground mb-2">Margem Média</p>
+        {/* MARGEM - CIRCULAR GAUGE */}
+        <motion.div variants={item} className="bg-card border border-border rounded-xl p-8 shadow-card">
+          <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">Margem Média</p>
           {meusDados ? (
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              <span className={`text-4xl font-extrabold ${margemColor}`}>{fmtPct(margem)}</span>
-              <div className="flex-1 w-full">
-                <Progress value={margem} className="h-3 bg-secondary" />
-                <p className="text-xs text-muted-foreground mt-2">Margem média das suas vendas no período</p>
+            <div className="flex flex-col sm:flex-row items-center gap-8">
+              <CircularGauge value={margem} />
+              <div className="space-y-3">
+                <p className="text-sm text-secondary-foreground">Margem média das suas vendas no período</p>
+                <div className="flex items-center gap-4 text-xs">
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: 'hsl(160 100% 42%)' }} />
+                    ≥ 60% Ótima
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: 'hsl(38 90% 55%)' }} />
+                    ≥ 50% Regular
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: 'hsl(348 100% 62%)' }} />
+                    &lt; 50% Baixa
+                  </span>
+                </div>
               </div>
             </div>
           ) : (
             <p className="text-2xl font-bold text-muted-foreground">—</p>
           )}
-        </div>
+        </motion.div>
 
-        {/* SECTION 5: Evolução */}
-        <div className="bg-card border border-border rounded-lg p-6 shadow-card">
-          <p className="text-sm text-secondary-foreground mb-4">Evolução de Vendas</p>
+        {/* EVOLUÇÃO */}
+        <motion.div variants={item} className="bg-card border border-border rounded-xl p-8 shadow-card">
+          <div className="flex items-center gap-2 mb-6">
+            <TrendingUp className="h-4 w-4 text-primary" />
+            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Evolução de Vendas</p>
+          </div>
           {chartData.length > 1 ? (
-            <ResponsiveContainer width="100%" height={280}>
+            <ResponsiveContainer width="100%" height={300}>
               <AreaChart data={chartData}>
                 <defs>
                   <linearGradient id="gradVendido" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(38 90% 55%)" stopOpacity={0.2} />
+                    <stop offset="0%" stopColor="hsl(38 90% 55%)" stopOpacity={0.3} />
                     <stop offset="100%" stopColor="hsl(38 90% 55%)" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="gradComissao" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(160 100% 42%)" stopOpacity={0.2} />
+                    <stop offset="0%" stopColor="hsl(160 100% 42%)" stopOpacity={0.3} />
                     <stop offset="100%" stopColor="hsl(160 100% 42%)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
@@ -262,13 +370,19 @@ export default function MeuPainel() {
                 <XAxis dataKey="label" tick={{ fill: 'hsl(210 20% 60%)', fontSize: 12 }} />
                 <YAxis tick={{ fill: 'hsl(210 20% 60%)', fontSize: 12 }} tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} />
                 <Tooltip
-                  contentStyle={{ background: 'hsl(216 40% 14%)', border: '1px solid hsl(215 40% 24%)', borderRadius: 8 }}
-                  labelStyle={{ color: '#fff' }}
+                  contentStyle={{ background: 'hsl(216 40% 14%)', border: '1px solid hsl(215 40% 24%)', borderRadius: 10 }}
+                  labelStyle={{ color: '#fff', fontWeight: 600 }}
                   formatter={(v: number, name: string) => [fmt(v), name === 'vendido' ? 'Total Vendido' : 'Comissão']}
                 />
                 <Legend formatter={v => (v === 'vendido' ? 'Total Vendido' : 'Comissão')} />
-                <Area type="monotone" dataKey="vendido" stroke="hsl(38 90% 55%)" fill="url(#gradVendido)" strokeWidth={2} />
-                <Area type="monotone" dataKey="comissao" stroke="hsl(160 100% 42%)" fill="url(#gradComissao)" strokeWidth={2} />
+                <Area
+                  type="monotone" dataKey="vendido" stroke="hsl(38 90% 55%)" fill="url(#gradVendido)"
+                  strokeWidth={2.5} dot={{ r: 3, fill: 'hsl(38 90% 55%)' }} activeDot={{ r: 6, strokeWidth: 2, stroke: 'hsl(38 90% 55%)' }}
+                />
+                <Area
+                  type="monotone" dataKey="comissao" stroke="hsl(160 100% 42%)" fill="url(#gradComissao)"
+                  strokeWidth={2.5} dot={{ r: 3, fill: 'hsl(160 100% 42%)' }} activeDot={{ r: 6, strokeWidth: 2, stroke: 'hsl(160 100% 42%)' }}
+                />
               </AreaChart>
             </ResponsiveContainer>
           ) : (
@@ -278,8 +392,8 @@ export default function MeuPainel() {
               <p className="text-xs text-muted-foreground">Os dados serão comparados mês a mês automaticamente</p>
             </div>
           )}
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     </AppShell>
   );
 }
