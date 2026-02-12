@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import logoImg from '@/assets/logo-atacadao-maromba.png';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { PeriodFilter } from '@/components/PeriodFilter';
@@ -36,7 +37,7 @@ export function AppShell({ children, title }: { children: React.ReactNode; title
   const SidebarContent = () => (
     <>
       <div className="p-5">
-        <h1 className="text-xl font-extrabold text-primary tracking-wide">ATACADÃO MAROMBA</h1>
+        <img src={logoImg} alt="Atacadão Maromba" className="h-10 w-auto" />
         <div className="mt-3 h-px bg-primary/30" />
       </div>
 
