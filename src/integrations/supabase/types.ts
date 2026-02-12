@@ -224,6 +224,78 @@ export type Database = {
         }
         Relationships: []
       }
+      vendas: {
+        Row: {
+          cmc_total_movimento: number | null
+          cnpj_empresa: string | null
+          created_at: string | null
+          data_emissao: string | null
+          desconto: number | null
+          descricao_produto: string | null
+          familia_produto: string | null
+          frete: number | null
+          id: number
+          local_estoque: string | null
+          lucros_reais: number | null
+          marca: string | null
+          margem_percentual: string | null
+          markup: number | null
+          nota_fiscal: string | null
+          operacao: string | null
+          quantidade: number | null
+          situacao: string | null
+          total_com_desconto: number | null
+          total_mercadoria: number | null
+          vendedor_nome: string | null
+        }
+        Insert: {
+          cmc_total_movimento?: number | null
+          cnpj_empresa?: string | null
+          created_at?: string | null
+          data_emissao?: string | null
+          desconto?: number | null
+          descricao_produto?: string | null
+          familia_produto?: string | null
+          frete?: number | null
+          id?: number
+          local_estoque?: string | null
+          lucros_reais?: number | null
+          marca?: string | null
+          margem_percentual?: string | null
+          markup?: number | null
+          nota_fiscal?: string | null
+          operacao?: string | null
+          quantidade?: number | null
+          situacao?: string | null
+          total_com_desconto?: number | null
+          total_mercadoria?: number | null
+          vendedor_nome?: string | null
+        }
+        Update: {
+          cmc_total_movimento?: number | null
+          cnpj_empresa?: string | null
+          created_at?: string | null
+          data_emissao?: string | null
+          desconto?: number | null
+          descricao_produto?: string | null
+          familia_produto?: string | null
+          frete?: number | null
+          id?: number
+          local_estoque?: string | null
+          lucros_reais?: number | null
+          marca?: string | null
+          margem_percentual?: string | null
+          markup?: number | null
+          nota_fiscal?: string | null
+          operacao?: string | null
+          quantidade?: number | null
+          situacao?: string | null
+          total_com_desconto?: number | null
+          total_mercadoria?: number | null
+          vendedor_nome?: string | null
+        }
+        Relationships: []
+      }
       vendas_periodo: {
         Row: {
           id: string
