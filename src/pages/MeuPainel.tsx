@@ -1,14 +1,30 @@
 import { AppShell } from '@/components/AppShell';
 import { KPICard } from '@/components/KPICard';
+import { DataTable } from '@/components/DataTable';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePeriod } from '@/contexts/PeriodContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { DollarSign, Target, Percent, FileText, TrendingUp, Trophy, Flame, BarChart3 } from 'lucide-react';
+import { DollarSign, Target, Percent, FileText, TrendingUp, Trophy, Flame, BarChart3, ShoppingCart, TrendingDown } from 'lucide-react';
 import { motion } from 'framer-motion';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
+  BarChart, Bar,
 } from 'recharts';
+
+const parseMoneyBR = (str: string | null | undefined): number => {
+  if (!str) return 0;
+  const cleaned = str.replace(/[R$\s.]/g, '').replace(',', '.');
+  const val = parseFloat(cleaned);
+  return isNaN(val) ? 0 : val;
+};
+
+const parsePctBR = (str: string | null | undefined): number => {
+  if (!str) return 0;
+  const cleaned = str.replace('%', '').replace(/\s/g, '').replace(',', '.');
+  const val = parseFloat(cleaned);
+  return isNaN(val) ? 0 : val;
+};
 
 const fmt = (v: number | null | undefined) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(v ?? 0));
@@ -93,6 +109,48 @@ export default function MeuPainel() {
       return data ?? [];
     },
   });
+
+  const { data: vendasLucas } = useQuery({
+    queryKey: ['vendas-lucas'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('vendas')
+        .select('*')
+        .eq('vendedor_nome', 'LUCAS VILAR')
+        .order('data_emissao', { ascending: false });
+      return data ?? [];
+    },
+  });
+
+  const vendasAgg = (() => {
+    const rows = vendasLucas ?? [];
+    const totalVendido = rows.reduce((s, r) => s + parseMoneyBR(r.total_com_desconto), 0);
+    const totalLucro = rows.reduce((s, r) => s + parseMoneyBR(r.lucros_reais), 0);
+    const margens = rows.map(r => parsePctBR(r.margem_percentual)).filter(v => v !== 0);
+    const margemMedia = margens.length > 0 ? margens.reduce((a, b) => a + b, 0) / margens.length : 0;
+    const notasSet = new Set(rows.map(r => r.nota_fiscal).filter(Boolean));
+    return { totalVendido, totalLucro, margemMedia, qtdNotas: notasSet.size, qtdItens: rows.length };
+  })();
+
+  const vendasPorDia = (() => {
+    const map: Record<string, number> = {};
+    (vendasLucas ?? []).forEach(r => {
+      const d = r.data_emissao ?? 'Sem data';
+      map[d] = (map[d] ?? 0) + parseMoneyBR(r.total_com_desconto);
+    });
+    return Object.entries(map).sort(([a], [b]) => a.localeCompare(b)).map(([dia, total]) => ({ dia, total }));
+  })();
+
+  const vendasTableData = (vendasLucas ?? []).map(r => ({
+    data_emissao: r.data_emissao ?? '—',
+    nota_fiscal: r.nota_fiscal ?? '—',
+    produto: r.descricao_produto ?? '—',
+    marca: r.marca ?? '—',
+    quantidade: r.quantidade ?? '—',
+    total: r.total_com_desconto ?? '—',
+    margem: r.margem_percentual ?? '—',
+    lucro: r.lucros_reais ?? '—',
+  }));
 
   const meusDados = ranking?.find(r => r.vendedor_id === vendedor_id);
   const totalVendedores = ranking?.length ?? 0;
@@ -391,6 +449,64 @@ export default function MeuPainel() {
               <p className="text-muted-foreground">Evolução disponível a partir do próximo mês</p>
               <p className="text-xs text-muted-foreground">Os dados serão comparados mês a mês automaticamente</p>
             </div>
+          )}
+        </motion.div>
+
+        {/* VENDAS DIRETAS - LUCAS VILAR */}
+        <motion.div variants={item}>
+          <div className="flex items-center gap-2 mb-4">
+            <ShoppingCart className="h-4 w-4 text-primary" />
+            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Vendas Diretas</p>
+          </div>
+        </motion.div>
+
+        <motion.div variants={item} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <KPICard icon={DollarSign} label="Total Vendido" value={fmt(vendasAgg.totalVendido)} accentColor="hsl(38 90% 55%)" />
+          <KPICard icon={TrendingDown} label="Total Lucro" value={fmt(vendasAgg.totalLucro)} accentColor="hsl(160 100% 42%)" />
+          <KPICard icon={Percent} label="Margem Média" value={fmtPct(vendasAgg.margemMedia)} accentColor="hsl(210 80% 55%)" />
+          <KPICard icon={FileText} label="Notas Fiscais" value={String(vendasAgg.qtdNotas)} accentColor="hsl(215 30% 50%)" />
+        </motion.div>
+
+        {/* TABELA DETALHADA */}
+        <motion.div variants={item} className="bg-card border border-border rounded-xl p-6 shadow-card">
+          <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-4">Detalhamento de Vendas</p>
+          <DataTable
+            columns={[
+              { key: 'data_emissao', label: 'Data Emissão' },
+              { key: 'nota_fiscal', label: 'NF' },
+              { key: 'produto', label: 'Produto' },
+              { key: 'marca', label: 'Marca' },
+              { key: 'quantidade', label: 'Qtd', align: 'right' as const },
+              { key: 'total', label: 'Total c/ Desc.', align: 'right' as const },
+              { key: 'margem', label: 'Margem %', align: 'right' as const },
+              { key: 'lucro', label: 'Lucro', align: 'right' as const },
+            ]}
+            data={vendasTableData}
+          />
+        </motion.div>
+
+        {/* GRÁFICO VENDAS POR DIA */}
+        <motion.div variants={item} className="bg-card border border-border rounded-xl p-8 shadow-card">
+          <div className="flex items-center gap-2 mb-6">
+            <BarChart3 className="h-4 w-4 text-primary" />
+            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Vendas por Dia</p>
+          </div>
+          {vendasPorDia.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={vendasPorDia}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 40% 24%)" />
+                <XAxis dataKey="dia" tick={{ fill: 'hsl(210 20% 60%)', fontSize: 11 }} />
+                <YAxis tick={{ fill: 'hsl(210 20% 60%)', fontSize: 12 }} tickFormatter={v => `R$${v.toFixed(0)}`} />
+                <Tooltip
+                  contentStyle={{ background: 'hsl(216 40% 14%)', border: '1px solid hsl(215 40% 24%)', borderRadius: 10 }}
+                  labelStyle={{ color: '#fff', fontWeight: 600 }}
+                  formatter={(v: number) => [fmt(v), 'Total Vendido']}
+                />
+                <Bar dataKey="total" fill="hsl(38 90% 55%)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-muted-foreground text-center py-8">Sem dados de vendas</p>
           )}
         </motion.div>
       </motion.div>

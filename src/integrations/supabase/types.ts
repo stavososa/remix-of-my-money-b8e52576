@@ -226,72 +226,72 @@ export type Database = {
       }
       vendas: {
         Row: {
-          cmc_total_movimento: number | null
+          cmc_total_movimento: string | null
           cnpj_empresa: string | null
           created_at: string | null
           data_emissao: string | null
-          desconto: number | null
+          desconto: string | null
           descricao_produto: string | null
           familia_produto: string | null
-          frete: number | null
+          frete: string | null
           id: number
           local_estoque: string | null
-          lucros_reais: number | null
+          lucros_reais: string | null
           marca: string | null
           margem_percentual: string | null
-          markup: number | null
+          markup: string | null
           nota_fiscal: string | null
           operacao: string | null
-          quantidade: number | null
+          quantidade: string | null
           situacao: string | null
-          total_com_desconto: number | null
-          total_mercadoria: number | null
+          total_com_desconto: string | null
+          total_mercadoria: string | null
           vendedor_nome: string | null
         }
         Insert: {
-          cmc_total_movimento?: number | null
+          cmc_total_movimento?: string | null
           cnpj_empresa?: string | null
           created_at?: string | null
           data_emissao?: string | null
-          desconto?: number | null
+          desconto?: string | null
           descricao_produto?: string | null
           familia_produto?: string | null
-          frete?: number | null
+          frete?: string | null
           id?: number
           local_estoque?: string | null
-          lucros_reais?: number | null
+          lucros_reais?: string | null
           marca?: string | null
           margem_percentual?: string | null
-          markup?: number | null
+          markup?: string | null
           nota_fiscal?: string | null
           operacao?: string | null
-          quantidade?: number | null
+          quantidade?: string | null
           situacao?: string | null
-          total_com_desconto?: number | null
-          total_mercadoria?: number | null
+          total_com_desconto?: string | null
+          total_mercadoria?: string | null
           vendedor_nome?: string | null
         }
         Update: {
-          cmc_total_movimento?: number | null
+          cmc_total_movimento?: string | null
           cnpj_empresa?: string | null
           created_at?: string | null
           data_emissao?: string | null
-          desconto?: number | null
+          desconto?: string | null
           descricao_produto?: string | null
           familia_produto?: string | null
-          frete?: number | null
+          frete?: string | null
           id?: number
           local_estoque?: string | null
-          lucros_reais?: number | null
+          lucros_reais?: string | null
           marca?: string | null
           margem_percentual?: string | null
-          markup?: number | null
+          markup?: string | null
           nota_fiscal?: string | null
           operacao?: string | null
-          quantidade?: number | null
+          quantidade?: string | null
           situacao?: string | null
-          total_com_desconto?: number | null
-          total_mercadoria?: number | null
+          total_com_desconto?: string | null
+          total_mercadoria?: string | null
           vendedor_nome?: string | null
         }
         Relationships: []
