@@ -1,79 +1,42 @@
 
 
-## Painel Admin: Visao Geral com Ranking Completo
+## Reorganizacao do Painel Admin
 
-### Problema Atual
-Quando a conta admin acessa `/meu-painel`, o painel tenta buscar dados de um vendedor especifico (hardcoded "LUCAS VILAR") e exibe o nome como apenas "admin", pois a conta admin nao possui `vendedor_id` associado.
+### Mudancas Solicitadas
 
-### Solucao
+1. **Mover o Ranking de Vendedores para o final da pagina**
+2. **Limitar a tabela de produtos a 10 itens** com botao "Ver mais" que expande progressivamente
+3. **Restaurar os graficos do painel de vendedor** (Media Geral, Comparativo Ticket, Gauge) mas usando dados gerais/agregados da empresa
 
-Transformar o `/meu-painel` em um painel adaptativo que detecta a role do usuario:
-- **Admin**: Mostra visao geral da empresa com ranking completo de todos os vendedores
-- **Vendedor**: Mantem o comportamento atual (dados individuais)
+### Nova Ordem dos Blocos (Admin)
 
-### Mudancas no arquivo `src/pages/MeuPainel.tsx`
-
-#### 1. Importar `role` do AuthContext
-Adicionar `role` na desestruturacao do `useAuth()`.
-
-#### 2. Ajustar o Header para Admin
-- Exibir "Painel Administrativo" no lugar de "Ola, admin!"
-- Remover referencias a unidade/regime individuais
-- Mostrar KPIs agregados no header (total vendido geral, total lucro geral, margem media geral, total notas)
-
-#### 3. Buscar dados gerais (sem filtro de vendedor)
-- Para admin, a query de `vendas` nao filtra por `vendedor_nome` -- usa todos os registros
-- Os KPIs (Total Vendido, Lucro, Margem, Notas) serao calculados sobre TODAS as vendas
-
-#### 4. Substituir o card "Sua Posicao PJ" por um Ranking Completo
-Para admin, no lugar dos 3 cards (posicao PJ, comparativo, gauge), exibir uma tabela/listagem com:
-- Posicao (numero)
-- Nome do vendedor (vindo de `controle_pj.nome`)
-- Quantidade de vendas (contagem na tabela `vendas`)
-- Total arrecadado (soma de `total_com_desconto` ou `total_mercadoria`)
-- Medalhas para top 3
-
-#### 5. Manter graficos gerais
-- O grafico "Vendas da Empresa" continua mostrando todas as vendas por data
-- Remover a linha "Suas Vendas" do grafico (nao faz sentido para admin)
-- Manter as linhas de referencia (Media e Mediana)
-
-#### 6. Tabela Detalhada e Vendas por Dia
-- Mostrar TODAS as vendas na tabela detalhada (sem filtro por vendedor)
-- Adicionar coluna "Vendedor" na tabela detalhada
-- Grafico "Vendas por Dia" com dados de todos os vendedores
+```text
+1. Header (Painel Administrativo + mini KPIs)
+2. KPI Cards (4 cards principais)
+3. Media Geral de Vendas (3 cards: Total Geral, Ticket Medio, Qtd Itens)
+4. Comparativo + Gauge (Ticket Medio vs Media, sem "Voce vs" - perspectiva geral)
+5. Grafico Vendas da Empresa (LineChart cronologico)
+6. Grafico Vendas por Dia (BarChart)
+7. Detalhamento de Vendas (tabela limitada a 10 linhas + botao "Ver mais")
+8. Ranking Geral de Vendas PJ (movido para o final)
+```
 
 ### Detalhes Tecnicos
 
-```text
-Fluxo de decisao:
-+------------------+
-|  useAuth().role  |
-+--------+---------+
-         |
-    +----+----+
-    | admin?  |
-    +----+----+
-    Yes  |    No
-    |    |    |
-    v    |    v
-  Visao  | Visao
-  Geral  | Individual
-  (sem   | (comportamento
-  filtro)| atual)
-```
+**Arquivo**: `src/pages/MeuPainel.tsx`
 
-- Query `vendasAdmin`: busca TODAS as vendas sem filtro `vendedor_nome`, com `data_emissao`, `total_com_desconto`, `lucros_reais`, `margem_percentual`, `nota_fiscal`, `vendedor_nome`, `descricao_produto`, `marca`, `quantidade`
-- Ranking completo: usa os dados ja existentes de `rankingPj` (controle_pj + contagem de vendas), adicionando soma de valores arrecadados por vendedor
-- Condicional `role === 'admin'` para alternar entre os dois modos de exibicao em cada secao do JSX
+#### 1. Tabela com limite de 10 e "Ver mais"
+- Adicionar estado `const [showAllVendas, setShowAllVendas] = useState(false)`
+- Filtrar `vendasTableData` para mostrar apenas os 10 primeiros quando `showAllVendas === false`
+- Renderizar botao "Ver mais (X restantes)" abaixo da tabela que faz `setShowAllVendas(true)`
+- Quando expandido, mostrar botao "Ver menos" para recolher
 
-### Estrutura do Ranking (Admin)
+#### 2. Mover Ranking para baixo
+- Mover o bloco JSX do ranking (linhas 421-461) para depois da tabela de detalhamento
 
-| # | Vendedor | Vendas | Total Arrecadado |
-|---|----------|--------|------------------|
-| 1 | Nome     | 150    | R$ 500.000,00    |
-| 2 | Nome     | 120    | R$ 400.000,00    |
-| 3 | Nome     | 100    | R$ 350.000,00    |
-
-Com medalhas visuais para as 3 primeiras posicoes e estilizacao consistente com o design atual (cores dark, bordas sutis, gradientes dourados para destaques).
+#### 3. Restaurar graficos com dados gerais
+- Para admin, exibir os mesmos 3 cards de "Media Geral de Vendas" (Total Geral Vendido, Ticket Medio Geral, Qtd Total de Itens) que ja existem no modo vendedor
+- Remover o condicional `{isAdmin ? ... : ...}` na secao dos cards de comparativo, e mostrar ambos os blocos para admin tambem (removendo referencias pessoais como "Seu Ticket" e ajustando labels para perspectiva geral)
+- O Gauge mostrara a margem media geral da empresa
+- O comparativo mostrara o ticket medio geral vs mediana como referencia
 
