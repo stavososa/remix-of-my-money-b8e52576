@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      controle_pj: {
+        Row: {
+          cnpj: string | null
+          id: number
+          nome: string
+          setor: string | null
+          unidade: string | null
+        }
+        Insert: {
+          cnpj?: string | null
+          id?: number
+          nome: string
+          setor?: string | null
+          unidade?: string | null
+        }
+        Update: {
+          cnpj?: string | null
+          id?: number
+          nome?: string
+          setor?: string | null
+          unidade?: string | null
+        }
+        Relationships: []
+      }
       log_importacoes: {
         Row: {
           created_at: string | null

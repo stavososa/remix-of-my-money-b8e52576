@@ -205,45 +205,74 @@ export default function MeuPainel() {
           className="relative overflow-hidden rounded-xl border border-border shadow-card"
           style={{ background: 'linear-gradient(135deg, hsl(38 90% 55% / 0.05), hsl(216 40% 14%) 40%, hsl(216 40% 14%))' }}
         >
-          <div className="p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
-            <div className="space-y-2">
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground">
-                Olá, {primeiroNome}! <span className="inline-block">💪</span>
-              </h2>
-              <p className="text-sm text-secondary-foreground">{unidade_nome} • {regime}</p>
-              <p className="text-xs text-muted-foreground">{mesNome(periodoMes)} / {periodoAno}</p>
-              <div className="h-0.5 w-16 bg-gradient-to-r from-primary to-primary/0 rounded-full mt-2" />
-            </div>
-            <div className="flex flex-col items-center">
-              <div
-                className={`h-20 w-20 rounded-full flex items-center justify-center border-2 text-3xl font-black transition-all ${
-                  posicao && posicao <= 3
-                    ? 'text-primary border-primary bg-primary/10 glow-gold'
-                    : posicao && posicao <= 10
-                      ? 'text-secondary-foreground border-border bg-secondary'
-                      : 'text-foreground border-border bg-secondary'
-                }`}
-              >
-                {posicao ? `#${posicao}` : '—'}
+          <div className="p-6 sm:p-8 flex flex-col gap-5">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground">
+                  Olá, {primeiroNome}! <span className="inline-block">💪</span>
+                </h2>
+                <p className="text-sm text-secondary-foreground">{unidade_nome} • {regime}</p>
+                <p className="text-xs text-muted-foreground">{mesNome(periodoMes)} / {periodoAno}</p>
               </div>
-              <span className="text-[11px] text-muted-foreground mt-2">de {totalVendedores} vendedores</span>
+              <div className="flex flex-col items-center">
+                <div
+                  className={`h-20 w-20 rounded-full flex items-center justify-center border-2 text-3xl font-black transition-all ${
+                    posicao && posicao <= 3
+                      ? 'text-primary border-primary bg-primary/10 glow-gold'
+                      : posicao && posicao <= 10
+                        ? 'text-secondary-foreground border-border bg-secondary'
+                        : 'text-foreground border-border bg-secondary'
+                  }`}
+                >
+                  {posicao ? `#${posicao}` : '—'}
+                </div>
+                <span className="text-[11px] text-muted-foreground mt-2">de {totalVendedores} vendedores</span>
+              </div>
+            </div>
+            {/* Mini KPIs inline */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="flex items-center gap-2 bg-secondary/50 rounded-lg px-3 py-2">
+                <DollarSign className="h-3.5 w-3.5 text-primary" />
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase">Vendido</p>
+                  <p className="text-sm font-bold text-foreground">{fmt(vendasAgg.totalVendido)}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 bg-secondary/50 rounded-lg px-3 py-2">
+                <TrendingUp className="h-3.5 w-3.5" style={{ color: 'hsl(160 100% 42%)' }} />
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase">Lucro</p>
+                  <p className="text-sm font-bold text-foreground">{fmt(vendasAgg.totalLucro)}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 bg-secondary/50 rounded-lg px-3 py-2">
+                <Percent className="h-3.5 w-3.5" style={{ color: 'hsl(210 80% 55%)' }} />
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase">Margem</p>
+                  <p className="text-sm font-bold text-foreground">{fmtPct(vendasAgg.margemMedia)}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 bg-secondary/50 rounded-lg px-3 py-2">
+                <FileText className="h-3.5 w-3.5" style={{ color: 'hsl(215 30% 50%)' }} />
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase">Notas</p>
+                  <p className="text-sm font-bold text-foreground">{vendasAgg.qtdNotas}</p>
+                </div>
+              </div>
             </div>
           </div>
         </motion.div>
 
-        {/* KPI CARDS */}
+        {/* KPI CARDS - Dados reais da tabela vendas */}
         <motion.div variants={item} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <KPICard icon={DollarSign} label="Total Vendido" value={meusDados ? fmt(meusDados.total_vendido) : '—'} accentColor="hsl(38 90% 55%)" />
-          <KPICard icon={Target} label="Comissão" value={meusDados ? fmt(meusDados.total_comissao) : '—'} accentColor="hsl(160 100% 42%)" />
-          <KPICard icon={Percent} label="% Comissão" value={meusDados ? fmtPct(meusDados.percentual_aplicado) : '—'} accentColor="hsl(210 80% 55%)" />
-          <KPICard icon={FileText} label="Notas Fiscais" value={meusDados ? String(meusDados.qtd_notas ?? 0) : '—'} accentColor="hsl(215 30% 50%)" />
+          <KPICard icon={DollarSign} label="Total Vendido" value={fmt(vendasAgg.totalVendido)} subtitle={meusDados ? `Comissão: ${fmt(meusDados.total_comissao)}` : undefined} accentColor="hsl(38 90% 55%)" />
+          <KPICard icon={TrendingUp} label="Total Lucro" value={fmt(vendasAgg.totalLucro)} accentColor="hsl(160 100% 42%)" />
+          <KPICard icon={Percent} label="Margem Média" value={fmtPct(vendasAgg.margemMedia)} subtitle={meusDados ? `% Comissão: ${fmtPct(meusDados.percentual_aplicado)}` : undefined} accentColor="hsl(210 80% 55%)" />
+          <KPICard icon={FileText} label="Notas Fiscais" value={String(vendasAgg.qtdNotas)} subtitle={`${vendasAgg.qtdItens} itens`} accentColor="hsl(215 30% 50%)" />
         </motion.div>
-        {!meusDados && (
-          <p className="text-sm text-muted-foreground text-center">Sem dados para este período</p>
-        )}
 
         {/* TWO COLUMNS */}
-        <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Posição */}
           <div className="bg-card border border-border rounded-xl p-8 shadow-card flex flex-col items-center text-center relative overflow-hidden">
             <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-4">Sua Posição</p>
@@ -374,35 +403,33 @@ export default function MeuPainel() {
               )}
             </div>
           </div>
-        </motion.div>
 
-        {/* MARGEM - CIRCULAR GAUGE */}
-        <motion.div variants={item} className="bg-card border border-border rounded-xl p-8 shadow-card">
-          <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">Margem Média</p>
-          {meusDados ? (
-            <div className="flex flex-col sm:flex-row items-center gap-8">
-              <CircularGauge value={margem} />
-              <div className="space-y-3">
-                <p className="text-sm text-secondary-foreground">Margem média das suas vendas no período</p>
-                <div className="flex items-center gap-4 text-xs">
-                  <span className="flex items-center gap-1.5">
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: 'hsl(160 100% 42%)' }} />
-                    ≥ 60% Ótima
+
+          {/* Margem Gauge - terceira coluna */}
+          <div className="bg-card border border-border rounded-xl p-8 shadow-card flex flex-col items-center text-center">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">Margem Média</p>
+            {meusDados ? (
+              <div className="flex flex-col items-center gap-4">
+                <CircularGauge value={margem} />
+                <div className="flex items-center gap-3 text-[10px]">
+                  <span className="flex items-center gap-1">
+                    <span className="h-2 w-2 rounded-full" style={{ background: 'hsl(160 100% 42%)' }} />
+                    ≥60%
                   </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: 'hsl(38 90% 55%)' }} />
-                    ≥ 50% Regular
+                  <span className="flex items-center gap-1">
+                    <span className="h-2 w-2 rounded-full" style={{ background: 'hsl(38 90% 55%)' }} />
+                    ≥50%
                   </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: 'hsl(348 100% 62%)' }} />
-                    &lt; 50% Baixa
+                  <span className="flex items-center gap-1">
+                    <span className="h-2 w-2 rounded-full" style={{ background: 'hsl(348 100% 62%)' }} />
+                    &lt;50%
                   </span>
                 </div>
               </div>
-            </div>
-          ) : (
-            <p className="text-2xl font-bold text-muted-foreground">—</p>
-          )}
+            ) : (
+              <p className="text-2xl font-bold text-muted-foreground">—</p>
+            )}
+          </div>
         </motion.div>
 
         {/* EVOLUÇÃO */}
@@ -452,20 +479,7 @@ export default function MeuPainel() {
           )}
         </motion.div>
 
-        {/* VENDAS DIRETAS - LUCAS VILAR */}
-        <motion.div variants={item}>
-          <div className="flex items-center gap-2 mb-4">
-            <ShoppingCart className="h-4 w-4 text-primary" />
-            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Vendas Diretas</p>
-          </div>
-        </motion.div>
-
-        <motion.div variants={item} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <KPICard icon={DollarSign} label="Total Vendido" value={fmt(vendasAgg.totalVendido)} accentColor="hsl(38 90% 55%)" />
-          <KPICard icon={TrendingDown} label="Total Lucro" value={fmt(vendasAgg.totalLucro)} accentColor="hsl(160 100% 42%)" />
-          <KPICard icon={Percent} label="Margem Média" value={fmtPct(vendasAgg.margemMedia)} accentColor="hsl(210 80% 55%)" />
-          <KPICard icon={FileText} label="Notas Fiscais" value={String(vendasAgg.qtdNotas)} accentColor="hsl(215 30% 50%)" />
-        </motion.div>
+        {/* Seção de título para vendas detalhadas */}
 
         {/* TABELA DETALHADA */}
         <motion.div variants={item} className="bg-card border border-border rounded-xl p-6 shadow-card">
