@@ -605,66 +605,6 @@ export default function MeuPainel() {
           />
         </motion.div>
 
-        {/* RANKING PJ */}
-        {regime === 'PJ' && rankingPj.length > 0 && (
-          <motion.div variants={item} className="bg-card border border-border rounded-xl p-6 shadow-card">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Medal className="h-4 w-4 text-primary" />
-                <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Ranking PJ - Presença em Vendas</p>
-              </div>
-              {minhaPosicaoPj && (
-                <span className="text-xs font-bold text-primary bg-primary/10 px-3 py-1 rounded-full">
-                  #{minhaPosicaoPj.posicao} de {rankingPj.length}
-                </span>
-              )}
-            </div>
-            <div className="overflow-x-auto rounded-lg border border-border">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-secondary">
-                    <th className="px-4 py-3 text-left font-medium text-secondary-foreground">#</th>
-                    <th className="px-4 py-3 text-left font-medium text-secondary-foreground">Nome</th>
-                    <th className="px-4 py-3 text-left font-medium text-secondary-foreground">Unidade</th>
-                    <th className="px-4 py-3 text-right font-medium text-secondary-foreground">Qtd Vendas</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rankingPj.map((r) => {
-                    const isMe = nome_completo && r.nome.toLowerCase().trim() === nome_completo.toLowerCase().trim();
-                    return (
-                      <tr
-                        key={r.nome}
-                        className={`border-t border-border ${isMe ? 'bg-primary/10 font-bold' : 'hover:bg-secondary/50'}`}
-                      >
-                        <td className="px-4 py-3">
-                          {r.posicao <= 3 ? (
-                            <span className="text-primary font-black">{r.posicao}º</span>
-                          ) : (
-                            <span>{r.posicao}º</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          {r.nome}
-                          {isMe && <span className="ml-2 text-[10px] text-primary">(você)</span>}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">{r.unidade}</td>
-                        <td className="px-4 py-3 text-right">
-                          {r.nome_vendas ? r.qtd_vendas : <span className="text-muted-foreground text-xs">sem vínculo</span>}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            {rankingPj.some(r => !r.nome_vendas) && (
-              <p className="text-[10px] text-muted-foreground mt-2">
-                ⚠ Alguns vendedores não possuem vínculo com a tabela de vendas. Peça ao admin para preencher o campo "nome_vendas" no controle PJ.
-              </p>
-            )}
-          </motion.div>
-        )}
 
         {/* GRÁFICO VENDAS POR DIA */}
         <motion.div variants={item} className="bg-card border border-border rounded-xl p-8 shadow-card">
