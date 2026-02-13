@@ -14,9 +14,10 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-{ label: 'Ranking', to: '/ranking', icon: Trophy, roles: ['admin', 'vendedor'] },
-{ label: 'Meu Painel', to: '/meu-painel', icon: User, roles: ['vendedor'] },
-{ label: 'Gerencial', to: '/gerencial', icon: BarChart3, roles: ['admin'] }];
+  { label: 'Ranking', to: '/ranking', icon: Trophy, roles: ['admin', 'vendedor'] },
+  { label: 'Meu Painel', to: '/meu-painel', icon: User, roles: ['admin', 'vendedor'] },
+  { label: 'Gerencial', to: '/gerencial', icon: BarChart3, roles: ['admin'] },
+];
 
 
 const adminItems: NavItem[] = [
@@ -42,23 +43,23 @@ export function AppShell({ children, title }: {children: React.ReactNode;title: 
       </div>
 
       <nav className="flex-1 px-3 space-y-1">
-        {filteredNav.map((item) => {}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      )}
+        {filteredNav.map((navItem) => (
+          <NavLink
+            key={navItem.to}
+            to={navItem.to}
+            onClick={() => setSidebarOpen(false)}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors ${
+                isActive
+                  ? 'bg-sidebar-accent text-foreground border-l-2 border-primary'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+              }`
+            }
+          >
+            <navItem.icon className="h-4 w-4" />
+            {navItem.label}
+          </NavLink>
+        ))}
 
         {filteredAdmin.length > 0 &&
       <>
