@@ -90,6 +90,7 @@ export default function MeuPainel() {
   const { periodoAno, periodoMes } = usePeriod();
   const isAdmin = role === 'admin';
   const [showAllVendas, setShowAllVendas] = useState(false);
+  const [showAllProdutos, setShowAllProdutos] = useState(false);
 
   // ── Shared queries ──
 
@@ -325,6 +326,27 @@ export default function MeuPainel() {
 
   const displayedVendas = showAllVendas ? vendasTableData : vendasTableData.slice(0, 10);
   const remainingVendas = vendasTableData.length - 10;
+
+  // ── Produtos mais vendidos (agregação) ──
+  const topProdutos = (() => {
+    const map = new Map<string, { count: number; qty: number; total: number; marca: string }>();
+    vendasSource.forEach(v => {
+      const nome = v.descricao_produto ?? '';
+      if (!nome) return;
+      const current = map.get(nome) ?? { count: 0, qty: 0, total: 0, marca: v.marca ?? '—' };
+      map.set(nome, {
+        count: current.count + 1,
+        qty: current.qty + parseFloat((v.quantidade ?? '0').replace(',', '.') || '0'),
+        total: current.total + parseMoneyBR(v.total_com_desconto),
+        marca: current.marca,
+      });
+    });
+    return Array.from(map.entries())
+      .map(([nome, d], _i) => ({ nome, ...d }))
+      .sort((a, b) => b.count - a.count);
+  })();
+  const displayedProdutos = showAllProdutos ? topProdutos : topProdutos.slice(0, 10);
+  const remainingProdutos = topProdutos.length - 10;
 
   if (isLoading) {
     return (
@@ -680,6 +702,63 @@ export default function MeuPainel() {
             </ResponsiveContainer>
           ) : (
             <p className="text-muted-foreground text-center py-8">Sem dados de vendas</p>
+          )}
+        </motion.div>
+
+        {/* PRODUTOS MAIS VENDIDOS */}
+        <motion.div variants={item} className="bg-card border border-border rounded-xl p-6 shadow-card">
+          <div className="flex items-center gap-2 mb-4">
+            <ShoppingCart className="h-4 w-4 text-primary" />
+            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Produtos Mais Vendidos</p>
+          </div>
+          <div className="overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border">
+                  <TableHead className="w-12">#</TableHead>
+                  <TableHead>Produto</TableHead>
+                  <TableHead>Marca</TableHead>
+                  <TableHead className="text-right">Qtd Vendida</TableHead>
+                  <TableHead className="text-right">Total Arrecadado</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {displayedProdutos.map((p, i) => (
+                  <TableRow key={p.nome} className="border-border">
+                    <TableCell className="font-bold">{i + 1}</TableCell>
+                    <TableCell className="font-medium text-foreground">{p.nome}</TableCell>
+                    <TableCell className="text-muted-foreground">{p.marca}</TableCell>
+                    <TableCell className="text-right font-bold">{p.qty % 1 === 0 ? p.qty : p.qty.toFixed(2)}</TableCell>
+                    <TableCell className="text-right font-bold">{fmt(p.total)}</TableCell>
+                  </TableRow>
+                ))}
+                {topProdutos.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">Nenhum produto encontrado</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          {topProdutos.length > 10 && (
+            <div className="flex justify-center mt-4">
+              <button
+                onClick={() => setShowAllProdutos(!showAllProdutos)}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary hover:text-primary/80 bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors"
+              >
+                {showAllProdutos ? (
+                  <>
+                    <ChevronUp className="h-4 w-4" />
+                    Ver menos
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-4 w-4" />
+                    Ver mais ({remainingProdutos} restantes)
+                  </>
+                )}
+              </button>
+            </div>
           )}
         </motion.div>
 
