@@ -175,9 +175,27 @@ export default function MeuPainel() {
     return ranked.map((r, i) => ({ ...r, posicao: i + 1 }));
   })();
 
-  const minhaPosicaoPj = rankingPj.find(r => 
-    nome_completo && r.nome.toLowerCase().trim() === nome_completo.toLowerCase().trim()
-  );
+  // Buscar nome_omie do vendedor logado para match alternativo
+  const { data: vendedorLogado } = useQuery({
+    queryKey: ['vendedor-logado', vendedor_id],
+    enabled: !!vendedor_id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('vendedores')
+        .select('nome_omie')
+        .eq('id', vendedor_id!)
+        .maybeSingle();
+      return data;
+    },
+  });
+
+  const minhaPosicaoPj = rankingPj.find(r => {
+    // Match por nome_completo (controle_pj.nome)
+    if (nome_completo && r.nome.toLowerCase().trim() === nome_completo.toLowerCase().trim()) return true;
+    // Match por nome_omie (controle_pj.nome_vendas)
+    if (vendedorLogado?.nome_omie && r.nome_vendas && r.nome_vendas.toLowerCase().trim() === vendedorLogado.nome_omie.toLowerCase().trim()) return true;
+    return false;
+  });
 
   // Nova query: vendas_gerais
   const { data: vendasGeraisRaw } = useQuery({
