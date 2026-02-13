@@ -52,7 +52,7 @@ function CircularGauge({ value, size = 140, strokeWidth = 12, label = 'Margem' }
   const clamped = Math.min(Math.max(value, 0), 150);
   const displayPct = Math.min(clamped, 100);
   const offset = circumference - (displayPct / 100) * circumference;
-  const color = value >= 100 ? 'hsl(160 100% 42%)' : value >= 80 ? 'hsl(38 90% 55%)' : 'hsl(348 100% 62%)';
+  const color = value >= 75 ? 'hsl(160 100% 42%)' : value >= 50 ? 'hsl(38 90% 55%)' : 'hsl(348 100% 62%)';
 
   return (
     <div className="relative" style={{ width: size, height: size }}>
@@ -467,15 +467,15 @@ export default function MeuPainel() {
                 <div className="flex items-center gap-3 text-[10px]">
                   <span className="flex items-center gap-1">
                     <span className="h-2 w-2 rounded-full" style={{ background: 'hsl(160 100% 42%)' }} />
-                    ≥100%
+                    ≥75%
                   </span>
                   <span className="flex items-center gap-1">
                     <span className="h-2 w-2 rounded-full" style={{ background: 'hsl(38 90% 55%)' }} />
-                    ≥80%
+                    ≥50%
                   </span>
                   <span className="flex items-center gap-1">
                     <span className="h-2 w-2 rounded-full" style={{ background: 'hsl(348 100% 62%)' }} />
-                    &lt;80%
+                    &lt;50%
                   </span>
                 </div>
                 <p className="text-[10px] text-muted-foreground">Seu ticket: {fmt(ticketMedioIndividual)} | Média: {fmt(vendasGeraisAgg.ticketMedio)}</p>
