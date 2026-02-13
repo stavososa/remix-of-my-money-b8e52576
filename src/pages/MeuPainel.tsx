@@ -485,72 +485,38 @@ export default function MeuPainel() {
           </div>
         </motion.div>
 
-        {/* EVOLUÇÃO */}
+        {/* COMPARATIVO INDIVIDUAL VS EMPRESA */}
         <motion.div variants={item} className="bg-card border border-border rounded-xl p-8 shadow-card">
           <div className="flex items-center gap-2 mb-6">
-            <TrendingUp className="h-4 w-4 text-primary" />
-            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Evolução de Vendas</p>
+            <BarChart3 className="h-4 w-4 text-primary" />
+            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Seu Desempenho vs Empresa</p>
           </div>
-          {chartData.length > 1 ? (
+          {vendasGeraisAgg.qtdItens > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="gradVendido" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(38 90% 55%)" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="hsl(38 90% 55%)" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="gradComissao" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(160 100% 42%)" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="hsl(160 100% 42%)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
+              <BarChart
+                data={[
+                  { metrica: 'Total Vendido', individual: vendasAgg.totalVendido, geral: vendasGeraisAgg.totalGeral },
+                  { metrica: 'Ticket Médio', individual: ticketMedioIndividual, geral: vendasGeraisAgg.ticketMedio },
+                ]}
+                barGap={8}
+              >
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 40% 24%)" />
-                <XAxis dataKey="label" tick={{ fill: 'hsl(210 20% 60%)', fontSize: 12 }} />
-                <YAxis tick={{ fill: 'hsl(210 20% 60%)', fontSize: 12 }} tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} />
+                <XAxis dataKey="metrica" tick={{ fill: 'hsl(210 20% 60%)', fontSize: 12 }} />
+                <YAxis tick={{ fill: 'hsl(210 20% 60%)', fontSize: 12 }} tickFormatter={v => fmt(v)} />
                 <Tooltip
                   contentStyle={{ background: 'hsl(216 40% 14%)', border: '1px solid hsl(215 40% 24%)', borderRadius: 10 }}
                   labelStyle={{ color: '#fff', fontWeight: 600 }}
-                  formatter={(v: number, name: string) => [fmt(v), name === 'vendido' ? 'Total Vendido' : 'Comissão']}
+                  formatter={(v: number, name: string) => [fmt(v), name === 'individual' ? 'Você' : 'Empresa']}
                 />
-                <Legend formatter={v => (v === 'vendido' ? 'Total Vendido' : 'Comissão')} />
-                <Area
-                  type="monotone" dataKey="vendido" stroke="hsl(38 90% 55%)" fill="url(#gradVendido)"
-                  strokeWidth={2.5} dot={{ r: 3, fill: 'hsl(38 90% 55%)' }} activeDot={{ r: 6, strokeWidth: 2, stroke: 'hsl(38 90% 55%)' }}
-                />
-                <Area
-                  type="monotone" dataKey="comissao" stroke="hsl(160 100% 42%)" fill="url(#gradComissao)"
-                  strokeWidth={2.5} dot={{ r: 3, fill: 'hsl(160 100% 42%)' }} activeDot={{ r: 6, strokeWidth: 2, stroke: 'hsl(160 100% 42%)' }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : evolucaoDiaria.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={evolucaoDiaria}>
-                <defs>
-                  <linearGradient id="gradVendidoDiario" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(38 90% 55%)" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="hsl(38 90% 55%)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 40% 24%)" />
-                <XAxis dataKey="label" tick={{ fill: 'hsl(210 20% 60%)', fontSize: 11 }} />
-                <YAxis tick={{ fill: 'hsl(210 20% 60%)', fontSize: 12 }} tickFormatter={v => `R$${v.toFixed(0)}`} />
-                <Tooltip
-                  contentStyle={{ background: 'hsl(216 40% 14%)', border: '1px solid hsl(215 40% 24%)', borderRadius: 10 }}
-                  labelStyle={{ color: '#fff', fontWeight: 600 }}
-                  formatter={(v: number) => [fmt(v), 'Total Vendido']}
-                />
-                <Area
-                  type="monotone" dataKey="vendido" stroke="hsl(38 90% 55%)" fill="url(#gradVendidoDiario)"
-                  strokeWidth={2.5} dot={{ r: 4, fill: 'hsl(38 90% 55%)' }} activeDot={{ r: 6, strokeWidth: 2, stroke: 'hsl(38 90% 55%)' }}
-                />
-              </AreaChart>
+                <Legend formatter={v => (v === 'individual' ? 'Você' : 'Empresa')} />
+                <Bar dataKey="individual" fill="hsl(38 90% 55%)" radius={[6, 6, 0, 0]} name="individual" />
+                <Bar dataKey="geral" fill="hsl(270 60% 55%)" radius={[6, 6, 0, 0]} name="geral" />
+              </BarChart>
             </ResponsiveContainer>
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
-              <TrendingUp className="h-12 w-12 text-muted-foreground" />
-              <p className="text-muted-foreground">Evolução disponível a partir do próximo mês</p>
-              <p className="text-xs text-muted-foreground">Os dados serão comparados mês a mês automaticamente</p>
+              <BarChart3 className="h-12 w-12 text-muted-foreground" />
+              <p className="text-muted-foreground">Comparativo disponível quando houver dados gerais</p>
             </div>
           )}
         </motion.div>
