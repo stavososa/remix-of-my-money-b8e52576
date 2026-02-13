@@ -52,7 +52,7 @@ function CircularGauge({ value, size = 140, strokeWidth = 12, label = 'Margem' }
   const clamped = Math.min(Math.max(value, 0), 150);
   const displayPct = Math.min(clamped, 100);
   const offset = circumference - (displayPct / 100) * circumference;
-  const color = value >= 80 ? 'hsl(160 100% 42%)' : value >= 60 ? 'hsl(38 90% 55%)' : 'hsl(348 100% 62%)';
+  const color = value >= 80 ? 'hsl(160 100% 42%)' : value >= 50 ? 'hsl(38 90% 55%)' : 'hsl(348 100% 62%)';
 
   return (
     <div className="relative" style={{ width: size, height: size }}>
@@ -477,7 +477,7 @@ export default function MeuPainel() {
                   </span>
                   <span className="flex items-center gap-1">
                     <span className="h-2 w-2 rounded-full" style={{ background: 'hsl(38 90% 55%)' }} />
-                    ≥60%
+                    ≥50%
                   </span>
                   <span className="flex items-center gap-1">
                     <span className="h-2 w-2 rounded-full" style={{ background: 'hsl(348 100% 62%)' }} />
