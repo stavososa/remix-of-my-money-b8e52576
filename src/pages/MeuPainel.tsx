@@ -452,8 +452,7 @@ export default function MeuPainel() {
             <Store className="h-4 w-4 text-primary" />
             {isAdmin ? 'Média Geral de Vendas (Empresa)' : 'Média Geral de Vendas (Empresa)'}
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <KPICard icon={DollarSign} label="Total Geral Vendido" value={fmt(vendasGeraisAgg.totalGeral)} subtitle="Todas as vendas da empresa" accentColor="hsl(270 60% 55%)" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <KPICard icon={ShoppingCart} label="Ticket Médio Geral" value={fmt(vendasGeraisAgg.ticketMedio)} subtitle={isAdmin ? `Mediana: ${fmt(vendasGeraisAgg.mediana)}` : `Mediana: ${fmt(vendasGeraisAgg.mediana)} | Seu: ${fmt(ticketMedioIndividual)}`} accentColor="hsl(200 80% 50%)" />
             <KPICard icon={FileText} label="Qtd Total de Itens" value={String(vendasGeraisAgg.qtdItens)} subtitle={isAdmin ? 'Total de itens vendidos' : `Seus itens: ${vendasAgg.qtdItens}`} accentColor="hsl(330 70% 55%)" />
           </div>
