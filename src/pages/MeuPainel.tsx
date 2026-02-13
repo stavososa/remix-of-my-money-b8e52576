@@ -9,7 +9,7 @@ import { DollarSign, Target, Percent, FileText, TrendingUp, Trophy, Flame, BarCh
 import { motion } from 'framer-motion';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
-  BarChart, Bar,
+  BarChart, Bar, LineChart, Line, ReferenceLine,
 } from 'recharts';
 
 const parseMoneyBR = (str: string | null | undefined): number => {
@@ -46,12 +46,13 @@ const item = {
   show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' as const } },
 };
 
-function CircularGauge({ value, size = 140, strokeWidth = 12 }: { value: number; size?: number; strokeWidth?: number }) {
+function CircularGauge({ value, size = 140, strokeWidth = 12, label = 'Margem' }: { value: number; size?: number; strokeWidth?: number; label?: string }) {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const clamped = Math.min(Math.max(value, 0), 100);
-  const offset = circumference - (clamped / 100) * circumference;
-  const color = value >= 60 ? 'hsl(160 100% 42%)' : value >= 50 ? 'hsl(38 90% 55%)' : 'hsl(348 100% 62%)';
+  const clamped = Math.min(Math.max(value, 0), 150);
+  const displayPct = Math.min(clamped, 100);
+  const offset = circumference - (displayPct / 100) * circumference;
+  const color = value >= 100 ? 'hsl(160 100% 42%)' : value >= 80 ? 'hsl(38 90% 55%)' : 'hsl(348 100% 62%)';
 
   return (
     <div className="relative" style={{ width: size, height: size }}>
@@ -72,7 +73,7 @@ function CircularGauge({ value, size = 140, strokeWidth = 12 }: { value: number;
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="text-2xl font-extrabold text-foreground">{fmtPct(value)}</span>
-        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Margem</span>
+        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</span>
       </div>
     </div>
   );
@@ -457,27 +458,27 @@ export default function MeuPainel() {
             </div>
           </div>
 
-          {/* Margem Gauge */}
+          {/* Ticket vs Média Gauge */}
           <div className="bg-card border border-border rounded-xl p-8 shadow-card flex flex-col items-center text-center">
-            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">Margem Média</p>
-            {(meusDados || vendasAgg.margemMedia > 0) ? (
+            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">Seu Ticket vs Média</p>
+            {vendasGeraisAgg.ticketMedio > 0 ? (
               <div className="flex flex-col items-center gap-4">
-                <CircularGauge value={margem} />
+                <CircularGauge value={vendasGeraisAgg.ticketMedio > 0 ? (ticketMedioIndividual / vendasGeraisAgg.ticketMedio) * 100 : 0} label="vs Média" />
                 <div className="flex items-center gap-3 text-[10px]">
                   <span className="flex items-center gap-1">
                     <span className="h-2 w-2 rounded-full" style={{ background: 'hsl(160 100% 42%)' }} />
-                    ≥60%
+                    ≥100%
                   </span>
                   <span className="flex items-center gap-1">
                     <span className="h-2 w-2 rounded-full" style={{ background: 'hsl(38 90% 55%)' }} />
-                    ≥50%
+                    ≥80%
                   </span>
                   <span className="flex items-center gap-1">
                     <span className="h-2 w-2 rounded-full" style={{ background: 'hsl(348 100% 62%)' }} />
-                    &lt;50%
+                    &lt;80%
                   </span>
                 </div>
-                <p className="text-[10px] text-muted-foreground">Sua margem: {fmtPct(vendasAgg.margemMedia)}</p>
+                <p className="text-[10px] text-muted-foreground">Seu ticket: {fmt(ticketMedioIndividual)} | Média: {fmt(vendasGeraisAgg.ticketMedio)}</p>
               </div>
             ) : (
               <p className="text-2xl font-bold text-muted-foreground">—</p>
@@ -485,38 +486,38 @@ export default function MeuPainel() {
           </div>
         </motion.div>
 
-        {/* COMPARATIVO INDIVIDUAL VS EMPRESA */}
+        {/* VENDAS DA EMPRESA - LineChart */}
         <motion.div variants={item} className="bg-card border border-border rounded-xl p-8 shadow-card">
           <div className="flex items-center gap-2 mb-6">
             <BarChart3 className="h-4 w-4 text-primary" />
-            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Seu Desempenho vs Empresa</p>
+            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Vendas da Empresa</p>
           </div>
           {vendasGeraisAgg.qtdItens > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart
-                data={[
-                  { metrica: 'Total Vendido', individual: vendasAgg.totalVendido, geral: vendasGeraisAgg.totalGeral },
-                  { metrica: 'Ticket Médio', individual: ticketMedioIndividual, geral: vendasGeraisAgg.ticketMedio },
-                ]}
-                barGap={8}
+              <LineChart
+                data={(vendasGeraisRaw ?? [])
+                  .map(r => parseMoneyBR(r.total_mercadoria))
+                  .filter(v => v > 0)
+                  .sort((a, b) => a - b)
+                  .map((v, i) => ({ idx: i + 1, valor: v }))}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 40% 24%)" />
-                <XAxis dataKey="metrica" tick={{ fill: 'hsl(210 20% 60%)', fontSize: 12 }} />
+                <XAxis dataKey="idx" tick={{ fill: 'hsl(210 20% 60%)', fontSize: 11 }} label={{ value: 'Vendas (ordenadas)', position: 'insideBottom', offset: -5, fill: 'hsl(210 20% 60%)', fontSize: 11 }} />
                 <YAxis tick={{ fill: 'hsl(210 20% 60%)', fontSize: 12 }} tickFormatter={v => fmt(v)} />
                 <Tooltip
                   contentStyle={{ background: 'hsl(216 40% 14%)', border: '1px solid hsl(215 40% 24%)', borderRadius: 10 }}
                   labelStyle={{ color: '#fff', fontWeight: 600 }}
-                  formatter={(v: number, name: string) => [fmt(v), name === 'individual' ? 'Você' : 'Empresa']}
+                  labelFormatter={v => `Venda #${v}`}
+                  formatter={(v: number) => [fmt(v), 'Valor']}
                 />
-                <Legend formatter={v => (v === 'individual' ? 'Você' : 'Empresa')} />
-                <Bar dataKey="individual" fill="hsl(38 90% 55%)" radius={[6, 6, 0, 0]} name="individual" />
-                <Bar dataKey="geral" fill="hsl(270 60% 55%)" radius={[6, 6, 0, 0]} name="geral" />
-              </BarChart>
+                <ReferenceLine y={vendasGeraisAgg.ticketMedio} stroke="hsl(38 90% 55%)" strokeDasharray="6 4" strokeWidth={2} label={{ value: `Ticket Médio: ${fmt(vendasGeraisAgg.ticketMedio)}`, position: 'insideTopRight', fill: 'hsl(38 90% 55%)', fontSize: 11 }} />
+                <Line type="monotone" dataKey="valor" stroke="hsl(270 60% 55%)" strokeWidth={2} dot={false} />
+              </LineChart>
             </ResponsiveContainer>
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
               <BarChart3 className="h-12 w-12 text-muted-foreground" />
-              <p className="text-muted-foreground">Comparativo disponível quando houver dados gerais</p>
+              <p className="text-muted-foreground">Dados de vendas gerais indisponíveis</p>
             </div>
           )}
         </motion.div>
