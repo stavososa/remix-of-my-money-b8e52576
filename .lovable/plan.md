@@ -1,67 +1,79 @@
 
 
-# Ranking PJ - Contagem de Vendas via controle_pj
+## Painel Admin: Visao Geral com Ranking Completo
 
-## Problema
+### Problema Atual
+Quando a conta admin acessa `/meu-painel`, o painel tenta buscar dados de um vendedor especifico (hardcoded "LUCAS VILAR") e exibe o nome como apenas "admin", pois a conta admin nao possui `vendedor_id` associado.
 
-A tabela `controle_pj` tem nomes completos (ex: "Ana Thaynara Ferreira Rocha") mas `vendas.vendedor_nome` usa abreviacoes em maiusculo (ex: "ANA ROCHA"). Alguns casos sao impossiveis de deduzir automaticamente (ex: "Wallace Pereira da Cruz" vira "WALLACE SOL").
+### Solucao
 
-## Solucao
+Transformar o `/meu-painel` em um painel adaptativo que detecta a role do usuario:
+- **Admin**: Mostra visao geral da empresa com ranking completo de todos os vendedores
+- **Vendedor**: Mantem o comportamento atual (dados individuais)
 
-### Passo 1 - Migracaco: adicionar coluna `nome_vendas` em `controle_pj`
+### Mudancas no arquivo `src/pages/MeuPainel.tsx`
 
-Adicionar uma coluna `nome_vendas` (text, nullable) na tabela `controle_pj` que armazena o nome exato usado em `vendas.vendedor_nome`.
+#### 1. Importar `role` do AuthContext
+Adicionar `role` na desestruturacao do `useAuth()`.
 
-Pre-popular com os mapeamentos conhecidos usando a tabela `vendedores` como ponte (`controle_pj.nome` ~ `vendedores.nome_completo` -> `vendedores.nome_omie`).
+#### 2. Ajustar o Header para Admin
+- Exibir "Painel Administrativo" no lugar de "Ola, admin!"
+- Remover referencias a unidade/regime individuais
+- Mostrar KPIs agregados no header (total vendido geral, total lucro geral, margem media geral, total notas)
 
-```sql
-ALTER TABLE controle_pj ADD COLUMN nome_vendas text;
+#### 3. Buscar dados gerais (sem filtro de vendedor)
+- Para admin, a query de `vendas` nao filtra por `vendedor_nome` -- usa todos os registros
+- Os KPIs (Total Vendido, Lucro, Margem, Notas) serao calculados sobre TODAS as vendas
 
--- Pre-popular via vendedores (ponte confiavel)
-UPDATE controle_pj cp
-SET nome_vendas = v.nome_omie
-FROM vendedores v
-WHERE v.regime = 'PJ'
-  AND LOWER(TRIM(cp.nome)) = LOWER(TRIM(v.nome_completo));
-```
+#### 4. Substituir o card "Sua Posicao PJ" por um Ranking Completo
+Para admin, no lugar dos 3 cards (posicao PJ, comparativo, gauge), exibir uma tabela/listagem com:
+- Posicao (numero)
+- Nome do vendedor (vindo de `controle_pj.nome`)
+- Quantidade de vendas (contagem na tabela `vendas`)
+- Total arrecadado (soma de `total_com_desconto` ou `total_mercadoria`)
+- Medalhas para top 3
 
-Isso preenchera a maioria dos 31 registros. Nomes nao encontrados ficam NULL para o admin corrigir manualmente depois.
+#### 5. Manter graficos gerais
+- O grafico "Vendas da Empresa" continua mostrando todas as vendas por data
+- Remover a linha "Suas Vendas" do grafico (nao faz sentido para admin)
+- Manter as linhas de referencia (Media e Mediana)
 
-### Passo 2 - Nova query no MeuPainel.tsx
+#### 6. Tabela Detalhada e Vendas por Dia
+- Mostrar TODAS as vendas na tabela detalhada (sem filtro por vendedor)
+- Adicionar coluna "Vendedor" na tabela detalhada
+- Grafico "Vendas por Dia" com dados de todos os vendedores
 
-Adicionar uma query que:
-1. Busca todos os 31 registros de `controle_pj` (com `nome_vendas`)
-2. Para cada `nome_vendas` nao-nulo, conta quantas vezes aparece em `vendas.vendedor_nome`
-3. Ordena por quantidade DESC e atribui posicao
-
-### Passo 3 - Nova secao no UI do MeuPainel
-
-Adicionar uma secao "Ranking PJ - Presenca em Vendas" com:
-- Tabela: Posicao | Nome | Unidade | Qtd Vendas
-- Linha do vendedor logado destacada com fundo diferente
-- Badge no topo mostrando a posicao do usuario (ex: "#5 de 31")
-
-### Passo 4 - Identificar o vendedor logado na lista
-
-Usar o `nome_completo` do `AuthContext` para encontrar o registro correspondente em `controle_pj.nome` e destacar sua posicao.
-
-## Detalhes Tecnicos
+### Detalhes Tecnicos
 
 ```text
-Arquivo alterado: src/pages/MeuPainel.tsx
-
-Queries:
-  1. supabase.from('controle_pj').select('*')
-  2. supabase.from('vendas').select('vendedor_nome')
-     -> agrupar client-side por vendedor_nome com count
-
-Join client-side:
-  - Para cada controle_pj com nome_vendas, buscar count
-  - Ordenar DESC, atribuir posicao
-  - Localizar vendedor logado via nome_completo = controle_pj.nome
-
-Migracao SQL:
-  - ALTER TABLE controle_pj ADD COLUMN nome_vendas text
-  - UPDATE com join em vendedores para pre-popular
+Fluxo de decisao:
++------------------+
+|  useAuth().role  |
++--------+---------+
+         |
+    +----+----+
+    | admin?  |
+    +----+----+
+    Yes  |    No
+    |    |    |
+    v    |    v
+  Visao  | Visao
+  Geral  | Individual
+  (sem   | (comportamento
+  filtro)| atual)
 ```
+
+- Query `vendasAdmin`: busca TODAS as vendas sem filtro `vendedor_nome`, com `data_emissao`, `total_com_desconto`, `lucros_reais`, `margem_percentual`, `nota_fiscal`, `vendedor_nome`, `descricao_produto`, `marca`, `quantidade`
+- Ranking completo: usa os dados ja existentes de `rankingPj` (controle_pj + contagem de vendas), adicionando soma de valores arrecadados por vendedor
+- Condicional `role === 'admin'` para alternar entre os dois modos de exibicao em cada secao do JSX
+
+### Estrutura do Ranking (Admin)
+
+| # | Vendedor | Vendas | Total Arrecadado |
+|---|----------|--------|------------------|
+| 1 | Nome     | 150    | R$ 500.000,00    |
+| 2 | Nome     | 120    | R$ 400.000,00    |
+| 3 | Nome     | 100    | R$ 350.000,00    |
+
+Com medalhas visuais para as 3 primeiras posicoes e estilizacao consistente com o design atual (cores dark, bordas sutis, gradientes dourados para destaques).
 
