@@ -208,6 +208,19 @@ export default function MeuPainel() {
     },
   });
 
+  // Query: vendas com data_emissao para gráfico cronológico
+  const { data: vendasComDataRaw } = useQuery({
+    queryKey: ['vendas-com-data'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('vendas')
+        .select('data_emissao, total_mercadoria')
+        .not('data_emissao', 'is', null)
+        .order('data_emissao', { ascending: true });
+      return data ?? [];
+    },
+  });
+
   // Nova query: vendas_gerais (original kept)
 
   // Agregados de vendas_gerais
@@ -561,41 +574,64 @@ export default function MeuPainel() {
           </div>
         </motion.div>
 
-        {/* VENDAS DA EMPRESA - LineChart */}
+        {/* VENDAS DA EMPRESA - LineChart por Data */}
         <motion.div variants={item} className="bg-card border border-border rounded-xl p-8 shadow-card">
           <div className="flex items-center gap-2 mb-6">
             <BarChart3 className="h-4 w-4 text-primary" />
             <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Vendas da Empresa</p>
           </div>
-          {vendasGeraisAgg.qtdItens > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart
-                data={(vendasGeraisRaw ?? [])
-                  .map(r => parseMoneyBR(r.total_mercadoria))
-                  .filter(v => v > 0)
-                  .sort((a, b) => a - b)
-                  .map((v, i) => ({ idx: i + 1, valor: v }))}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 40% 24%)" />
-                <XAxis dataKey="idx" tick={{ fill: 'hsl(210 20% 60%)', fontSize: 11 }} label={{ value: 'Vendas (ordenadas)', position: 'insideBottom', offset: -5, fill: 'hsl(210 20% 60%)', fontSize: 11 }} />
-                <YAxis tick={{ fill: 'hsl(210 20% 60%)', fontSize: 12 }} tickFormatter={v => fmt(v)} />
-                <Tooltip
-                  contentStyle={{ background: 'hsl(216 40% 14%)', border: '1px solid hsl(215 40% 24%)', borderRadius: 10 }}
-                  labelStyle={{ color: '#fff', fontWeight: 600 }}
-                  labelFormatter={v => `Venda #${v}`}
-                  formatter={(v: number) => [fmt(v), 'Valor']}
-                />
-                <ReferenceLine y={vendasGeraisAgg.mediana} stroke="hsl(160 100% 42%)" strokeDasharray="6 4" strokeWidth={2} label={{ value: `Mediana: ${fmt(vendasGeraisAgg.mediana)}`, position: 'insideTopRight', fill: 'hsl(160 100% 42%)', fontSize: 11 }} />
-                <ReferenceLine y={vendasGeraisAgg.ticketMedio} stroke="hsl(38 90% 55%)" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: `Média: ${fmt(vendasGeraisAgg.ticketMedio)}`, position: 'insideBottomRight', fill: 'hsl(38 90% 55%)', fontSize: 10 }} />
-                <Line type="monotone" dataKey="valor" stroke="hsl(270 60% 55%)" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
-              <BarChart3 className="h-12 w-12 text-muted-foreground" />
-              <p className="text-muted-foreground">Dados de vendas gerais indisponíveis</p>
-            </div>
-          )}
+          {(() => {
+            // Agrupar vendas por data_emissao
+            const rows = vendasComDataRaw ?? [];
+            const mapDia: Record<string, number> = {};
+            rows.forEach(r => {
+              const dateStr = r.data_emissao ?? '';
+              if (!dateStr) return;
+              const val = parseMoneyBR(r.total_mercadoria);
+              if (val <= 0) return;
+              mapDia[dateStr] = (mapDia[dateStr] ?? 0) + val;
+            });
+
+            // Ordenar cronologicamente
+            const chartDataEmpresa = Object.entries(mapDia)
+              .sort(([a], [b]) => {
+                // Lidar com formato YYYY-MM-DD (padrão postgres date)
+                return a.localeCompare(b);
+              })
+              .map(([dateStr, total]) => {
+                // Formatar para DD/MM
+                const parts = dateStr.split('-');
+                const label = parts.length === 3 ? `${parts[2]}/${parts[1]}` : dateStr;
+                return { label, total };
+              });
+
+            if (chartDataEmpresa.length === 0) {
+              return (
+                <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
+                  <BarChart3 className="h-12 w-12 text-muted-foreground" />
+                  <p className="text-muted-foreground">Dados de vendas gerais indisponíveis</p>
+                </div>
+              );
+            }
+
+            return (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={chartDataEmpresa}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 40% 24%)" />
+                  <XAxis dataKey="label" tick={{ fill: 'hsl(210 20% 60%)', fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
+                  <YAxis tick={{ fill: 'hsl(210 20% 60%)', fontSize: 12 }} tickFormatter={v => fmt(v)} />
+                  <Tooltip
+                    contentStyle={{ background: 'hsl(216 40% 14%)', border: '1px solid hsl(215 40% 24%)', borderRadius: 10 }}
+                    labelStyle={{ color: '#fff', fontWeight: 600 }}
+                    formatter={(v: number) => [fmt(v), 'Total Vendido']}
+                  />
+                  <ReferenceLine y={vendasGeraisAgg.mediana} stroke="hsl(160 100% 42%)" strokeDasharray="6 4" strokeWidth={2} label={{ value: `Mediana: ${fmt(vendasGeraisAgg.mediana)}`, position: 'insideTopRight', fill: 'hsl(160 100% 42%)', fontSize: 11 }} />
+                  <ReferenceLine y={vendasGeraisAgg.ticketMedio} stroke="hsl(38 90% 55%)" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: `Média: ${fmt(vendasGeraisAgg.ticketMedio)}`, position: 'insideBottomRight', fill: 'hsl(38 90% 55%)', fontSize: 10 }} />
+                  <Line type="monotone" dataKey="total" stroke="hsl(270 60% 55%)" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            );
+          })()}
         </motion.div>
 
         {/* TABELA DETALHADA */}
