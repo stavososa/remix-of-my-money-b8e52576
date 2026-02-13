@@ -1,44 +1,50 @@
 
 
-# Ajustar Margem Media e Grafico de Desempenho
+# Ajustar Limiares do Gauge "Seu Ticket vs Media"
 
-## Problema Atual
-1. **Margem Media (Gauge)**: Esta usando `margem_percentual` (margem de lucro) que nao faz sentido como comparativo. O usuario quer ver **quanto % o ticket medio do Lucas representa em relacao ao ticket medio geral**.
-2. **Seu Desempenho vs Empresa**: Esta como BarChart comparativo. O usuario quer **somente um grafico de linha mostrando as vendas da empresa** (cada registro de `vendas_gerais`).
+## Contexto da Analise
+
+Com base na analise estatistica feita anteriormente:
+- A **media** das vendas gerais (R$ 46,62) e inflada por outliers (top 10% > R$ 100).
+- A **mediana** real e R$ 36,00 -- ou seja, metade das vendas esta abaixo disso.
+- 61% das vendas estao abaixo de R$ 40.
+- O ticket do Lucas (R$ 25,04) representa ~53,7% da media, mas esta dentro da faixa mais comum de vendas (R$ 20-40).
+
+Os limiares atuais (verde >= 100%, dourado >= 80%, vermelho < 80%) sao irrealistas porque a media e distorcida por valores extremos.
 
 ## Mudancas no arquivo `src/pages/MeuPainel.tsx`
 
-### 1. Alterar o Gauge "Margem Media" (linhas 460-485)
+### 1. Ajustar limiares na funcao `CircularGauge` (linha 55)
 
-- **Renomear** de "Margem Media" para "Seu Ticket vs Media"
-- **Novo calculo**: `(ticketMedioIndividual / vendasGeraisAgg.ticketMedio) * 100`
-  - Exemplo: (R$ 25,04 / R$ 46,62) * 100 = ~53.7%
-  - Isso mostra que o ticket medio do Lucas esta em 53.7% da media geral
-- **Faixas de cor** permanecem as mesmas (verde >= 100%, dourado >= 80%, vermelho < 80%) -- ajustar para refletir que 100% = na media
-- **Texto interno**: mostrar o percentual e "vs Media" em vez de "Margem"
-- **Legenda abaixo**: "Seu ticket: R$ 25,04 | Media: R$ 46,62"
+**Antes:**
+```
+value >= 100 ? verde : value >= 80 ? dourado : vermelho
+```
 
-### 2. Alterar "Seu Desempenho vs Empresa" (linhas 488-522)
+**Depois:**
+```
+value >= 75 ? verde : value >= 50 ? dourado : vermelho
+```
 
-- **Remover** o BarChart comparativo com barras lado a lado
-- **Substituir** por um **LineChart** (grafico de linha) mostrando todas as 468 vendas da empresa (`vendas_gerais`)
-- Cada ponto no grafico = um registro de `vendas_gerais`, ordenado por valor
-- Eixo X: indice da venda (1 a 468)
-- Eixo Y: valor de `total_mercadoria`
-- Uma unica linha roxa representando a distribuicao de vendas da empresa
-- Adicionar uma linha de referencia horizontal mostrando o ticket medio geral (linha tracejada)
-- **Renomear** para "Vendas da Empresa"
+Justificativa:
+- **Verde (>= 75%)**: Equivale a ~R$ 35, proximo da mediana real. O vendedor esta na metade superior da distribuicao.
+- **Dourado (>= 50%)**: Equivale a ~R$ 23. O vendedor esta dentro do padrao normal de vendas.
+- **Vermelho (< 50%)**: Abaixo de R$ 23, significativamente abaixo do padrao.
 
-### 3. Remover referencia a `margem_percentual` dos KPIs de comparacao
+Com isso, Lucas (53,7%) passaria de **vermelho para dourado** -- refletindo que ele esta dentro do padrao, mas com espaco para melhorar.
 
-- O KPI Card "Margem Media" nos cards superiores (linha 302) continua mostrando a margem de lucro individual -- isso e informativo e correto como dado individual
-- Apenas o **gauge circular** muda para o comparativo de ticket
+### 2. Atualizar legendas do gauge (linhas 469-479)
 
-## Detalhes Tecnicos
+Trocar os textos das legendas de cor:
+- Verde: `>=75%`
+- Dourado: `>=50%`
+- Vermelho: `<50%`
 
-- Dados para o LineChart: `vendasGeraisRaw.map(r => parseMoneyBR(r.total_mercadoria)).sort((a,b) => a-b).map((v, i) => ({ idx: i+1, valor: v }))`
-- Gauge: `const gaugeValue = vendasGeraisAgg.ticketMedio > 0 ? (ticketMedioIndividual / vendasGeraisAgg.ticketMedio) * 100 : 0`
-- Novas faixas do gauge: >= 100% verde (acima da media), >= 80% dourado (proximo), < 80% vermelho (abaixo)
-- Usar `ReferenceLine` do recharts para a linha tracejada do ticket medio
-- Nenhuma dependencia nova necessaria
+### 3. Atualizar o clamp maximo do gauge (linha 52)
+
+Manter o clamp em 150 para permitir que vendedores acima da media tenham o arco completo e um pouco alem.
+
+## Resultado
+
+O gauge vai refletir a realidade estatistica da distribuicao de vendas, sem penalizar vendedores que estao dentro da faixa normal so porque a media e puxada por outliers.
 
