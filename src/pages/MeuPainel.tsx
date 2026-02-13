@@ -581,28 +581,35 @@ export default function MeuPainel() {
             <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Vendas da Empresa</p>
           </div>
           {(() => {
-            // Agrupar vendas por data_emissao
+            // Agrupar vendas da empresa por data_emissao
             const rows = vendasComDataRaw ?? [];
-            const mapDia: Record<string, number> = {};
+            const mapEmpresa: Record<string, number> = {};
             rows.forEach(r => {
               const dateStr = r.data_emissao ?? '';
               if (!dateStr) return;
               const val = parseMoneyBR(r.total_mercadoria);
               if (val <= 0) return;
-              mapDia[dateStr] = (mapDia[dateStr] ?? 0) + val;
+              mapEmpresa[dateStr] = (mapEmpresa[dateStr] ?? 0) + val;
             });
 
-            // Ordenar cronologicamente
-            const chartDataEmpresa = Object.entries(mapDia)
-              .sort(([a], [b]) => {
-                // Lidar com formato YYYY-MM-DD (padrão postgres date)
-                return a.localeCompare(b);
-              })
-              .map(([dateStr, total]) => {
-                // Formatar para DD/MM
+            // Agrupar vendas do vendedor logado por data_emissao
+            const mapVendedor: Record<string, number> = {};
+            (vendasLucas ?? []).forEach(r => {
+              const dateStr = r.data_emissao ?? '';
+              if (!dateStr) return;
+              const val = parseMoneyBR(r.total_com_desconto);
+              if (val <= 0) return;
+              mapVendedor[dateStr] = (mapVendedor[dateStr] ?? 0) + val;
+            });
+
+            // Unir todas as datas
+            const allDates = new Set([...Object.keys(mapEmpresa), ...Object.keys(mapVendedor)]);
+            const chartDataEmpresa = Array.from(allDates)
+              .sort((a, b) => a.localeCompare(b))
+              .map(dateStr => {
                 const parts = dateStr.split('-');
                 const label = parts.length === 3 ? `${parts[2]}/${parts[1]}` : dateStr;
-                return { label, total };
+                return { label, empresa: mapEmpresa[dateStr] ?? 0, vendedor: mapVendedor[dateStr] ?? 0 };
               });
 
             if (chartDataEmpresa.length === 0) {
@@ -623,11 +630,13 @@ export default function MeuPainel() {
                   <Tooltip
                     contentStyle={{ background: 'hsl(216 40% 14%)', border: '1px solid hsl(215 40% 24%)', borderRadius: 10 }}
                     labelStyle={{ color: '#fff', fontWeight: 600 }}
-                    formatter={(v: number) => [fmt(v), 'Total Vendido']}
+                    formatter={(v: number, name: string) => [fmt(v), name === 'empresa' ? 'Empresa' : 'Suas Vendas']}
                   />
+                  <Legend formatter={(value) => value === 'empresa' ? 'Empresa' : 'Suas Vendas'} />
                   <ReferenceLine y={vendasGeraisAgg.mediana} stroke="hsl(160 100% 42%)" strokeDasharray="6 4" strokeWidth={2} label={{ value: `Mediana: ${fmt(vendasGeraisAgg.mediana)}`, position: 'insideTopRight', fill: 'hsl(160 100% 42%)', fontSize: 11 }} />
                   <ReferenceLine y={vendasGeraisAgg.ticketMedio} stroke="hsl(38 90% 55%)" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: `Média: ${fmt(vendasGeraisAgg.ticketMedio)}`, position: 'insideBottomRight', fill: 'hsl(38 90% 55%)', fontSize: 10 }} />
-                  <Line type="monotone" dataKey="total" stroke="hsl(270 60% 55%)" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="empresa" stroke="hsl(270 60% 55%)" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="vendedor" stroke="hsl(38 90% 55%)" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             );
