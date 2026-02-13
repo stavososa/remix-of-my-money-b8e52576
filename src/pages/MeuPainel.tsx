@@ -404,37 +404,6 @@ export default function MeuPainel() {
                 </div>
               )}
             </div>
-            {/* Mini KPIs inline */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="flex items-center gap-2 bg-secondary/50 rounded-lg px-3 py-2">
-                <DollarSign className="h-3.5 w-3.5 text-primary" />
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase">Vendido</p>
-                  <p className="text-sm font-bold text-foreground">{fmt(vendasAgg.totalVendido)}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 bg-secondary/50 rounded-lg px-3 py-2">
-                <TrendingUp className="h-3.5 w-3.5" style={{ color: 'hsl(160 100% 42%)' }} />
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase">Lucro</p>
-                  <p className="text-sm font-bold text-foreground">{fmt(vendasAgg.totalLucro)}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 bg-secondary/50 rounded-lg px-3 py-2">
-                <Percent className="h-3.5 w-3.5" style={{ color: 'hsl(210 80% 55%)' }} />
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase">Margem</p>
-                  <p className="text-sm font-bold text-foreground">{fmtPct(vendasAgg.margemMedia)}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 bg-secondary/50 rounded-lg px-3 py-2">
-                <FileText className="h-3.5 w-3.5" style={{ color: 'hsl(215 30% 50%)' }} />
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase">Notas</p>
-                  <p className="text-sm font-bold text-foreground">{vendasAgg.qtdNotas}</p>
-                </div>
-              </div>
-            </div>
           </div>
         </motion.div>
 
