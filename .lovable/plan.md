@@ -1,40 +1,67 @@
 
 
-# Reverter Gauge e Comparativo para usar Media (ticketMedio)
+# Ranking PJ - Contagem de Vendas via controle_pj
 
-## O que muda
+## Problema
 
-Ambas as secoes -- o **Gauge "Seu Ticket vs Mediana"** e o **"Voce vs Mediana da Empresa"** -- voltam a usar a **media aritmetica** (`ticketMedio`) como baseline de comparacao, em vez da mediana.
+A tabela `controle_pj` tem nomes completos (ex: "Ana Thaynara Ferreira Rocha") mas `vendas.vendedor_nome` usa abreviacoes em maiusculo (ex: "ANA ROCHA"). Alguns casos sao impossiveis de deduzir automaticamente (ex: "Wallace Pereira da Cruz" vira "WALLACE SOL").
 
-## Mudancas no arquivo `src/pages/MeuPainel.tsx`
+## Solucao
 
-### 1. Calculos comparativos (linhas 210-214)
+### Passo 1 - Migracaco: adicionar coluna `nome_vendas` em `controle_pj`
 
-Reverter de `vendasGeraisAgg.mediana` para `vendasGeraisAgg.ticketMedio`:
+Adicionar uma coluna `nome_vendas` (text, nullable) na tabela `controle_pj` que armazena o nome exato usado em `vendas.vendedor_nome`.
 
-```typescript
-const barMaxTicket = Math.max(ticketMedioIndividual, vendasGeraisAgg.ticketMedio, 1);
-const meuTicketPct = (ticketMedioIndividual / barMaxTicket) * 100;
-const geralTicketPct = (vendasGeraisAgg.ticketMedio / barMaxTicket) * 100;
-const diffTicket = ticketMedioIndividual - vendasGeraisAgg.ticketMedio;
+Pre-popular com os mapeamentos conhecidos usando a tabela `vendedores` como ponte (`controle_pj.nome` ~ `vendedores.nome_completo` -> `vendedores.nome_omie`).
+
+```sql
+ALTER TABLE controle_pj ADD COLUMN nome_vendas text;
+
+-- Pre-popular via vendedores (ponte confiavel)
+UPDATE controle_pj cp
+SET nome_vendas = v.nome_omie
+FROM vendedores v
+WHERE v.regime = 'PJ'
+  AND LOWER(TRIM(cp.nome)) = LOWER(TRIM(v.nome_completo));
 ```
 
-### 2. Secao "Voce vs Mediana da Empresa" (linhas 397-464)
+Isso preenchera a maioria dos 31 registros. Nomes nao encontrados ficam NULL para o admin corrigir manualmente depois.
 
-- Renomear para **"Voce vs Media da Empresa"**
-- Barra inferior mostra **Media Geral** com valor `vendasGeraisAgg.ticketMedio`
-- Mensagens: "Falta R$ X por item para a media" / "Acima da media!"
-- Nota inferior: "Media: R$ X | Mediana: R$ Y" (mantém ambos para contexto)
+### Passo 2 - Nova query no MeuPainel.tsx
 
-### 3. Gauge (linhas 467-492)
+Adicionar uma query que:
+1. Busca todos os 31 registros de `controle_pj` (com `nome_vendas`)
+2. Para cada `nome_vendas` nao-nulo, conta quantas vezes aparece em `vendas.vendedor_nome`
+3. Ordena por quantidade DESC e atribui posicao
 
-- Renomear para **"Seu Ticket vs Media"**
-- Calculo: `(ticketMedioIndividual / vendasGeraisAgg.ticketMedio) * 100`
-- Label: "vs Media"
-- Texto inferior: "Seu ticket: R$ X | Media: R$ Y"
-- Manter os limiares atuais (>=90% verde, >=65% dourado, <65% vermelho)
+### Passo 3 - Nova secao no UI do MeuPainel
 
-### Resumo
+Adicionar uma secao "Ranking PJ - Presenca em Vendas" com:
+- Tabela: Posicao | Nome | Unidade | Qtd Vendas
+- Linha do vendedor logado destacada com fundo diferente
+- Badge no topo mostrando a posicao do usuario (ex: "#5 de 31")
 
-Todas as referencias a "mediana" nos calculos e labels voltam para "media". O calculo da mediana continua existindo no `vendasGeraisAgg` e aparece como informacao complementar na nota de rodape e na ReferenceLine do grafico.
+### Passo 4 - Identificar o vendedor logado na lista
+
+Usar o `nome_completo` do `AuthContext` para encontrar o registro correspondente em `controle_pj.nome` e destacar sua posicao.
+
+## Detalhes Tecnicos
+
+```text
+Arquivo alterado: src/pages/MeuPainel.tsx
+
+Queries:
+  1. supabase.from('controle_pj').select('*')
+  2. supabase.from('vendas').select('vendedor_nome')
+     -> agrupar client-side por vendedor_nome com count
+
+Join client-side:
+  - Para cada controle_pj com nome_vendas, buscar count
+  - Ordenar DESC, atribuir posicao
+  - Localizar vendedor logado via nome_completo = controle_pj.nome
+
+Migracao SQL:
+  - ALTER TABLE controle_pj ADD COLUMN nome_vendas text
+  - UPDATE com join em vendedores para pre-popular
+```
 
