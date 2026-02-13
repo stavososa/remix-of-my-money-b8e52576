@@ -61,6 +61,14 @@ export default function Gerencial() {
 
   const isLoading = loadR || loadU || loadRg;
 
+  // --- Ranked units by total sold ---
+  const unidadesRanked = useMemo(() => {
+    const src = filtroUnidade !== 'all'
+      ? resumoUnidade.filter(u => u.unidade_nome === filtroUnidade)
+      : resumoUnidade;
+    return [...src].sort((a, b) => Number(b.total_vendido ?? 0) - Number(a.total_vendido ?? 0));
+  }, [resumoUnidade, filtroUnidade]);
+
   // --- Unique filter values ---
   const unidades = useMemo(() => {
     const names = [...new Set(ranking.map(r => r.unidade_nome).filter(Boolean))] as string[];
@@ -237,6 +245,40 @@ export default function Gerencial() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <RegimeCard data={pjData} regime="PJ" borderClass="border-primary" />
             <RegimeCard data={cltData} regime="CLT" borderClass="border-blue-500" />
+          </div>
+        )}
+
+        {/* Unidades que Mais Venderam */}
+        {unidadesRanked.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold text-secondary-foreground">Unidades que Mais Venderam</h3>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              {unidadesRanked.map((u, i) => {
+                const pos = i + 1;
+                const borderColor = pos === 1 ? 'border-yellow-500' : pos === 2 ? 'border-gray-400' : pos === 3 ? 'border-amber-700' : 'border-border';
+                const bgHighlight = pos <= 3 ? 'bg-primary/5' : '';
+                return (
+                  <div
+                    key={u.unidade_id ?? i}
+                    className={`bg-card border-2 ${borderColor} ${bgHighlight} rounded-lg p-4 shadow-card transition-transform hover:scale-[1.02]`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-lg font-bold">{medalha(pos <= 3 ? pos : null) !== '—' ? medalha(pos) : `${pos}º`}</span>
+                      {u.unidade_tipo && <StatusBadge status={u.unidade_tipo} />}
+                    </div>
+                    <p className="font-semibold text-foreground text-sm truncate mb-2">{u.unidade_nome}</p>
+                    <p className="text-lg font-bold text-primary mb-1">{fmt(u.total_vendido)}</p>
+                    <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
+                      <span>{u.qtd_vendedores ?? 0} vendedores</span>
+                      <span>Margem {fmtPct(u.margem_media)}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
