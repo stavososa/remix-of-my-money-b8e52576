@@ -19,6 +19,7 @@ export type Database = {
           cnpj: string | null
           id: number
           nome: string
+          nome_vendas: string | null
           setor: string | null
           unidade: string | null
         }
@@ -26,6 +27,7 @@ export type Database = {
           cnpj?: string | null
           id?: number
           nome: string
+          nome_vendas?: string | null
           setor?: string | null
           unidade?: string | null
         }
@@ -33,6 +35,7 @@ export type Database = {
           cnpj?: string | null
           id?: number
           nome?: string
+          nome_vendas?: string | null
           setor?: string | null
           unidade?: string | null
         }

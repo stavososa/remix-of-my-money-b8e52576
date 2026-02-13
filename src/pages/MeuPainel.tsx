@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usePeriod } from '@/contexts/PeriodContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { DollarSign, Target, Percent, FileText, TrendingUp, Trophy, Flame, BarChart3, ShoppingCart, TrendingDown, Store } from 'lucide-react';
+import { DollarSign, Target, Percent, FileText, TrendingUp, Trophy, Flame, BarChart3, ShoppingCart, TrendingDown, Store, Medal } from 'lucide-react';
 import { motion } from 'framer-motion';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
@@ -123,6 +123,62 @@ export default function MeuPainel() {
     },
   });
 
+  // Query: controle_pj (ranking PJ)
+  const { data: controlePj } = useQuery({
+    queryKey: ['controle-pj'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('controle_pj')
+        .select('*');
+      return data ?? [];
+    },
+  });
+
+  // Query: contagem de vendas por vendedor_nome (para ranking PJ)
+  const nomeVendasList = (controlePj ?? []).map(c => (c as any).nome_vendas).filter(Boolean) as string[];
+  const { data: vendasCountRaw } = useQuery({
+    queryKey: ['vendas-count-pj', nomeVendasList.sort().join(',')],
+    enabled: nomeVendasList.length > 0,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('vendas')
+        .select('vendedor_nome')
+        .in('vendedor_nome', nomeVendasList);
+      return data ?? [];
+    },
+  });
+
+  // Ranking PJ: contar vendas e ordenar
+  const rankingPj = (() => {
+    const pjList = controlePj ?? [];
+    const vendasRows = vendasCountRaw ?? [];
+    
+    // Contar vendas por vendedor_nome
+    const countMap: Record<string, number> = {};
+    vendasRows.forEach(v => {
+      const nome = v.vendedor_nome ?? '';
+      countMap[nome] = (countMap[nome] ?? 0) + 1;
+    });
+
+    // Montar ranking
+    const ranked = pjList.map(pj => ({
+      nome: pj.nome,
+      unidade: pj.unidade ?? '—',
+      nome_vendas: (pj as any).nome_vendas as string | null,
+      qtd_vendas: (pj as any).nome_vendas ? (countMap[(pj as any).nome_vendas] ?? 0) : 0,
+    }));
+
+    // Ordenar por qtd_vendas DESC
+    ranked.sort((a, b) => b.qtd_vendas - a.qtd_vendas);
+
+    // Atribuir posição
+    return ranked.map((r, i) => ({ ...r, posicao: i + 1 }));
+  })();
+
+  const minhaPosicaoPj = rankingPj.find(r => 
+    nome_completo && r.nome.toLowerCase().trim() === nome_completo.toLowerCase().trim()
+  );
+
   // Nova query: vendas_gerais
   const { data: vendasGeraisRaw } = useQuery({
     queryKey: ['vendas-gerais'],
@@ -133,6 +189,8 @@ export default function MeuPainel() {
       return data ?? [];
     },
   });
+
+  // Nova query: vendas_gerais (original kept)
 
   // Agregados de vendas_gerais
   const vendasGeraisAgg = (() => {
@@ -546,6 +604,67 @@ export default function MeuPainel() {
             data={vendasTableData}
           />
         </motion.div>
+
+        {/* RANKING PJ */}
+        {regime === 'PJ' && rankingPj.length > 0 && (
+          <motion.div variants={item} className="bg-card border border-border rounded-xl p-6 shadow-card">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Medal className="h-4 w-4 text-primary" />
+                <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Ranking PJ - Presença em Vendas</p>
+              </div>
+              {minhaPosicaoPj && (
+                <span className="text-xs font-bold text-primary bg-primary/10 px-3 py-1 rounded-full">
+                  #{minhaPosicaoPj.posicao} de {rankingPj.length}
+                </span>
+              )}
+            </div>
+            <div className="overflow-x-auto rounded-lg border border-border">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-secondary">
+                    <th className="px-4 py-3 text-left font-medium text-secondary-foreground">#</th>
+                    <th className="px-4 py-3 text-left font-medium text-secondary-foreground">Nome</th>
+                    <th className="px-4 py-3 text-left font-medium text-secondary-foreground">Unidade</th>
+                    <th className="px-4 py-3 text-right font-medium text-secondary-foreground">Qtd Vendas</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rankingPj.map((r) => {
+                    const isMe = nome_completo && r.nome.toLowerCase().trim() === nome_completo.toLowerCase().trim();
+                    return (
+                      <tr
+                        key={r.nome}
+                        className={`border-t border-border ${isMe ? 'bg-primary/10 font-bold' : 'hover:bg-secondary/50'}`}
+                      >
+                        <td className="px-4 py-3">
+                          {r.posicao <= 3 ? (
+                            <span className="text-primary font-black">{r.posicao}º</span>
+                          ) : (
+                            <span>{r.posicao}º</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {r.nome}
+                          {isMe && <span className="ml-2 text-[10px] text-primary">(você)</span>}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">{r.unidade}</td>
+                        <td className="px-4 py-3 text-right">
+                          {r.nome_vendas ? r.qtd_vendas : <span className="text-muted-foreground text-xs">sem vínculo</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {rankingPj.some(r => !r.nome_vendas) && (
+              <p className="text-[10px] text-muted-foreground mt-2">
+                ⚠ Alguns vendedores não possuem vínculo com a tabela de vendas. Peça ao admin para preencher o campo "nome_vendas" no controle PJ.
+              </p>
+            )}
+          </motion.div>
+        )}
 
         {/* GRÁFICO VENDAS POR DIA */}
         <motion.div variants={item} className="bg-card border border-border rounded-xl p-8 shadow-card">
