@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { KPICard } from '@/components/KPICard';
 import { DataTable } from '@/components/DataTable';
@@ -5,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usePeriod } from '@/contexts/PeriodContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { DollarSign, Target, Percent, FileText, TrendingUp, Trophy, Flame, BarChart3, ShoppingCart, TrendingDown, Store, Medal } from 'lucide-react';
+import { DollarSign, Target, Percent, FileText, TrendingUp, Trophy, Flame, BarChart3, ShoppingCart, TrendingDown, Store, Medal, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion } from 'framer-motion';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
@@ -88,6 +89,7 @@ export default function MeuPainel() {
   const { vendedor_id, nome_completo, unidade_nome, regime, role } = useAuth();
   const { periodoAno, periodoMes } = usePeriod();
   const isAdmin = role === 'admin';
+  const [showAllVendas, setShowAllVendas] = useState(false);
 
   // ── Shared queries ──
 
@@ -312,12 +314,17 @@ export default function MeuPainel() {
   const diffAcima = acima ? Number(acima.total_vendido ?? 0) - meuTotal : 0;
   const diffAbaixo = abaixo ? meuTotal - Number(abaixo.total_vendido ?? 0) : 0;
 
-  const barMaxTicket = Math.max(ticketMedioIndividual, vendasGeraisAgg.ticketMedio, 1);
-  const meuTicketPct = (ticketMedioIndividual / barMaxTicket) * 100;
+  // For admin, use global ticket medio for comparisons
+  const displayTicket = isAdmin ? vendasGeraisAgg.ticketMedio : ticketMedioIndividual;
+  const barMaxTicket = Math.max(displayTicket, vendasGeraisAgg.ticketMedio, 1);
+  const meuTicketPct = (displayTicket / barMaxTicket) * 100;
   const geralTicketPct = (vendasGeraisAgg.ticketMedio / barMaxTicket) * 100;
-  const diffTicket = ticketMedioIndividual - vendasGeraisAgg.ticketMedio;
+  const diffTicket = displayTicket - vendasGeraisAgg.ticketMedio;
 
-  const margem = meusDados?.margem_media ? Number(meusDados.margem_media) : vendasAgg.margemMedia;
+  const margem = isAdmin ? vendasAgg.margemMedia : (meusDados?.margem_media ? Number(meusDados.margem_media) : vendasAgg.margemMedia);
+
+  const displayedVendas = showAllVendas ? vendasTableData : vendasTableData.slice(0, 10);
+  const remainingVendas = vendasTableData.length - 10;
 
   if (isLoading) {
     return (
@@ -417,197 +424,171 @@ export default function MeuPainel() {
           <KPICard icon={FileText} label="Notas Fiscais" value={String(vendasAgg.qtdNotas)} subtitle={`${vendasAgg.qtdItens} itens`} accentColor="hsl(215 30% 50%)" />
         </motion.div>
 
-        {/* ADMIN: RANKING COMPLETO | VENDEDOR: Posição + Comparativo + Gauge */}
-        {isAdmin ? (
-          <motion.div variants={item} className="bg-card border border-border rounded-xl p-6 shadow-card">
-            <div className="flex items-center gap-2 mb-6">
-              <Trophy className="h-5 w-5 text-primary" />
-              <p className="text-sm uppercase tracking-widest text-muted-foreground font-medium">Ranking Geral de Vendas (PJ)</p>
-            </div>
-            <div className="overflow-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-border">
-                    <TableHead className="w-16">#</TableHead>
-                    <TableHead>Vendedor</TableHead>
-                    <TableHead className="text-right">Vendas</TableHead>
-                    <TableHead className="text-right">Total Arrecadado</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rankingPj.map((r) => (
-                    <TableRow key={r.nome} className={`border-border ${r.posicao <= 3 ? 'bg-primary/5' : ''}`}>
-                      <TableCell className="font-bold text-lg">
-                        {r.posicao <= 3 ? MEDAL[r.posicao - 1] : r.posicao}
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <span className={`font-semibold ${r.posicao <= 3 ? 'text-primary' : 'text-foreground'}`}>{r.nome}</span>
-                          <span className="block text-xs text-muted-foreground">{r.unidade}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right font-bold">{r.qtd_vendas}</TableCell>
-                      <TableCell className="text-right font-bold">{fmt(r.total_arrecadado)}</TableCell>
-                    </TableRow>
-                  ))}
-                  {rankingPj.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">Sem dados de ranking</TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </motion.div>
-        ) : (
-          <>
-            {/* MÉDIA GERAL DE VENDAS */}
-            <motion.div variants={item}>
-              <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-3 flex items-center gap-2">
-                <Store className="h-4 w-4 text-primary" />
-                Média Geral de Vendas (Empresa)
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <KPICard icon={DollarSign} label="Total Geral Vendido" value={fmt(vendasGeraisAgg.totalGeral)} subtitle="Todas as vendas da empresa" accentColor="hsl(270 60% 55%)" />
-                <KPICard icon={ShoppingCart} label="Ticket Médio Geral" value={fmt(vendasGeraisAgg.ticketMedio)} subtitle={`Mediana: ${fmt(vendasGeraisAgg.mediana)} | Seu: ${fmt(ticketMedioIndividual)}`} accentColor="hsl(200 80% 50%)" />
-                <KPICard icon={FileText} label="Qtd Total de Itens" value={String(vendasGeraisAgg.qtdItens)} subtitle={`Seus itens: ${vendasAgg.qtdItens}`} accentColor="hsl(330 70% 55%)" />
-              </div>
-            </motion.div>
+        {/* MÉDIA GERAL DE VENDAS */}
+        <motion.div variants={item}>
+          <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-3 flex items-center gap-2">
+            <Store className="h-4 w-4 text-primary" />
+            {isAdmin ? 'Média Geral de Vendas (Empresa)' : 'Média Geral de Vendas (Empresa)'}
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <KPICard icon={DollarSign} label="Total Geral Vendido" value={fmt(vendasGeraisAgg.totalGeral)} subtitle="Todas as vendas da empresa" accentColor="hsl(270 60% 55%)" />
+            <KPICard icon={ShoppingCart} label="Ticket Médio Geral" value={fmt(vendasGeraisAgg.ticketMedio)} subtitle={isAdmin ? `Mediana: ${fmt(vendasGeraisAgg.mediana)}` : `Mediana: ${fmt(vendasGeraisAgg.mediana)} | Seu: ${fmt(ticketMedioIndividual)}`} accentColor="hsl(200 80% 50%)" />
+            <KPICard icon={FileText} label="Qtd Total de Itens" value={String(vendasGeraisAgg.qtdItens)} subtitle={isAdmin ? 'Total de itens vendidos' : `Seus itens: ${vendasAgg.qtdItens}`} accentColor="hsl(330 70% 55%)" />
+          </div>
+        </motion.div>
 
-            {/* THREE COLUMNS: Posição PJ + Comparativo + Gauge */}
-            <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Posição */}
-              <div className="bg-card border border-border rounded-xl p-8 shadow-card flex flex-col items-center text-center relative overflow-hidden">
-                <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-4">Sua Posição PJ</p>
-                <div className="relative">
-                  {minhaPosicaoPj && minhaPosicaoPj.posicao <= 3 && (
-                    <svg className="absolute inset-0 w-full h-full" viewBox="0 0 120 120">
-                      <circle cx="60" cy="60" r="55" fill="none" stroke="hsl(38 90% 55%)" strokeWidth="1" opacity="0.15" />
-                      <circle cx="60" cy="60" r="48" fill="none" stroke="hsl(38 90% 55%)" strokeWidth="0.5" opacity="0.1" />
-                    </svg>
-                  )}
-                  <span
-                    className={`font-black leading-none ${minhaPosicaoPj && minhaPosicaoPj.posicao <= 3 ? 'text-gradient-gold' : 'text-foreground'}`}
-                    style={{ fontSize: '5.5rem' }}
-                  >
-                    {minhaPosicaoPj ? minhaPosicaoPj.posicao : '—'}
-                  </span>
-                </div>
-                <p className="text-sm text-muted-foreground mt-2">de {rankingPj.length} vendedores PJ</p>
-                {minhaPosicaoPj && minhaPosicaoPj.posicao === 1 && (
-                  <div className="mt-5 space-y-1">
-                    <div className="flex items-center justify-center gap-2">
-                      <Trophy className="h-5 w-5 text-primary" />
-                      <p className="text-primary font-bold">Top Performer PJ!</p>
-                    </div>
-                    {rankingPj[1] && (
-                      <p className="text-xs text-secondary-foreground">
-                        {minhaPosicaoPj.qtd_vendas - rankingPj[1].qtd_vendas} vendas à frente de #{2}
-                      </p>
-                    )}
-                  </div>
+        {/* COMPARATIVO + GAUGE (+ Posição PJ para vendedor) */}
+        <motion.div variants={item} className={`grid grid-cols-1 ${isAdmin ? 'lg:grid-cols-2' : 'lg:grid-cols-3'} gap-6`}>
+          {/* Posição PJ - only for vendedor */}
+          {!isAdmin && (
+            <div className="bg-card border border-border rounded-xl p-8 shadow-card flex flex-col items-center text-center relative overflow-hidden">
+              <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-4">Sua Posição PJ</p>
+              <div className="relative">
+                {minhaPosicaoPj && minhaPosicaoPj.posicao <= 3 && (
+                  <svg className="absolute inset-0 w-full h-full" viewBox="0 0 120 120">
+                    <circle cx="60" cy="60" r="55" fill="none" stroke="hsl(38 90% 55%)" strokeWidth="1" opacity="0.15" />
+                    <circle cx="60" cy="60" r="48" fill="none" stroke="hsl(38 90% 55%)" strokeWidth="0.5" opacity="0.1" />
+                  </svg>
                 )}
-                {minhaPosicaoPj && minhaPosicaoPj.posicao > 1 && (
-                  <div className="mt-5 w-full space-y-3">
-                    <p className="text-sm text-secondary-foreground">
-                      Falta <span className="text-primary font-bold">{rankingPj[minhaPosicaoPj.posicao - 2].qtd_vendas - minhaPosicaoPj.qtd_vendas}</span> vendas para alcançar
-                    </p>
-                    <p className="text-xs text-muted-foreground">#{minhaPosicaoPj.posicao - 1} posição</p>
-                    <div className="h-2.5 rounded-full bg-secondary overflow-hidden">
-                      <motion.div
-                        className="h-full rounded-full"
-                        style={{ background: 'linear-gradient(90deg, hsl(38 90% 55%), hsl(40 95% 65%))' }}
-                        initial={{ width: 0 }}
-                        animate={{ width: `${rankingPj[minhaPosicaoPj.posicao - 2].qtd_vendas > 0 ? (minhaPosicaoPj.qtd_vendas / rankingPj[minhaPosicaoPj.posicao - 2].qtd_vendas) * 100 : 0}%` }}
-                        transition={{ duration: 1, ease: 'easeOut', delay: 0.4 }}
-                      />
-                    </div>
-                    <p className="text-[10px] text-muted-foreground">Suas vendas: {minhaPosicaoPj.qtd_vendas} | Acima: {rankingPj[minhaPosicaoPj.posicao - 2].qtd_vendas}</p>
-                  </div>
-                )}
-                {!minhaPosicaoPj && (
-                  <p className="text-sm text-muted-foreground mt-4">Vendedor não encontrado no controle PJ</p>
-                )}
+                <span
+                  className={`font-black leading-none ${minhaPosicaoPj && minhaPosicaoPj.posicao <= 3 ? 'text-gradient-gold' : 'text-foreground'}`}
+                  style={{ fontSize: '5.5rem' }}
+                >
+                  {minhaPosicaoPj ? minhaPosicaoPj.posicao : '—'}
+                </span>
               </div>
-
-              {/* Você vs Média da Empresa */}
-              <div className="bg-card border border-border rounded-xl p-8 shadow-card">
-                <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">Você vs Média da Empresa</p>
-                <p className="text-[10px] text-muted-foreground mb-4">Comparativo contra a média geral de vendas</p>
-                <div className="space-y-5">
-                  <div>
-                    <div className="flex justify-between text-xs mb-1.5">
-                      <span className="text-foreground font-semibold">Seu Ticket</span>
-                      <span className="text-foreground font-bold">{fmt(ticketMedioIndividual)}</span>
-                    </div>
-                    <div className="h-5 rounded-full bg-secondary overflow-hidden relative">
-                      <motion.div
-                        className="h-full rounded-full"
-                        style={{ background: diffTicket >= 0 ? 'linear-gradient(90deg, hsl(38 90% 55%), hsl(40 95% 65%))' : 'hsl(215 30% 40%)' }}
-                        initial={{ width: 0 }}
-                        animate={{ width: `${meuTicketPct}%` }}
-                        transition={{ duration: 0.8, ease: 'easeOut', delay: 0.3 }}
-                      />
-                    </div>
+              <p className="text-sm text-muted-foreground mt-2">de {rankingPj.length} vendedores PJ</p>
+              {minhaPosicaoPj && minhaPosicaoPj.posicao === 1 && (
+                <div className="mt-5 space-y-1">
+                  <div className="flex items-center justify-center gap-2">
+                    <Trophy className="h-5 w-5 text-primary" />
+                    <p className="text-primary font-bold">Top Performer PJ!</p>
                   </div>
-                  <div>
-                    <div className="flex justify-between text-xs mb-1.5">
-                      <span className="text-secondary-foreground">Média Geral</span>
-                      <span className="text-secondary-foreground">{fmt(vendasGeraisAgg.ticketMedio)}</span>
-                    </div>
-                    <div className="h-5 rounded-full bg-secondary overflow-hidden relative">
-                      <motion.div
-                        className="h-full rounded-full bg-secondary-foreground/30"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${geralTicketPct}%` }}
-                        transition={{ duration: 0.8, ease: 'easeOut', delay: 0.5 }}
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-6 flex items-center gap-2">
-                  {diffTicket > 0 ? (
-                    <>
-                      <Flame className="h-5 w-5 text-primary" />
-                      <div>
-                        <p className="text-success font-bold text-sm">Acima da média!</p>
-                        <p className="text-xs text-muted-foreground">{fmt(diffTicket)} acima por item</p>
-                      </div>
-                    </>
-                  ) : diffTicket < 0 ? (
-                    <>
-                      <Target className="h-5 w-5 text-primary" />
-                      <p className="text-primary font-semibold text-sm">Falta {fmt(Math.abs(diffTicket))} por item para a média</p>
-                    </>
-                  ) : (
-                    <p className="text-secondary-foreground text-sm flex items-center gap-2">
-                      <BarChart3 className="h-4 w-4" /> Na média
+                  {rankingPj[1] && (
+                    <p className="text-xs text-secondary-foreground">
+                      {minhaPosicaoPj.qtd_vendas - rankingPj[1].qtd_vendas} vendas à frente de #{2}
                     </p>
                   )}
                 </div>
-                <p className="text-[10px] text-muted-foreground mt-3">Média: {fmt(vendasGeraisAgg.ticketMedio)} | Mediana: {fmt(vendasGeraisAgg.mediana)}</p>
-              </div>
-
-              {/* Gauge */}
-              <div className="bg-card border border-border rounded-xl p-8 shadow-card flex flex-col items-center text-center">
-                <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">Seu Ticket vs Média</p>
-                {vendasGeraisAgg.ticketMedio > 0 ? (
-                  <div className="flex flex-col items-center gap-4">
-                    <CircularGauge value={vendasGeraisAgg.ticketMedio > 0 ? (ticketMedioIndividual / vendasGeraisAgg.ticketMedio) * 100 : 0} label="vs Média" />
-                    <div className="flex items-center gap-3 text-[10px]">
-                      <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: 'hsl(160 100% 42%)' }} />≥80%</span>
-                      <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: 'hsl(38 90% 55%)' }} />≥50%</span>
-                      <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: 'hsl(348 100% 62%)' }} />&lt;60%</span>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground">Seu ticket: {fmt(ticketMedioIndividual)} | Média: {fmt(vendasGeraisAgg.ticketMedio)}</p>
+              )}
+              {minhaPosicaoPj && minhaPosicaoPj.posicao > 1 && (
+                <div className="mt-5 w-full space-y-3">
+                  <p className="text-sm text-secondary-foreground">
+                    Falta <span className="text-primary font-bold">{rankingPj[minhaPosicaoPj.posicao - 2].qtd_vendas - minhaPosicaoPj.qtd_vendas}</span> vendas para alcançar
+                  </p>
+                  <p className="text-xs text-muted-foreground">#{minhaPosicaoPj.posicao - 1} posição</p>
+                  <div className="h-2.5 rounded-full bg-secondary overflow-hidden">
+                    <motion.div
+                      className="h-full rounded-full"
+                      style={{ background: 'linear-gradient(90deg, hsl(38 90% 55%), hsl(40 95% 65%))' }}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${rankingPj[minhaPosicaoPj.posicao - 2].qtd_vendas > 0 ? (minhaPosicaoPj.qtd_vendas / rankingPj[minhaPosicaoPj.posicao - 2].qtd_vendas) * 100 : 0}%` }}
+                      transition={{ duration: 1, ease: 'easeOut', delay: 0.4 }}
+                    />
                   </div>
+                  <p className="text-[10px] text-muted-foreground">Suas vendas: {minhaPosicaoPj.qtd_vendas} | Acima: {rankingPj[minhaPosicaoPj.posicao - 2].qtd_vendas}</p>
+                </div>
+              )}
+              {!minhaPosicaoPj && (
+                <p className="text-sm text-muted-foreground mt-4">Vendedor não encontrado no controle PJ</p>
+              )}
+            </div>
+          )}
+
+          {/* Comparativo Ticket Médio */}
+          <div className="bg-card border border-border rounded-xl p-8 shadow-card">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">
+              {isAdmin ? 'Ticket Médio vs Mediana' : 'Você vs Média da Empresa'}
+            </p>
+            <p className="text-[10px] text-muted-foreground mb-4">
+              {isAdmin ? 'Comparativo do ticket médio geral contra a mediana' : 'Comparativo contra a média geral de vendas'}
+            </p>
+            <div className="space-y-5">
+              <div>
+                <div className="flex justify-between text-xs mb-1.5">
+                  <span className="text-foreground font-semibold">{isAdmin ? 'Ticket Médio' : 'Seu Ticket'}</span>
+                  <span className="text-foreground font-bold">{fmt(displayTicket)}</span>
+                </div>
+                <div className="h-5 rounded-full bg-secondary overflow-hidden relative">
+                  <motion.div
+                    className="h-full rounded-full"
+                    style={{ background: isAdmin ? 'linear-gradient(90deg, hsl(270 60% 55%), hsl(280 70% 65%))' : (diffTicket >= 0 ? 'linear-gradient(90deg, hsl(38 90% 55%), hsl(40 95% 65%))' : 'hsl(215 30% 40%)') }}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${meuTicketPct}%` }}
+                    transition={{ duration: 0.8, ease: 'easeOut', delay: 0.3 }}
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between text-xs mb-1.5">
+                  <span className="text-secondary-foreground">{isAdmin ? 'Mediana' : 'Média Geral'}</span>
+                  <span className="text-secondary-foreground">{isAdmin ? fmt(vendasGeraisAgg.mediana) : fmt(vendasGeraisAgg.ticketMedio)}</span>
+                </div>
+                <div className="h-5 rounded-full bg-secondary overflow-hidden relative">
+                  <motion.div
+                    className="h-full rounded-full bg-secondary-foreground/30"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${isAdmin ? (vendasGeraisAgg.mediana / barMaxTicket) * 100 : geralTicketPct}%` }}
+                    transition={{ duration: 0.8, ease: 'easeOut', delay: 0.5 }}
+                  />
+                </div>
+              </div>
+            </div>
+            {!isAdmin && (
+              <div className="mt-6 flex items-center gap-2">
+                {diffTicket > 0 ? (
+                  <>
+                    <Flame className="h-5 w-5 text-primary" />
+                    <div>
+                      <p className="text-success font-bold text-sm">Acima da média!</p>
+                      <p className="text-xs text-muted-foreground">{fmt(diffTicket)} acima por item</p>
+                    </div>
+                  </>
+                ) : diffTicket < 0 ? (
+                  <>
+                    <Target className="h-5 w-5 text-primary" />
+                    <p className="text-primary font-semibold text-sm">Falta {fmt(Math.abs(diffTicket))} por item para a média</p>
+                  </>
                 ) : (
-                  <p className="text-2xl font-bold text-muted-foreground">—</p>
+                  <p className="text-secondary-foreground text-sm flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4" /> Na média
+                  </p>
                 )}
               </div>
-            </motion.div>
-          </>
-        )}
+            )}
+            <p className="text-[10px] text-muted-foreground mt-3">Média: {fmt(vendasGeraisAgg.ticketMedio)} | Mediana: {fmt(vendasGeraisAgg.mediana)}</p>
+          </div>
+
+          {/* Gauge */}
+          <div className="bg-card border border-border rounded-xl p-8 shadow-card flex flex-col items-center text-center">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">
+              {isAdmin ? 'Margem Média Geral' : 'Seu Ticket vs Média'}
+            </p>
+            {isAdmin ? (
+              <div className="flex flex-col items-center gap-4">
+                <CircularGauge value={vendasAgg.margemMedia} label="Margem" />
+                <div className="flex items-center gap-3 text-[10px]">
+                  <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: 'hsl(160 100% 42%)' }} />≥80%</span>
+                  <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: 'hsl(38 90% 55%)' }} />≥50%</span>
+                  <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: 'hsl(348 100% 62%)' }} />&lt;50%</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground">Margem média geral da empresa</p>
+              </div>
+            ) : vendasGeraisAgg.ticketMedio > 0 ? (
+              <div className="flex flex-col items-center gap-4">
+                <CircularGauge value={vendasGeraisAgg.ticketMedio > 0 ? (ticketMedioIndividual / vendasGeraisAgg.ticketMedio) * 100 : 0} label="vs Média" />
+                <div className="flex items-center gap-3 text-[10px]">
+                  <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: 'hsl(160 100% 42%)' }} />≥80%</span>
+                  <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: 'hsl(38 90% 55%)' }} />≥50%</span>
+                  <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: 'hsl(348 100% 62%)' }} />&lt;60%</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground">Seu ticket: {fmt(ticketMedioIndividual)} | Média: {fmt(vendasGeraisAgg.ticketMedio)}</p>
+              </div>
+            ) : (
+              <p className="text-2xl font-bold text-muted-foreground">—</p>
+            )}
+          </div>
+        </motion.div>
 
         {/* VENDAS DA EMPRESA - LineChart por Data */}
         <motion.div variants={item} className="bg-card border border-border rounded-xl p-8 shadow-card">
@@ -626,7 +607,6 @@ export default function MeuPainel() {
               mapEmpresa[dateStr] = (mapEmpresa[dateStr] ?? 0) + val;
             });
 
-            // Vendedor line only for non-admin
             const mapVendedor: Record<string, number> = {};
             if (!isAdmin) {
               (vendasIndividuais ?? []).forEach(r => {
@@ -678,25 +658,6 @@ export default function MeuPainel() {
           })()}
         </motion.div>
 
-        {/* TABELA DETALHADA */}
-        <motion.div variants={item} className="bg-card border border-border rounded-xl p-6 shadow-card">
-          <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-4">Detalhamento de Vendas</p>
-          <DataTable
-            columns={[
-              { key: 'data_emissao', label: 'Data Emissão' },
-              { key: 'nota_fiscal', label: 'NF' },
-              ...(isAdmin ? [{ key: 'vendedor' as const, label: 'Vendedor' }] : []),
-              { key: 'produto', label: 'Produto' },
-              { key: 'marca', label: 'Marca' },
-              { key: 'quantidade', label: 'Qtd', align: 'right' as const },
-              { key: 'total', label: 'Total c/ Desc.', align: 'right' as const },
-              { key: 'margem', label: 'Margem %', align: 'right' as const },
-              { key: 'lucro', label: 'Lucro', align: 'right' as const },
-            ]}
-            data={vendasTableData}
-          />
-        </motion.div>
-
         {/* GRÁFICO VENDAS POR DIA */}
         <motion.div variants={item} className="bg-card border border-border rounded-xl p-8 shadow-card">
           <div className="flex items-center gap-2 mb-6">
@@ -721,6 +682,89 @@ export default function MeuPainel() {
             <p className="text-muted-foreground text-center py-8">Sem dados de vendas</p>
           )}
         </motion.div>
+
+        {/* TABELA DETALHADA - limitada a 10 com "Ver mais" */}
+        <motion.div variants={item} className="bg-card border border-border rounded-xl p-6 shadow-card">
+          <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-4">Detalhamento de Vendas</p>
+          <DataTable
+            columns={[
+              { key: 'data_emissao', label: 'Data Emissão' },
+              { key: 'nota_fiscal', label: 'NF' },
+              ...(isAdmin ? [{ key: 'vendedor' as const, label: 'Vendedor' }] : []),
+              { key: 'produto', label: 'Produto' },
+              { key: 'marca', label: 'Marca' },
+              { key: 'quantidade', label: 'Qtd', align: 'right' as const },
+              { key: 'total', label: 'Total c/ Desc.', align: 'right' as const },
+              { key: 'margem', label: 'Margem %', align: 'right' as const },
+              { key: 'lucro', label: 'Lucro', align: 'right' as const },
+            ]}
+            data={displayedVendas}
+          />
+          {vendasTableData.length > 10 && (
+            <div className="flex justify-center mt-4">
+              <button
+                onClick={() => setShowAllVendas(!showAllVendas)}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary hover:text-primary/80 bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors"
+              >
+                {showAllVendas ? (
+                  <>
+                    <ChevronUp className="h-4 w-4" />
+                    Ver menos
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-4 w-4" />
+                    Ver mais ({remainingVendas} restantes)
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+        </motion.div>
+
+        {/* RANKING GERAL DE VENDAS PJ - movido para o final */}
+        {isAdmin && (
+          <motion.div variants={item} className="bg-card border border-border rounded-xl p-6 shadow-card">
+            <div className="flex items-center gap-2 mb-6">
+              <Trophy className="h-5 w-5 text-primary" />
+              <p className="text-sm uppercase tracking-widest text-muted-foreground font-medium">Ranking Geral de Vendas (PJ)</p>
+            </div>
+            <div className="overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border">
+                    <TableHead className="w-16">#</TableHead>
+                    <TableHead>Vendedor</TableHead>
+                    <TableHead className="text-right">Vendas</TableHead>
+                    <TableHead className="text-right">Total Arrecadado</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rankingPj.map((r) => (
+                    <TableRow key={r.nome} className={`border-border ${r.posicao <= 3 ? 'bg-primary/5' : ''}`}>
+                      <TableCell className="font-bold text-lg">
+                        {r.posicao <= 3 ? MEDAL[r.posicao - 1] : r.posicao}
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <span className={`font-semibold ${r.posicao <= 3 ? 'text-primary' : 'text-foreground'}`}>{r.nome}</span>
+                          <span className="block text-xs text-muted-foreground">{r.unidade}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-bold">{r.qtd_vendas}</TableCell>
+                      <TableCell className="text-right font-bold">{fmt(r.total_arrecadado)}</TableCell>
+                    </TableRow>
+                  ))}
+                  {rankingPj.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">Sem dados de ranking</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </motion.div>
+        )}
       </motion.div>
     </AppShell>
   );
