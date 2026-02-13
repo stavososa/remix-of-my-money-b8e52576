@@ -207,11 +207,11 @@ export default function MeuPainel() {
   // Margem: usar vendasAgg como fallback
   const margem = meusDados?.margem_media ? Number(meusDados.margem_media) : vendasAgg.margemMedia;
 
-  // Comparativo: ticket médio individual vs mediana
-  const barMaxTicket = Math.max(ticketMedioIndividual, vendasGeraisAgg.mediana, 1);
+  // Comparativo: ticket médio individual vs média geral
+  const barMaxTicket = Math.max(ticketMedioIndividual, vendasGeraisAgg.ticketMedio, 1);
   const meuTicketPct = (ticketMedioIndividual / barMaxTicket) * 100;
-  const geralTicketPct = (vendasGeraisAgg.mediana / barMaxTicket) * 100;
-  const diffTicket = ticketMedioIndividual - vendasGeraisAgg.mediana;
+  const geralTicketPct = (vendasGeraisAgg.ticketMedio / barMaxTicket) * 100;
+  const diffTicket = ticketMedioIndividual - vendasGeraisAgg.ticketMedio;
 
   // Evolução diária como fallback
   const evolucaoDiaria = vendasPorDia.map(d => ({
@@ -394,10 +394,10 @@ export default function MeuPainel() {
             )}
           </div>
 
-          {/* Você vs Mediana da Empresa (Ticket Médio) */}
+          {/* Você vs Média da Empresa (Ticket Médio) */}
           <div className="bg-card border border-border rounded-xl p-8 shadow-card">
-            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">Você vs Mediana da Empresa</p>
-            <p className="text-[10px] text-muted-foreground mb-4">Comparativo contra o valor central de vendas</p>
+            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">Você vs Média da Empresa</p>
+            <p className="text-[10px] text-muted-foreground mb-4">Comparativo contra a média geral de vendas</p>
 
             <div className="space-y-5">
               <div>
@@ -427,8 +427,8 @@ export default function MeuPainel() {
 
               <div>
                 <div className="flex justify-between text-xs mb-1.5">
-                  <span className="text-secondary-foreground">Mediana</span>
-                  <span className="text-secondary-foreground">{fmt(vendasGeraisAgg.mediana)}</span>
+                  <span className="text-secondary-foreground">Média Geral</span>
+                  <span className="text-secondary-foreground">{fmt(vendasGeraisAgg.ticketMedio)}</span>
                 </div>
                 <div className="h-5 rounded-full bg-secondary overflow-hidden relative">
                   <motion.div
@@ -446,30 +446,30 @@ export default function MeuPainel() {
                 <>
                   <Flame className="h-5 w-5 text-primary" />
                   <div>
-                    <p className="text-success font-bold text-sm">Acima da mediana!</p>
+                  <p className="text-success font-bold text-sm">Acima da média!</p>
                     <p className="text-xs text-muted-foreground">{fmt(diffTicket)} acima por item</p>
                   </div>
                 </>
               ) : diffTicket < 0 ? (
                 <>
                   <Target className="h-5 w-5 text-primary" />
-                  <p className="text-primary font-semibold text-sm">Falta {fmt(Math.abs(diffTicket))} por item para a mediana</p>
+                  <p className="text-primary font-semibold text-sm">Falta {fmt(Math.abs(diffTicket))} por item para a média</p>
                 </>
               ) : (
                 <p className="text-secondary-foreground text-sm flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4" /> Na mediana
+                  <BarChart3 className="h-4 w-4" /> Na média
                 </p>
               )}
             </div>
-            <p className="text-[10px] text-muted-foreground mt-3">Mediana: {fmt(vendasGeraisAgg.mediana)} | Média: {fmt(vendasGeraisAgg.ticketMedio)}</p>
+            <p className="text-[10px] text-muted-foreground mt-3">Média: {fmt(vendasGeraisAgg.ticketMedio)} | Mediana: {fmt(vendasGeraisAgg.mediana)}</p>
           </div>
 
-          {/* Ticket vs Mediana Gauge */}
+          {/* Ticket vs Média Gauge */}
           <div className="bg-card border border-border rounded-xl p-8 shadow-card flex flex-col items-center text-center">
-            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">Seu Ticket vs Mediana</p>
-            {vendasGeraisAgg.mediana > 0 ? (
+            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">Seu Ticket vs Média</p>
+            {vendasGeraisAgg.ticketMedio > 0 ? (
               <div className="flex flex-col items-center gap-4">
-                <CircularGauge value={vendasGeraisAgg.mediana > 0 ? (ticketMedioIndividual / vendasGeraisAgg.mediana) * 100 : 0} label="vs Mediana" />
+                <CircularGauge value={vendasGeraisAgg.ticketMedio > 0 ? (ticketMedioIndividual / vendasGeraisAgg.ticketMedio) * 100 : 0} label="vs Média" />
                 <div className="flex items-center gap-3 text-[10px]">
                   <span className="flex items-center gap-1">
                     <span className="h-2 w-2 rounded-full" style={{ background: 'hsl(160 100% 42%)' }} />
@@ -484,7 +484,7 @@ export default function MeuPainel() {
                     &lt;65%
                   </span>
                 </div>
-                <p className="text-[10px] text-muted-foreground">Seu ticket: {fmt(ticketMedioIndividual)} | Mediana: {fmt(vendasGeraisAgg.mediana)}</p>
+                <p className="text-[10px] text-muted-foreground">Seu ticket: {fmt(ticketMedioIndividual)} | Média: {fmt(vendasGeraisAgg.ticketMedio)}</p>
               </div>
             ) : (
               <p className="text-2xl font-bold text-muted-foreground">—</p>
