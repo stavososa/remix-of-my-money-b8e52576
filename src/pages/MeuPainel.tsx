@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usePeriod } from '@/contexts/PeriodContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { DollarSign, Target, Percent, FileText, TrendingUp, Trophy, Flame, BarChart3, ShoppingCart, TrendingDown } from 'lucide-react';
+import { DollarSign, Target, Percent, FileText, TrendingUp, Trophy, Flame, BarChart3, ShoppingCart, TrendingDown, Store } from 'lucide-react';
 import { motion } from 'framer-motion';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
@@ -122,6 +122,27 @@ export default function MeuPainel() {
     },
   });
 
+  // Nova query: vendas_gerais
+  const { data: vendasGeraisRaw } = useQuery({
+    queryKey: ['vendas-gerais'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('vendas_gerais')
+        .select('total_mercadoria');
+      return data ?? [];
+    },
+  });
+
+  // Agregados de vendas_gerais
+  const vendasGeraisAgg = (() => {
+    const rows = vendasGeraisRaw ?? [];
+    const valores = rows.map(r => parseMoneyBR(r.total_mercadoria)).filter(v => v > 0);
+    const totalGeral = valores.reduce((s, v) => s + v, 0);
+    const qtdItens = valores.length;
+    const ticketMedio = qtdItens > 0 ? totalGeral / qtdItens : 0;
+    return { totalGeral, qtdItens, ticketMedio };
+  })();
+
   const vendasAgg = (() => {
     const rows = vendasLucas ?? [];
     const totalVendido = rows.reduce((s, r) => s + parseMoneyBR(r.total_com_desconto), 0);
@@ -131,6 +152,9 @@ export default function MeuPainel() {
     const notasSet = new Set(rows.map(r => r.nota_fiscal).filter(Boolean));
     return { totalVendido, totalLucro, margemMedia, qtdNotas: notasSet.size, qtdItens: rows.length };
   })();
+
+  // Ticket médio individual
+  const ticketMedioIndividual = vendasAgg.qtdItens > 0 ? vendasAgg.totalVendido / vendasAgg.qtdItens : 0;
 
   const vendasPorDia = (() => {
     const map: Record<string, number> = {};
@@ -160,7 +184,7 @@ export default function MeuPainel() {
 
   const primeiroNome = (nome_completo ?? '').split(' ')[0] || 'Vendedor';
   const posicao = meusDados?.posicao ?? null;
-  const meuTotal = Number(meusDados?.total_vendido ?? 0);
+  const meuTotal = meusDados ? Number(meusDados.total_vendido ?? 0) : vendasAgg.totalVendido;
 
   const acima = posicao && posicao > 1 ? ranking?.find(r => r.posicao === posicao - 1) : null;
   const abaixo = posicao === 1 && ranking && ranking.length > 1 ? ranking.find(r => r.posicao === 2) : null;
@@ -174,12 +198,20 @@ export default function MeuPainel() {
     comissao: Number(h.total_comissao ?? 0),
   }));
 
-  const margem = Number(meusDados?.margem_media ?? 0);
+  // Margem: usar vendasAgg como fallback
+  const margem = meusDados?.margem_media ? Number(meusDados.margem_media) : vendasAgg.margemMedia;
 
-  const barMax = Math.max(meuTotal, mediaTime, 1);
-  const meuPct = (meuTotal / barMax) * 100;
-  const mediaPct = (mediaTime / barMax) * 100;
-  const diffMedia = meuTotal - mediaTime;
+  // Comparativo: ticket médio individual vs geral
+  const barMaxTicket = Math.max(ticketMedioIndividual, vendasGeraisAgg.ticketMedio, 1);
+  const meuTicketPct = (ticketMedioIndividual / barMaxTicket) * 100;
+  const geralTicketPct = (vendasGeraisAgg.ticketMedio / barMaxTicket) * 100;
+  const diffTicket = ticketMedioIndividual - vendasGeraisAgg.ticketMedio;
+
+  // Evolução diária como fallback
+  const evolucaoDiaria = vendasPorDia.map(d => ({
+    label: d.dia,
+    vendido: d.total,
+  }));
 
   if (isLoading) {
     return (
@@ -271,14 +303,26 @@ export default function MeuPainel() {
           <KPICard icon={FileText} label="Notas Fiscais" value={String(vendasAgg.qtdNotas)} subtitle={`${vendasAgg.qtdItens} itens`} accentColor="hsl(215 30% 50%)" />
         </motion.div>
 
-        {/* TWO COLUMNS */}
+        {/* MÉDIA GERAL DE VENDAS - Dados de vendas_gerais */}
+        <motion.div variants={item}>
+          <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-3 flex items-center gap-2">
+            <Store className="h-4 w-4 text-primary" />
+            Média Geral de Vendas (Empresa)
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <KPICard icon={DollarSign} label="Total Geral Vendido" value={fmt(vendasGeraisAgg.totalGeral)} subtitle="Todas as vendas da empresa" accentColor="hsl(270 60% 55%)" />
+            <KPICard icon={ShoppingCart} label="Ticket Médio Geral" value={fmt(vendasGeraisAgg.ticketMedio)} subtitle={`Seu ticket: ${fmt(ticketMedioIndividual)}`} accentColor="hsl(200 80% 50%)" />
+            <KPICard icon={FileText} label="Qtd Total de Itens" value={String(vendasGeraisAgg.qtdItens)} subtitle={`Seus itens: ${vendasAgg.qtdItens}`} accentColor="hsl(330 70% 55%)" />
+          </div>
+        </motion.div>
+
+        {/* THREE COLUMNS */}
         <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Posição */}
           <div className="bg-card border border-border rounded-xl p-8 shadow-card flex flex-col items-center text-center relative overflow-hidden">
             <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-4">Sua Posição</p>
 
             <div className="relative">
-              {/* Halo SVG */}
               {posicao && posicao <= 3 && (
                 <svg className="absolute inset-0 w-full h-full" viewBox="0 0 120 120">
                   <circle cx="60" cy="60" r="55" fill="none" stroke="hsl(38 90% 55%)" strokeWidth="1" opacity="0.15" />
@@ -331,36 +375,45 @@ export default function MeuPainel() {
               </div>
             )}
 
-            {!meusDados && (
+            {!meusDados && vendasAgg.totalVendido > 0 && (
+              <div className="mt-5 space-y-2">
+                <p className="text-sm text-foreground font-bold">{fmt(vendasAgg.totalVendido)}</p>
+                <p className="text-xs text-muted-foreground">Total vendido individual</p>
+                <p className="text-[10px] text-muted-foreground">Ranking será calculado quando o período for processado</p>
+              </div>
+            )}
+
+            {!meusDados && vendasAgg.totalVendido === 0 && (
               <p className="text-sm text-muted-foreground mt-4">Sem vendas registradas neste período</p>
             )}
           </div>
 
-          {/* Você vs Média */}
+          {/* Você vs Média Geral (Ticket Médio) */}
           <div className="bg-card border border-border rounded-xl p-8 shadow-card">
-            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">Você vs Média do Time</p>
+            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">Você vs Média Geral</p>
+            <p className="text-[10px] text-muted-foreground mb-4">Comparativo de Ticket Médio</p>
 
             <div className="space-y-5">
               <div>
                 <div className="flex justify-between text-xs mb-1.5">
-                  <span className="text-foreground font-semibold">Você</span>
-                  <span className="text-foreground font-bold">{fmt(meuTotal)}</span>
+                  <span className="text-foreground font-semibold">Seu Ticket</span>
+                  <span className="text-foreground font-bold">{fmt(ticketMedioIndividual)}</span>
                 </div>
                 <div className="h-5 rounded-full bg-secondary overflow-hidden relative">
                   <motion.div
                     className="h-full rounded-full"
                     style={{
-                      background: diffMedia >= 0
+                      background: diffTicket >= 0
                         ? 'linear-gradient(90deg, hsl(38 90% 55%), hsl(40 95% 65%))'
                         : 'hsl(215 30% 40%)',
                     }}
                     initial={{ width: 0 }}
-                    animate={{ width: `${meuPct}%` }}
+                    animate={{ width: `${meuTicketPct}%` }}
                     transition={{ duration: 0.8, ease: 'easeOut', delay: 0.3 }}
                   />
-                  {meuPct > 15 && (
+                  {meuTicketPct > 15 && (
                     <span className="absolute inset-y-0 left-3 flex items-center text-[10px] font-bold text-primary-foreground">
-                      {fmt(meuTotal)}
+                      {fmt(ticketMedioIndividual)}
                     </span>
                   )}
                 </div>
@@ -368,14 +421,14 @@ export default function MeuPainel() {
 
               <div>
                 <div className="flex justify-between text-xs mb-1.5">
-                  <span className="text-secondary-foreground">Média</span>
-                  <span className="text-secondary-foreground">{fmt(mediaTime)}</span>
+                  <span className="text-secondary-foreground">Média Geral</span>
+                  <span className="text-secondary-foreground">{fmt(vendasGeraisAgg.ticketMedio)}</span>
                 </div>
                 <div className="h-5 rounded-full bg-secondary overflow-hidden relative">
                   <motion.div
                     className="h-full rounded-full bg-secondary-foreground/30"
                     initial={{ width: 0 }}
-                    animate={{ width: `${mediaPct}%` }}
+                    animate={{ width: `${geralTicketPct}%` }}
                     transition={{ duration: 0.8, ease: 'easeOut', delay: 0.5 }}
                   />
                 </div>
@@ -383,32 +436,31 @@ export default function MeuPainel() {
             </div>
 
             <div className="mt-6 flex items-center gap-2">
-              {diffMedia > 0 ? (
+              {diffTicket > 0 ? (
                 <>
                   <Flame className="h-5 w-5 text-primary" />
                   <div>
                     <p className="text-success font-bold text-sm">Acima da média!</p>
-                    <p className="text-xs text-muted-foreground">{fmt(diffMedia)} acima</p>
+                    <p className="text-xs text-muted-foreground">{fmt(diffTicket)} acima por item</p>
                   </div>
                 </>
-              ) : diffMedia < 0 ? (
+              ) : diffTicket < 0 ? (
                 <>
                   <Target className="h-5 w-5 text-primary" />
-                  <p className="text-primary font-semibold text-sm">Falta {fmt(Math.abs(diffMedia))} para a média</p>
+                  <p className="text-primary font-semibold text-sm">Falta {fmt(Math.abs(diffTicket))} por item para a média</p>
                 </>
               ) : (
                 <p className="text-secondary-foreground text-sm flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4" /> Na média do time
+                  <BarChart3 className="h-4 w-4" /> Na média geral
                 </p>
               )}
             </div>
           </div>
 
-
-          {/* Margem Gauge - terceira coluna */}
+          {/* Margem Gauge */}
           <div className="bg-card border border-border rounded-xl p-8 shadow-card flex flex-col items-center text-center">
             <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">Margem Média</p>
-            {meusDados ? (
+            {(meusDados || vendasAgg.margemMedia > 0) ? (
               <div className="flex flex-col items-center gap-4">
                 <CircularGauge value={margem} />
                 <div className="flex items-center gap-3 text-[10px]">
@@ -425,6 +477,7 @@ export default function MeuPainel() {
                     &lt;50%
                   </span>
                 </div>
+                <p className="text-[10px] text-muted-foreground">Sua margem: {fmtPct(vendasAgg.margemMedia)}</p>
               </div>
             ) : (
               <p className="text-2xl font-bold text-muted-foreground">—</p>
@@ -470,6 +523,29 @@ export default function MeuPainel() {
                 />
               </AreaChart>
             </ResponsiveContainer>
+          ) : evolucaoDiaria.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={evolucaoDiaria}>
+                <defs>
+                  <linearGradient id="gradVendidoDiario" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(38 90% 55%)" stopOpacity={0.3} />
+                    <stop offset="100%" stopColor="hsl(38 90% 55%)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 40% 24%)" />
+                <XAxis dataKey="label" tick={{ fill: 'hsl(210 20% 60%)', fontSize: 11 }} />
+                <YAxis tick={{ fill: 'hsl(210 20% 60%)', fontSize: 12 }} tickFormatter={v => `R$${v.toFixed(0)}`} />
+                <Tooltip
+                  contentStyle={{ background: 'hsl(216 40% 14%)', border: '1px solid hsl(215 40% 24%)', borderRadius: 10 }}
+                  labelStyle={{ color: '#fff', fontWeight: 600 }}
+                  formatter={(v: number) => [fmt(v), 'Total Vendido']}
+                />
+                <Area
+                  type="monotone" dataKey="vendido" stroke="hsl(38 90% 55%)" fill="url(#gradVendidoDiario)"
+                  strokeWidth={2.5} dot={{ r: 4, fill: 'hsl(38 90% 55%)' }} activeDot={{ r: 6, strokeWidth: 2, stroke: 'hsl(38 90% 55%)' }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
               <TrendingUp className="h-12 w-12 text-muted-foreground" />
@@ -478,8 +554,6 @@ export default function MeuPainel() {
             </div>
           )}
         </motion.div>
-
-        {/* Seção de título para vendas detalhadas */}
 
         {/* TABELA DETALHADA */}
         <motion.div variants={item} className="bg-card border border-border rounded-xl p-6 shadow-card">
