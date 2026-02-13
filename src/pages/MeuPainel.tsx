@@ -384,10 +384,10 @@ export default function MeuPainel() {
         <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Posição */}
           <div className="bg-card border border-border rounded-xl p-8 shadow-card flex flex-col items-center text-center relative overflow-hidden">
-            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-4">Sua Posição</p>
+            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-4">Sua Posição PJ</p>
 
             <div className="relative">
-              {posicao && posicao <= 3 && (
+              {minhaPosicaoPj && minhaPosicaoPj.posicao <= 3 && (
                 <svg className="absolute inset-0 w-full h-full" viewBox="0 0 120 120">
                   <circle cx="60" cy="60" r="55" fill="none" stroke="hsl(38 90% 55%)" strokeWidth="1" opacity="0.15" />
                   <circle cx="60" cy="60" r="48" fill="none" stroke="hsl(38 90% 55%)" strokeWidth="0.5" opacity="0.1" />
@@ -395,60 +395,53 @@ export default function MeuPainel() {
               )}
               <span
                 className={`font-black leading-none ${
-                  posicao && posicao <= 3 ? 'text-gradient-gold' : 'text-foreground'
+                  minhaPosicaoPj && minhaPosicaoPj.posicao <= 3 ? 'text-gradient-gold' : 'text-foreground'
                 }`}
                 style={{ fontSize: '5.5rem' }}
               >
-                {posicao ?? '—'}
+                {minhaPosicaoPj ? minhaPosicaoPj.posicao : '—'}
               </span>
             </div>
 
-            <p className="text-sm text-muted-foreground mt-2">de {totalVendedores} vendedores</p>
+            <p className="text-sm text-muted-foreground mt-2">de {rankingPj.length} vendedores PJ</p>
 
-            {meusDados && posicao === 1 && (
+            {minhaPosicaoPj && minhaPosicaoPj.posicao === 1 && (
               <div className="mt-5 space-y-1">
                 <div className="flex items-center justify-center gap-2">
                   <Trophy className="h-5 w-5 text-primary" />
-                  <p className="text-primary font-bold">Top Performer!</p>
+                  <p className="text-primary font-bold">Top Performer PJ!</p>
                 </div>
-                {abaixo && (
+                {rankingPj[1] && (
                   <p className="text-xs text-secondary-foreground">
-                    {fmt(diffAbaixo)} à frente de #{2} {abaixo.vendedor_nome}
+                    {minhaPosicaoPj.qtd_vendas - rankingPj[1].qtd_vendas} vendas à frente de #{2}
                   </p>
                 )}
               </div>
             )}
 
-            {meusDados && posicao && posicao > 1 && acima && (
+            {minhaPosicaoPj && minhaPosicaoPj.posicao > 1 && (
               <div className="mt-5 w-full space-y-3">
                 <p className="text-sm text-secondary-foreground">
-                  Falta <span className="text-primary font-bold">{fmt(diffAcima)}</span> para alcançar
+                  Falta <span className="text-primary font-bold">{rankingPj[minhaPosicaoPj.posicao - 2].qtd_vendas - minhaPosicaoPj.qtd_vendas}</span> vendas para alcançar
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  #{posicao - 1} {acima.vendedor_nome}
+                  #{minhaPosicaoPj.posicao - 1} posição
                 </p>
                 <div className="h-2.5 rounded-full bg-secondary overflow-hidden">
                   <motion.div
                     className="h-full rounded-full"
                     style={{ background: 'linear-gradient(90deg, hsl(38 90% 55%), hsl(40 95% 65%))' }}
                     initial={{ width: 0 }}
-                    animate={{ width: `${Number(acima.total_vendido) > 0 ? (meuTotal / Number(acima.total_vendido)) * 100 : 0}%` }}
+                    animate={{ width: `${rankingPj[minhaPosicaoPj.posicao - 2].qtd_vendas > 0 ? (minhaPosicaoPj.qtd_vendas / rankingPj[minhaPosicaoPj.posicao - 2].qtd_vendas) * 100 : 0}%` }}
                     transition={{ duration: 1, ease: 'easeOut', delay: 0.4 }}
                   />
                 </div>
+                <p className="text-[10px] text-muted-foreground">Suas vendas: {minhaPosicaoPj.qtd_vendas} | Acima: {rankingPj[minhaPosicaoPj.posicao - 2].qtd_vendas}</p>
               </div>
             )}
 
-            {!meusDados && vendasAgg.totalVendido > 0 && (
-              <div className="mt-5 space-y-2">
-                <p className="text-sm text-foreground font-bold">{fmt(vendasAgg.totalVendido)}</p>
-                <p className="text-xs text-muted-foreground">Total vendido individual</p>
-                <p className="text-[10px] text-muted-foreground">Ranking será calculado quando o período for processado</p>
-              </div>
-            )}
-
-            {!meusDados && vendasAgg.totalVendido === 0 && (
-              <p className="text-sm text-muted-foreground mt-4">Sem vendas registradas neste período</p>
+            {!minhaPosicaoPj && (
+              <p className="text-sm text-muted-foreground mt-4">Vendedor não encontrado no controle PJ</p>
             )}
           </div>
 
