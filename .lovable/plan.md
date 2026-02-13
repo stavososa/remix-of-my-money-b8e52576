@@ -1,42 +1,43 @@
 
 
-## Reorganizacao do Painel Admin
+## Adicionar Secao "Produtos Mais Vendidos"
 
-### Mudancas Solicitadas
+### O que sera feito
 
-1. **Mover o Ranking de Vendedores para o final da pagina**
-2. **Limitar a tabela de produtos a 10 itens** com botao "Ver mais" que expande progressivamente
-3. **Restaurar os graficos do painel de vendedor** (Media Geral, Comparativo Ticket, Gauge) mas usando dados gerais/agregados da empresa
+Criar uma nova secao no painel que exibe os **10 produtos mais vendidos**, com botao "Ver mais" para expandir a lista completa -- seguindo o mesmo padrao ja usado na tabela de detalhamento.
 
-### Nova Ordem dos Blocos (Admin)
+### Posicionamento
+
+A secao ficara entre o grafico "Vendas por Dia" e o "Detalhamento de Vendas":
 
 ```text
-1. Header (Painel Administrativo + mini KPIs)
-2. KPI Cards (4 cards principais)
-3. Media Geral de Vendas (3 cards: Total Geral, Ticket Medio, Qtd Itens)
-4. Comparativo + Gauge (Ticket Medio vs Media, sem "Voce vs" - perspectiva geral)
-5. Grafico Vendas da Empresa (LineChart cronologico)
+...
 6. Grafico Vendas por Dia (BarChart)
-7. Detalhamento de Vendas (tabela limitada a 10 linhas + botao "Ver mais")
-8. Ranking Geral de Vendas PJ (movido para o final)
+7. **Produtos Mais Vendidos (NOVO)** -- limitado a 10 + "Ver mais"
+8. Detalhamento de Vendas (tabela limitada a 10 + "Ver mais")
+9. Ranking Geral de Vendas PJ
 ```
 
 ### Detalhes Tecnicos
 
 **Arquivo**: `src/pages/MeuPainel.tsx`
 
-#### 1. Tabela com limite de 10 e "Ver mais"
-- Adicionar estado `const [showAllVendas, setShowAllVendas] = useState(false)`
-- Filtrar `vendasTableData` para mostrar apenas os 10 primeiros quando `showAllVendas === false`
-- Renderizar botao "Ver mais (X restantes)" abaixo da tabela que faz `setShowAllVendas(true)`
-- Quando expandido, mostrar botao "Ver menos" para recolher
+1. **Novo estado**: `const [showAllProdutos, setShowAllProdutos] = useState(false)`
 
-#### 2. Mover Ranking para baixo
-- Mover o bloco JSX do ranking (linhas 421-461) para depois da tabela de detalhamento
+2. **Agregacao de produtos**: A partir de `vendasSource` (que ja contem todas as vendas para admin ou individuais para vendedor), agrupar por `descricao_produto`:
+   - Contar quantidade de ocorrencias (vezes vendido)
+   - Somar `total_com_desconto` (valor total arrecadado)
+   - Somar `quantidade` (unidades vendidas)
+   - Ordenar por quantidade de ocorrencias (mais vendido primeiro)
 
-#### 3. Restaurar graficos com dados gerais
-- Para admin, exibir os mesmos 3 cards de "Media Geral de Vendas" (Total Geral Vendido, Ticket Medio Geral, Qtd Total de Itens) que ja existem no modo vendedor
-- Remover o condicional `{isAdmin ? ... : ...}` na secao dos cards de comparativo, e mostrar ambos os blocos para admin tambem (removendo referencias pessoais como "Seu Ticket" e ajustando labels para perspectiva geral)
-- O Gauge mostrara a margem media geral da empresa
-- O comparativo mostrara o ticket medio geral vs mediana como referencia
+3. **Tabela com colunas**:
+   - Posicao (#)
+   - Produto (nome)
+   - Marca
+   - Qtd Vendida (soma das quantidades)
+   - Total Arrecadado (soma dos valores)
+
+4. **Limitacao**: Mostrar apenas os 10 primeiros por padrao, com botao "Ver mais (X restantes)" / "Ver menos" identico ao ja existente na tabela de detalhamento.
+
+5. **Icone**: Usar `ShoppingCart` (ja importado) no titulo da secao.
 
