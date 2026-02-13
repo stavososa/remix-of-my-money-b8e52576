@@ -14,76 +14,76 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { label: 'Ranking', to: '/ranking', icon: Trophy, roles: ['admin', 'vendedor'] },
-  { label: 'Meu Painel', to: '/meu-painel', icon: User, roles: ['vendedor'] },
-  { label: 'Gerencial', to: '/gerencial', icon: BarChart3, roles: ['admin'] },
-];
+{ label: 'Ranking', to: '/ranking', icon: Trophy, roles: ['admin', 'vendedor'] },
+{ label: 'Meu Painel', to: '/meu-painel', icon: User, roles: ['vendedor'] },
+{ label: 'Gerencial', to: '/gerencial', icon: BarChart3, roles: ['admin'] }];
+
 
 const adminItems: NavItem[] = [
-  { label: 'Regras de Comissão', to: '/admin/regras', icon: FileText, roles: ['admin'] },
-  { label: 'Importar Dados', to: '/admin/importar', icon: Download, roles: ['admin'] },
-];
+{ label: 'Regras de Comissão', to: '/admin/regras', icon: FileText, roles: ['admin'] },
+{ label: 'Importar Dados', to: '/admin/importar', icon: Download, roles: ['admin'] }];
 
-export function AppShell({ children, title }: { children: React.ReactNode; title: string }) {
+
+export function AppShell({ children, title }: {children: React.ReactNode;title: string;}) {
   const { role, nome_completo, user, signOut } = useAuth();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const filteredNav = navItems.filter(i => role && i.roles.includes(role));
-  const filteredAdmin = adminItems.filter(i => role && i.roles.includes(role));
+  const filteredNav = navItems.filter((i) => role && i.roles.includes(role));
+  const filteredAdmin = adminItems.filter((i) => role && i.roles.includes(role));
 
-  const initials = (nome_completo || user?.email || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  const initials = (nome_completo || user?.email || '?').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 
-  const SidebarContent = () => (
-    <>
+  const SidebarContent = () =>
+  <>
       <div className="p-5">
         <img src={logoImg} alt="Atacadão Maromba" className="h-10 w-auto" />
         <div className="mt-3 h-px bg-primary/30" />
       </div>
 
       <nav className="flex-1 px-3 space-y-1">
-        {filteredNav.map(item => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            onClick={() => setSidebarOpen(false)}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors ${
-                isActive
-                  ? 'bg-sidebar-accent text-foreground border-l-2 border-primary'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
-              }`
-            }
-          >
-            <item.icon className="h-4 w-4" />
-            {item.label}
-          </NavLink>
-        ))}
+        {filteredNav.map((item) => {}
 
-        {filteredAdmin.length > 0 && (
-          <>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      )}
+
+        {filteredAdmin.length > 0 &&
+      <>
             <div className="pt-4 pb-1 px-3">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Administração</span>
             </div>
-            {filteredAdmin.map(item => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                onClick={() => setSidebarOpen(false)}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors ${
-                    isActive
-                      ? 'bg-sidebar-accent text-foreground border-l-2 border-primary'
-                      : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
-                  }`
-                }
-              >
+            {filteredAdmin.map((item) =>
+        <NavLink
+          key={item.to}
+          to={item.to}
+          onClick={() => setSidebarOpen(false)}
+          className={({ isActive }) =>
+          `flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors ${
+          isActive ?
+          'bg-sidebar-accent text-foreground border-l-2 border-primary' :
+          'text-sidebar-foreground hover:bg-sidebar-accent/50'}`
+
+          }>
+
                 <item.icon className="h-4 w-4" />
                 {item.label}
               </NavLink>
-            ))}
-          </>
         )}
+          </>
+      }
       </nav>
 
       <div className="p-4 border-t border-sidebar-border space-y-3">
@@ -92,15 +92,15 @@ export function AppShell({ children, title }: { children: React.ReactNode; title
           <CustomBadge text={role === 'admin' ? 'Admin' : 'Vendedor'} variant={role === 'admin' ? 'gold' : 'silver'} />
         </div>
         <button
-          onClick={signOut}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-colors"
-        >
+        onClick={signOut}
+        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-colors">
+
           <LogOut className="h-4 w-4" />
           Sair
         </button>
       </div>
-    </>
-  );
+    </>;
+
 
   return (
     <div className="flex min-h-screen">
@@ -110,8 +110,8 @@ export function AppShell({ children, title }: { children: React.ReactNode; title
       </aside>
 
       {/* Mobile overlay */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
+      {sidebarOpen &&
+      <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/60" onClick={() => setSidebarOpen(false)} />
           <aside className="absolute left-0 top-0 bottom-0 w-[260px] bg-sidebar border-r border-sidebar-border flex flex-col">
             <button onClick={() => setSidebarOpen(false)} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
@@ -120,7 +120,7 @@ export function AppShell({ children, title }: { children: React.ReactNode; title
             <SidebarContent />
           </aside>
         </div>
-      )}
+      }
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
@@ -141,6 +141,6 @@ export function AppShell({ children, title }: { children: React.ReactNode; title
           {children}
         </main>
       </div>
-    </div>
-  );
+    </div>);
+
 }
