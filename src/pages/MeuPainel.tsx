@@ -322,7 +322,10 @@ export default function MeuPainel() {
   const geralTicketPct = (vendasGeraisAgg.ticketMedio / barMaxTicket) * 100;
   const diffTicket = displayTicket - vendasGeraisAgg.ticketMedio;
 
-  const margem = isAdmin ? vendasAgg.margemMedia : (meusDados?.margem_media ? Number(meusDados.margem_media) : vendasAgg.margemMedia);
+  const margemAdmin = vendasAgg.totalVendido > 0
+    ? (vendasAgg.totalLucro / vendasAgg.totalVendido) * 100
+    : 0;
+  const margem = isAdmin ? margemAdmin : (meusDados?.margem_media ? Number(meusDados.margem_media) : vendasAgg.margemMedia);
 
   const displayedVendas = showAllVendas ? vendasTableData : vendasTableData.slice(0, 10);
   const remainingVendas = vendasTableData.length - 10;
@@ -556,13 +559,34 @@ export default function MeuPainel() {
             </p>
             {isAdmin ? (
               <div className="flex flex-col items-center gap-4">
-                <CircularGauge value={vendasAgg.margemMedia} label="Margem" />
+                {(() => {
+                  const val = margemAdmin;
+                  const clamped = Math.min(Math.max(val, 0), 150);
+                  const displayPct = Math.min(clamped, 100);
+                  const sizeG = 140, swG = 12;
+                  const radiusG = (sizeG - swG) / 2;
+                  const circG = 2 * Math.PI * radiusG;
+                  const offsetG = circG - (displayPct / 100) * circG;
+                  const colorG = val >= 55 ? 'hsl(160 100% 42%)' : val >= 45 ? 'hsl(38 90% 55%)' : 'hsl(348 100% 62%)';
+                  return (
+                    <div className="relative" style={{ width: sizeG, height: sizeG }}>
+                      <svg width={sizeG} height={sizeG} className="-rotate-90">
+                        <circle cx={sizeG/2} cy={sizeG/2} r={radiusG} fill="none" stroke="hsl(215 40% 24%)" strokeWidth={swG} />
+                        <motion.circle cx={sizeG/2} cy={sizeG/2} r={radiusG} fill="none" stroke={colorG} strokeWidth={swG} strokeLinecap="round" strokeDasharray={circG} initial={{ strokeDashoffset: circG }} animate={{ strokeDashoffset: offsetG }} transition={{ duration: 1.2, ease: 'easeOut', delay: 0.3 }} />
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="text-2xl font-extrabold text-foreground">{fmtPct(val)}</span>
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Margem</span>
+                      </div>
+                    </div>
+                  );
+                })()}
                 <div className="flex items-center gap-3 text-[10px]">
-                  <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: 'hsl(160 100% 42%)' }} />≥80%</span>
-                  <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: 'hsl(38 90% 55%)' }} />≥50%</span>
-                  <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: 'hsl(348 100% 62%)' }} />&lt;50%</span>
+                  <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: 'hsl(160 100% 42%)' }} />≥55%</span>
+                  <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: 'hsl(38 90% 55%)' }} />≥45%</span>
+                  <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: 'hsl(348 100% 62%)' }} />&lt;45%</span>
                 </div>
-                <p className="text-[10px] text-muted-foreground">Margem média geral da empresa</p>
+                <p className="text-[10px] text-muted-foreground">Margem ponderada por receita</p>
               </div>
             ) : vendasGeraisAgg.ticketMedio > 0 ? (
               <div className="flex flex-col items-center gap-4">
