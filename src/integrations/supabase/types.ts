@@ -320,6 +320,18 @@ export type Database = {
         }
         Relationships: []
       }
+      vendas_gerais: {
+        Row: {
+          total_mercadoria: string | null
+        }
+        Insert: {
+          total_mercadoria?: string | null
+        }
+        Update: {
+          total_mercadoria?: string | null
+        }
+        Relationships: []
+      }
       vendas_periodo: {
         Row: {
           id: string
