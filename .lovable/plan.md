@@ -1,76 +1,63 @@
 
 
-# Integrar Dados de `vendas_gerais` como Media Geral e Comparativo Individual
+# Corrigir Evolucao de Vendas para Refletir Dados Gerais
 
-## Objetivo
-Buscar todos os registros da tabela `vendas_gerais`, calcular agregados (total geral, ticket medio, quantidade) e usar como baseline de "Media Geral de Vendas" para comparar com o desempenho individual do vendedor (LUCAS VILAR).
+## Problema
+O grafico "Evolucao de Vendas" esta duplicando os mesmos dados de "Vendas por Dia" (ambos usam dados individuais agrupados por data). O usuario quer que "Evolucao de Vendas" mostre os dados da empresa inteira (tabela `vendas_gerais`).
 
-## Dados Disponíveis
+## Limitacao
+A tabela `vendas_gerais` possui apenas a coluna `total_mercadoria` (sem data, sem vendedor). Portanto, nao e possivel criar um grafico de evolucao temporal com esses dados. 
 
-- **vendas_gerais**: 468 registros, coluna unica `total_mercadoria` (texto BR, ex: `" 15,40 "`)
-- Total geral: ~R$ 21.818,81
-- Ticket medio: ~R$ 46,62
-- **Vendedor individual** (LUCAS VILAR): 13 itens, ~R$ 325 vendido, margem media ~49.8%
+## Solucao Proposta
 
-## Mudancas no arquivo `src/pages/MeuPainel.tsx`
+### Opcao: Transformar "Evolucao de Vendas" em comparativo visual Individual vs Geral
 
-### 1. Nova query para `vendas_gerais`
-- Adicionar `useQuery` com queryKey `['vendas-gerais']` buscando todos os registros da tabela `vendas_gerais`
-- Usar `parseMoneyBR` (ja existente) para converter `total_mercadoria` para numerico
-- Calcular agregados: total geral vendido, quantidade de itens e ticket medio
+Em vez de um AreaChart temporal (que nao tem dados suficientes), criar um grafico de barras comparativo mostrando:
+- **Barra 1**: Total Vendido Individual vs Total Vendido Geral
+- **Barra 2**: Ticket Medio Individual vs Ticket Medio Geral
+- **Barra 3**: Qtd Itens Individual vs Qtd Itens Geral
 
-### 2. Atualizar a secao "Voce vs Media do Time"
-- Renomear para "Voce vs Media Geral" 
-- A barra "Voce" continua mostrando `vendasAgg.totalVendido` (dados individuais do LUCAS VILAR)
-- A barra "Media" passara a usar o ticket medio calculado de `vendas_gerais` multiplicado pela quantidade de itens do vendedor (ou comparacao direta de totais)
-- Alternativa mais justa: comparar **ticket medio individual** vs **ticket medio geral**
+### Mudancas no arquivo `src/pages/MeuPainel.tsx`
 
-### 3. Atualizar a secao "Margem Media" (Gauge)
-- Usar `vendasAgg.margemMedia` (ja calculada dos dados individuais) em vez de depender de `meusDados` do `v_ranking`
-- O gauge passara a sempre renderizar quando houver dados na tabela `vendas`, removendo o fallback "---"
-- Adicionar indicador textual abaixo mostrando a comparacao: "Sua margem: X% | Media geral: indisponivel" (vendas_gerais nao tem margem, apenas total_mercadoria)
+**1. Substituir o bloco "Evolucao de Vendas" (linhas 488-556)**
+- Remover o AreaChart de evolucao diaria (que duplicava "Vendas por Dia")
+- Substituir por um BarChart comparativo com dados side-by-side (Individual vs Geral)
+- Dados do grafico:
+  ```
+  [
+    { metrica: 'Total Vendido', individual: vendasAgg.totalVendido, geral: vendasGeraisAgg.totalGeral },
+    { metrica: 'Ticket Medio', individual: ticketMedioIndividual, geral: vendasGeraisAgg.ticketMedio },
+  ]
+  ```
+- Usar barras lado a lado (dourado para individual, roxo para geral)
+- Renomear a secao para "Seu Desempenho vs Empresa"
 
-### 4. Atualizar "Sua Posicao"
-- Quando `meusDados` do `v_ranking` estiver vazio mas `vendasAgg` tiver dados, mostrar o total vendido individual como destaque em vez de "---"
-- Exibir mensagem "Ranking sera calculado quando o periodo for processado"
+**2. Manter "Vendas por Dia" intacto (linhas 576-599)**
+- Este grafico continua mostrando a evolucao diaria individual sem alteracao
 
-### 5. Atualizar "Evolucao de Vendas"
-- Quando `chartData` (de `vendas_periodo`) estiver vazio, usar `vendasPorDia` (ja calculado) como fonte do grafico de area
-- Adaptar o AreaChart para mostrar evolucao diaria em vez de mensal
-
-### 6. Novo bloco de KPI: "Media Geral de Vendas"
-- Adicionar uma nova secao com 3 mini-KPIs mostrando dados agregados de `vendas_gerais`:
-  - Total Geral Vendido (soma de todas as vendas da empresa)
-  - Ticket Medio Geral
-  - Qtd Total de Itens
-- Posicionar logo abaixo dos KPI Cards individuais, antes do grid de 3 colunas
-
-## Layout Final
+### Layout resultante
 
 ```text
 +--------------------------------------------------+
-| HEADER: Saudacao + Mini KPIs inline + Badge Rank  |
+| HEADER + Mini KPIs                                |
 +--------------------------------------------------+
-| KPI Cards: Vendido | Lucro | Margem | Notas       |
+| KPI Cards individuais                             |
 +--------------------------------------------------+
-| Media Geral: Total Geral | Ticket Medio | Qtd     |
+| Media Geral de Vendas (3 KPIs)                    |
 +--------------------------------------------------+
 | Posicao  |  Voce vs Media Geral  |  Gauge Margem  |
 +--------------------------------------------------+
-| Evolucao de Vendas (AreaChart diario)              |
+| Seu Desempenho vs Empresa (BarChart comparativo)   |
 +--------------------------------------------------+
 | Detalhamento de Vendas (DataTable)                 |
 +--------------------------------------------------+
-| Vendas por Dia (BarChart)                          |
+| Vendas por Dia (BarChart diario)                   |
 +--------------------------------------------------+
 ```
 
-## Detalhes Tecnicos
-
-- A query `vendas_gerais` buscara todos os 468 registros (tabela pequena)
-- Parsing: `parseMoneyBR(row.total_mercadoria)` -- funcao ja existente
-- Comparativo de barras: ticket medio individual (`vendasAgg.totalVendido / vendasAgg.qtdItens`) vs ticket medio geral (`totalGeral / qtdItens`)
-- `vendas_gerais` so tem `total_mercadoria`, entao margem e lucro nao estarao disponiveis no comparativo geral
-- O gauge de margem usara `vendasAgg.margemMedia` como fallback quando `meusDados` for null
+### Detalhes Tecnicos
+- O BarChart usara duas barras (`<Bar>`) lado a lado com `barGap` e cores distintas
+- Tooltip formatado com `fmt()` para valores monetarios
 - Nenhuma dependencia nova necessaria
+- Os dados ja estao disponiveis em `vendasAgg` e `vendasGeraisAgg`
 
