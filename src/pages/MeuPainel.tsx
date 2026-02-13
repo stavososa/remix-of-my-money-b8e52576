@@ -52,7 +52,7 @@ function CircularGauge({ value, size = 140, strokeWidth = 12, label = 'Margem' }
   const clamped = Math.min(Math.max(value, 0), 150);
   const displayPct = Math.min(clamped, 100);
   const offset = circumference - (displayPct / 100) * circumference;
-  const color = value >= 75 ? 'hsl(160 100% 42%)' : value >= 50 ? 'hsl(38 90% 55%)' : 'hsl(348 100% 62%)';
+  const color = value >= 90 ? 'hsl(160 100% 42%)' : value >= 65 ? 'hsl(38 90% 55%)' : 'hsl(348 100% 62%)';
 
   return (
     <div className="relative" style={{ width: size, height: size }}>
@@ -137,11 +137,16 @@ export default function MeuPainel() {
   // Agregados de vendas_gerais
   const vendasGeraisAgg = (() => {
     const rows = vendasGeraisRaw ?? [];
-    const valores = rows.map(r => parseMoneyBR(r.total_mercadoria)).filter(v => v > 0);
+    const valores = rows.map(r => parseMoneyBR(r.total_mercadoria)).filter(v => v > 0).sort((a, b) => a - b);
     const totalGeral = valores.reduce((s, v) => s + v, 0);
     const qtdItens = valores.length;
     const ticketMedio = qtdItens > 0 ? totalGeral / qtdItens : 0;
-    return { totalGeral, qtdItens, ticketMedio };
+    const mediana = qtdItens > 0
+      ? qtdItens % 2 === 0
+        ? (valores[qtdItens / 2 - 1] + valores[qtdItens / 2]) / 2
+        : valores[Math.floor(qtdItens / 2)]
+      : 0;
+    return { totalGeral, qtdItens, ticketMedio, mediana };
   })();
 
   const vendasAgg = (() => {
@@ -202,11 +207,11 @@ export default function MeuPainel() {
   // Margem: usar vendasAgg como fallback
   const margem = meusDados?.margem_media ? Number(meusDados.margem_media) : vendasAgg.margemMedia;
 
-  // Comparativo: ticket médio individual vs geral
-  const barMaxTicket = Math.max(ticketMedioIndividual, vendasGeraisAgg.ticketMedio, 1);
+  // Comparativo: ticket médio individual vs mediana
+  const barMaxTicket = Math.max(ticketMedioIndividual, vendasGeraisAgg.mediana, 1);
   const meuTicketPct = (ticketMedioIndividual / barMaxTicket) * 100;
-  const geralTicketPct = (vendasGeraisAgg.ticketMedio / barMaxTicket) * 100;
-  const diffTicket = ticketMedioIndividual - vendasGeraisAgg.ticketMedio;
+  const geralTicketPct = (vendasGeraisAgg.mediana / barMaxTicket) * 100;
+  const diffTicket = ticketMedioIndividual - vendasGeraisAgg.mediana;
 
   // Evolução diária como fallback
   const evolucaoDiaria = vendasPorDia.map(d => ({
@@ -312,7 +317,7 @@ export default function MeuPainel() {
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <KPICard icon={DollarSign} label="Total Geral Vendido" value={fmt(vendasGeraisAgg.totalGeral)} subtitle="Todas as vendas da empresa" accentColor="hsl(270 60% 55%)" />
-            <KPICard icon={ShoppingCart} label="Ticket Médio Geral" value={fmt(vendasGeraisAgg.ticketMedio)} subtitle={`Seu ticket: ${fmt(ticketMedioIndividual)}`} accentColor="hsl(200 80% 50%)" />
+            <KPICard icon={ShoppingCart} label="Ticket Médio Geral" value={fmt(vendasGeraisAgg.ticketMedio)} subtitle={`Mediana: ${fmt(vendasGeraisAgg.mediana)} | Seu: ${fmt(ticketMedioIndividual)}`} accentColor="hsl(200 80% 50%)" />
             <KPICard icon={FileText} label="Qtd Total de Itens" value={String(vendasGeraisAgg.qtdItens)} subtitle={`Seus itens: ${vendasAgg.qtdItens}`} accentColor="hsl(330 70% 55%)" />
           </div>
         </motion.div>
@@ -389,10 +394,10 @@ export default function MeuPainel() {
             )}
           </div>
 
-          {/* Você vs Média Geral (Ticket Médio) */}
+          {/* Você vs Mediana da Empresa (Ticket Médio) */}
           <div className="bg-card border border-border rounded-xl p-8 shadow-card">
-            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">Você vs Média Geral</p>
-            <p className="text-[10px] text-muted-foreground mb-4">Comparativo de Ticket Médio</p>
+            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">Você vs Mediana da Empresa</p>
+            <p className="text-[10px] text-muted-foreground mb-4">Comparativo contra o valor central de vendas</p>
 
             <div className="space-y-5">
               <div>
@@ -422,8 +427,8 @@ export default function MeuPainel() {
 
               <div>
                 <div className="flex justify-between text-xs mb-1.5">
-                  <span className="text-secondary-foreground">Média Geral</span>
-                  <span className="text-secondary-foreground">{fmt(vendasGeraisAgg.ticketMedio)}</span>
+                  <span className="text-secondary-foreground">Mediana</span>
+                  <span className="text-secondary-foreground">{fmt(vendasGeraisAgg.mediana)}</span>
                 </div>
                 <div className="h-5 rounded-full bg-secondary overflow-hidden relative">
                   <motion.div
@@ -441,44 +446,45 @@ export default function MeuPainel() {
                 <>
                   <Flame className="h-5 w-5 text-primary" />
                   <div>
-                    <p className="text-success font-bold text-sm">Acima da média!</p>
+                    <p className="text-success font-bold text-sm">Acima da mediana!</p>
                     <p className="text-xs text-muted-foreground">{fmt(diffTicket)} acima por item</p>
                   </div>
                 </>
               ) : diffTicket < 0 ? (
                 <>
                   <Target className="h-5 w-5 text-primary" />
-                  <p className="text-primary font-semibold text-sm">Falta {fmt(Math.abs(diffTicket))} por item para a média</p>
+                  <p className="text-primary font-semibold text-sm">Falta {fmt(Math.abs(diffTicket))} por item para a mediana</p>
                 </>
               ) : (
                 <p className="text-secondary-foreground text-sm flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4" /> Na média geral
+                  <BarChart3 className="h-4 w-4" /> Na mediana
                 </p>
               )}
             </div>
+            <p className="text-[10px] text-muted-foreground mt-3">Mediana: {fmt(vendasGeraisAgg.mediana)} | Média: {fmt(vendasGeraisAgg.ticketMedio)}</p>
           </div>
 
-          {/* Ticket vs Média Gauge */}
+          {/* Ticket vs Mediana Gauge */}
           <div className="bg-card border border-border rounded-xl p-8 shadow-card flex flex-col items-center text-center">
-            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">Seu Ticket vs Média</p>
-            {vendasGeraisAgg.ticketMedio > 0 ? (
+            <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">Seu Ticket vs Mediana</p>
+            {vendasGeraisAgg.mediana > 0 ? (
               <div className="flex flex-col items-center gap-4">
-                <CircularGauge value={vendasGeraisAgg.ticketMedio > 0 ? (ticketMedioIndividual / vendasGeraisAgg.ticketMedio) * 100 : 0} label="vs Média" />
+                <CircularGauge value={vendasGeraisAgg.mediana > 0 ? (ticketMedioIndividual / vendasGeraisAgg.mediana) * 100 : 0} label="vs Mediana" />
                 <div className="flex items-center gap-3 text-[10px]">
                   <span className="flex items-center gap-1">
                     <span className="h-2 w-2 rounded-full" style={{ background: 'hsl(160 100% 42%)' }} />
-                    ≥75%
+                    ≥90%
                   </span>
                   <span className="flex items-center gap-1">
                     <span className="h-2 w-2 rounded-full" style={{ background: 'hsl(38 90% 55%)' }} />
-                    ≥50%
+                    ≥65%
                   </span>
                   <span className="flex items-center gap-1">
                     <span className="h-2 w-2 rounded-full" style={{ background: 'hsl(348 100% 62%)' }} />
-                    &lt;50%
+                    &lt;65%
                   </span>
                 </div>
-                <p className="text-[10px] text-muted-foreground">Seu ticket: {fmt(ticketMedioIndividual)} | Média: {fmt(vendasGeraisAgg.ticketMedio)}</p>
+                <p className="text-[10px] text-muted-foreground">Seu ticket: {fmt(ticketMedioIndividual)} | Mediana: {fmt(vendasGeraisAgg.mediana)}</p>
               </div>
             ) : (
               <p className="text-2xl font-bold text-muted-foreground">—</p>
@@ -510,7 +516,8 @@ export default function MeuPainel() {
                   labelFormatter={v => `Venda #${v}`}
                   formatter={(v: number) => [fmt(v), 'Valor']}
                 />
-                <ReferenceLine y={vendasGeraisAgg.ticketMedio} stroke="hsl(38 90% 55%)" strokeDasharray="6 4" strokeWidth={2} label={{ value: `Ticket Médio: ${fmt(vendasGeraisAgg.ticketMedio)}`, position: 'insideTopRight', fill: 'hsl(38 90% 55%)', fontSize: 11 }} />
+                <ReferenceLine y={vendasGeraisAgg.mediana} stroke="hsl(160 100% 42%)" strokeDasharray="6 4" strokeWidth={2} label={{ value: `Mediana: ${fmt(vendasGeraisAgg.mediana)}`, position: 'insideTopRight', fill: 'hsl(160 100% 42%)', fontSize: 11 }} />
+                <ReferenceLine y={vendasGeraisAgg.ticketMedio} stroke="hsl(38 90% 55%)" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: `Média: ${fmt(vendasGeraisAgg.ticketMedio)}`, position: 'insideBottomRight', fill: 'hsl(38 90% 55%)', fontSize: 10 }} />
                 <Line type="monotone" dataKey="valor" stroke="hsl(270 60% 55%)" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
