@@ -1,47 +1,26 @@
 
 
-## Adicionar Ranking de Unidades que Mais Venderam
+## Criar Usuario Admin (adm@gmail.com)
 
 ### O que sera feito
 
-Adicionar uma secao visual de **ranking das unidades que mais venderam**, posicionada logo apos os cards PJ vs CLT e antes da tabela "Performance por Unidade". Sera um destaque visual com as unidades ordenadas por total vendido.
+Criar uma edge function temporaria para registrar o usuario `adm@gmail.com` com senha `adm123` e atribuir o role de **admin** no sistema.
 
-### Posicionamento
+### Passos
 
-```text
-1. KPIs
-2. Filtros
-3. PJ vs CLT
-4. **Unidades que Mais Venderam (NOVO)** -- ranking visual
-5. Performance por Unidade (tabela)
-6. Ranking Completo
-7. Grafico de barras
-```
+1. **Criar edge function `create-admin-user`** que usa o Supabase Admin API (service role key) para:
+   - Criar o usuario `adm@gmail.com` / `adm123` via `supabase.auth.admin.createUser`
+   - Inserir o registro na tabela `perfis` com `role = 'admin'`
+
+2. **Chamar a edge function** para criar o usuario
+
+3. **Remover a edge function** apos uso (nao precisa ficar no projeto)
 
 ### Detalhes Tecnicos
 
-**Arquivo**: `src/pages/Gerencial.tsx`
+**Arquivo**: `supabase/functions/create-admin-user/index.ts`
 
-1. **Dados**: Reutilizar `resumoUnidade` (ja carregado), ordenando por `total_vendido` decrescente. Aplicar o filtro de unidade existente (`filtroUnidade`).
+A funcao usara o `SUPABASE_SERVICE_ROLE_KEY` (ja configurado) para criar o usuario com privilegios administrativos, inserindo na tabela `perfis` com role `admin`.
 
-2. **Componente**: Criar uma secao com cards em grid mostrando cada unidade ranqueada:
-   - Posicao (medalha para top 3)
-   - Nome da unidade
-   - Total vendido (destaque)
-   - Quantidade de vendedores
-   - Margem media
-
-3. **Visual**: Cards compactos em grid responsivo (2 colunas mobile, 3-4 desktop), com destaque visual para os 3 primeiros (borda dourada/prata/bronze ou cor primaria).
-
-4. **Logica**:
-   ```typescript
-   const unidadesRanked = useMemo(() => {
-     const src = filtroUnidade !== 'all'
-       ? resumoUnidade.filter(u => u.unidade_nome === filtroUnidade)
-       : resumoUnidade;
-     return [...src].sort((a, b) => Number(b.total_vendido ?? 0) - Number(a.total_vendido ?? 0));
-   }, [resumoUnidade, filtroUnidade]);
-   ```
-
-5. **Titulo da secao**: "Unidades que Mais Venderam" com icone `TrendingUp` (ja importado).
+Apos a criacao e validacao, a funcao sera removida do projeto.
 
