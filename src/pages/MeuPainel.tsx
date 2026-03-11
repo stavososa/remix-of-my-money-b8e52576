@@ -239,20 +239,32 @@ export default function MeuPainel() {
   const rankingPj = (() => {
     const pjList = controlePj ?? [];
     const vendasRows = vendasCountRaw ?? [];
+    // Normalize helper
+    const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+    // Build count/revenue maps by normalized vendedor_nome
     const countMap: Record<string, number> = {};
     const revenueMap: Record<string, number> = {};
     vendasRows.forEach(v => {
       const nome = v.vendedor_nome ?? '';
-      countMap[nome] = (countMap[nome] ?? 0) + 1;
-      revenueMap[nome] = (revenueMap[nome] ?? 0) + parseMoneyBR(v.total_com_desconto);
+      const key = norm(nome);
+      countMap[key] = (countMap[key] ?? 0) + 1;
+      revenueMap[key] = (revenueMap[key] ?? 0) + parseMoneyBR(v.total_com_desconto);
     });
-    const ranked = pjList.map(pj => ({
-      nome: pj.nome,
-      unidade: pj.unidade ?? '—',
-      nome_vendas: (pj as any).nome_vendas as string | null,
-      qtd_vendas: (pj as any).nome_vendas ? (countMap[(pj as any).nome_vendas] ?? 0) : 0,
-      total_arrecadado: (pj as any).nome_vendas ? (revenueMap[(pj as any).nome_vendas] ?? 0) : 0,
-    }));
+    const ranked = pjList.map(pj => {
+      const nomeVendas = (pj as any).nome_vendas as string | null;
+      // Try nome_vendas first, then nome
+      const key1 = nomeVendas ? norm(nomeVendas) : '';
+      const key2 = pj.nome ? norm(pj.nome) : '';
+      const qtd = (key1 && countMap[key1]) ? countMap[key1] : (key2 && countMap[key2]) ? countMap[key2] : 0;
+      const total = (key1 && revenueMap[key1]) ? revenueMap[key1] : (key2 && revenueMap[key2]) ? revenueMap[key2] : 0;
+      return {
+        nome: pj.nome,
+        unidade: pj.unidade ?? '—',
+        nome_vendas: nomeVendas,
+        qtd_vendas: qtd,
+        total_arrecadado: total,
+      };
+    });
     ranked.sort((a, b) => b.qtd_vendas - a.qtd_vendas);
     return ranked.map((r, i) => ({ ...r, posicao: i + 1 }));
   })();
