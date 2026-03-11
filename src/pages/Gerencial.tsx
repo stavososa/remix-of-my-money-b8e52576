@@ -162,7 +162,6 @@ export default function Gerencial() {
     return vendasProcessadas.filter(v => {
       if (filtroUnidade !== 'all' && v.unidade_nome !== filtroUnidade) return false;
       if (filtroVendedor !== 'all' && v.vendedor_nome !== filtroVendedor) return false;
-      if (filtroProduto !== 'all' && v.descricao_produto !== filtroProduto) return false;
       if (filtroFamilia !== 'all' && v.familia_produto !== filtroFamilia) return false;
       if (filtroMarca !== 'all' && v.marca !== filtroMarca) return false;
       return true;
