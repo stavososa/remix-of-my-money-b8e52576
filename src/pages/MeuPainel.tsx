@@ -159,6 +159,7 @@ export default function MeuPainel() {
       const { data } = await supabase.from('vendas_gerais').select('total_mercadoria');
       return data ?? [];
     },
+    staleTime: 0,
   });
 
   // ── Admin: all sales ──
