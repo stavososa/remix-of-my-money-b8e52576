@@ -5,8 +5,9 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { usePeriod } from '@/contexts/PeriodContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { Trophy, DollarSign, Users, Receipt, Crown } from 'lucide-react';
+import { Trophy, DollarSign, Users, Receipt, Crown, Package, ShoppingCart } from 'lucide-react';
 import { DataTable } from '@/components/DataTable';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 const MESES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
@@ -23,10 +24,29 @@ const medalha = (pos: number | null) => {
   return String(pos ?? '—');
 };
 
+function parseBRL(val: unknown): number {
+  if (val == null) return 0;
+  if (typeof val === 'number') return val;
+  const s = String(val);
+  const cleaned = s.replace(/R\$\s?/g, '').replace(/\./g, '').replace(',', '.').trim();
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? 0 : n;
+}
+
+interface ProductRank {
+  posicao: number;
+  descricao_produto: string;
+  familia_produto: string;
+  marca: string;
+  total_vendido: number;
+  quantidade: number;
+}
+
 export default function Ranking() {
   const { periodoAno, periodoMes } = usePeriod();
 
-  const { data: ranking = [], isLoading } = useQuery({
+  // Ranking de vendedores (view existente)
+  const { data: ranking = [], isLoading: loadRanking } = useQuery({
     queryKey: ['ranking', periodoAno, periodoMes],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -40,6 +60,56 @@ export default function Ranking() {
     },
   });
 
+  // Ranking de produtos (tabela vendas)
+  const mesStr = String(periodoMes).padStart(2, '0');
+  const inicioMes = `${periodoAno}-${mesStr}-01`;
+  const fimMes = `${periodoAno}-${mesStr}-31`;
+
+  const { data: vendasRaw = [], isLoading: loadProd } = useQuery({
+    queryKey: ['vendas-ranking-prod', periodoAno, periodoMes],
+    queryFn: async () => {
+      let allData: any[] = [];
+      let from = 0;
+      const PAGE = 1000;
+      while (true) {
+        const { data } = await supabase
+          .from('vendas')
+          .select('descricao_produto, familia_produto, marca, total_com_desconto, quantidade')
+          .gte('data_emissao', inicioMes)
+          .lte('data_emissao', fimMes)
+          .range(from, from + PAGE - 1);
+        if (!data || data.length === 0) break;
+        allData.push(...data);
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+      return allData;
+    },
+  });
+
+  const isLoading = loadRanking || loadProd;
+
+  // Agrupar produtos
+  const productRanking: ProductRank[] = useMemo(() => {
+    const map = new Map<string, { total: number; qtd: number; familia: string; marca: string }>();
+    for (const v of vendasRaw) {
+      const nome = v.descricao_produto ?? 'Sem Nome';
+      const existing = map.get(nome);
+      const total = parseBRL(v.total_com_desconto);
+      const qtd = parseBRL(v.quantidade);
+      if (existing) {
+        existing.total += total;
+        existing.qtd += qtd;
+      } else {
+        map.set(nome, { total, qtd, familia: v.familia_produto ?? 'Outros', marca: v.marca ?? 'Sem Marca' });
+      }
+    }
+    return [...map.entries()]
+      .map(([nome, d]) => ({ descricao_produto: nome, familia_produto: d.familia, marca: d.marca, total_vendido: d.total, quantidade: d.qtd, posicao: 0 }))
+      .sort((a, b) => b.total_vendido - a.total_vendido)
+      .map((item, i) => ({ ...item, posicao: i + 1 }));
+  }, [vendasRaw]);
+
   const top1 = ranking[0] ?? null;
 
   const kpis = useMemo(() => {
@@ -50,7 +120,13 @@ export default function Ranking() {
     return { totalVendido, totalComissao, vendedores: ranking.length, ticketMedio };
   }, [ranking]);
 
-  const columns = [
+  const prodKpis = useMemo(() => {
+    const totalVendido = productRanking.reduce((s, p) => s + p.total_vendido, 0);
+    const totalQtd = productRanking.reduce((s, p) => s + p.quantidade, 0);
+    return { totalVendido, totalQtd, totalProdutos: productRanking.length };
+  }, [productRanking]);
+
+  const vendedorColumns = [
     {
       key: 'posicao' as const,
       label: '#',
@@ -90,6 +166,31 @@ export default function Ranking() {
     },
   ];
 
+  const produtoColumns = [
+    {
+      key: 'posicao' as const,
+      label: '#',
+      render: (v: number) => (
+        <span className={v <= 3 ? 'text-lg' : ''}>{medalha(v)}</span>
+      ),
+    },
+    { key: 'descricao_produto' as const, label: 'Produto' },
+    { key: 'familia_produto' as const, label: 'Família' },
+    { key: 'marca' as const, label: 'Marca' },
+    {
+      key: 'total_vendido' as const,
+      label: 'Total Vendido',
+      align: 'right' as const,
+      render: (v: number) => formatBRL(v),
+    },
+    {
+      key: 'quantidade' as const,
+      label: 'Quantidade',
+      align: 'right' as const,
+      render: (v: number) => Math.round(v).toLocaleString('pt-BR'),
+    },
+  ];
+
   return (
     <AppShell title="Ranking">
       {isLoading ? (
@@ -117,52 +218,101 @@ export default function Ranking() {
             </div>
           )}
 
-          {/* KPIs */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <KPICard icon={DollarSign} label="Total Vendido (Time)" value={formatBRL(kpis.totalVendido)} />
-            <KPICard icon={Trophy} label="Comissão Total" value={formatBRL(kpis.totalComissao)} />
-            <KPICard icon={Users} label="Vendedores Ativos" value={String(kpis.vendedores)} />
-            <KPICard icon={Receipt} label="Ticket Médio" value={formatBRL(kpis.ticketMedio)} />
-          </div>
+          {/* Tabs */}
+          <Tabs defaultValue="vendedores" className="w-full">
+            <TabsList className="w-full sm:w-auto">
+              <TabsTrigger value="vendedores" className="flex-1 sm:flex-none gap-2">
+                <Users className="h-4 w-4" />
+                Vendedores
+              </TabsTrigger>
+              <TabsTrigger value="produtos" className="flex-1 sm:flex-none gap-2">
+                <Package className="h-4 w-4" />
+                Produtos Mais Vendidos
+              </TabsTrigger>
+            </TabsList>
 
-          {/* Tabela Desktop */}
-          <div className="hidden md:block">
-            <DataTable columns={columns} data={ranking} rowClassName={(row: any) => row.posicao != null && row.posicao <= 3 ? 'bg-primary/5' : ''} />
-          </div>
-
-          {/* Cards Mobile */}
-          <div className="md:hidden space-y-3">
-            {ranking.map((r) => (
-              <div key={r.vendedor_id} className={`bg-card border border-border rounded-lg p-4 shadow-card ${r.posicao != null && r.posicao <= 3 ? 'border-primary/40' : ''}`}>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">{medalha(r.posicao)}</span>
-                    <span className="font-bold text-foreground">{r.vendedor_nome}</span>
-                  </div>
-                  {r.regime && <StatusBadge status={r.regime} />}
-                </div>
-                <p className="text-xs text-secondary-foreground mb-2">{r.unidade_nome}</p>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Vendido: </span>
-                    <span className="font-semibold text-foreground">{formatBRL(r.total_vendido)}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Comissão: </span>
-                    <span className="font-semibold text-foreground">{formatBRL(r.total_comissao)}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">%: </span>
-                    <span className="text-foreground">{formatPct(r.percentual_aplicado)}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Notas: </span>
-                    <span className="text-foreground">{r.qtd_notas ?? 0}</span>
-                  </div>
-                </div>
+            {/* Tab Vendedores */}
+            <TabsContent value="vendedores" className="space-y-6">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <KPICard icon={DollarSign} label="Total Vendido (Time)" value={formatBRL(kpis.totalVendido)} />
+                <KPICard icon={Trophy} label="Comissão Total" value={formatBRL(kpis.totalComissao)} />
+                <KPICard icon={Users} label="Vendedores Ativos" value={String(kpis.vendedores)} />
+                <KPICard icon={Receipt} label="Ticket Médio" value={formatBRL(kpis.ticketMedio)} />
               </div>
-            ))}
-          </div>
+
+              <div className="hidden md:block">
+                <DataTable columns={vendedorColumns} data={ranking} rowClassName={(row: any) => row.posicao != null && row.posicao <= 3 ? 'bg-primary/5' : ''} />
+              </div>
+
+              <div className="md:hidden space-y-3">
+                {ranking.map((r) => (
+                  <div key={r.vendedor_id} className={`bg-card border border-border rounded-lg p-4 shadow-card ${r.posicao != null && r.posicao <= 3 ? 'border-primary/40' : ''}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{medalha(r.posicao)}</span>
+                        <span className="font-bold text-foreground">{r.vendedor_nome}</span>
+                      </div>
+                      {r.regime && <StatusBadge status={r.regime} />}
+                    </div>
+                    <p className="text-xs text-secondary-foreground mb-2">{r.unidade_nome}</p>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Vendido: </span>
+                        <span className="font-semibold text-foreground">{formatBRL(r.total_vendido)}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Comissão: </span>
+                        <span className="font-semibold text-foreground">{formatBRL(r.total_comissao)}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">%: </span>
+                        <span className="text-foreground">{formatPct(r.percentual_aplicado)}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Notas: </span>
+                        <span className="text-foreground">{r.qtd_notas ?? 0}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </TabsContent>
+
+            {/* Tab Produtos */}
+            <TabsContent value="produtos" className="space-y-6">
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                <KPICard icon={DollarSign} label="Total Vendido" value={formatBRL(prodKpis.totalVendido)} />
+                <KPICard icon={ShoppingCart} label="Qtd Total Vendida" value={Math.round(prodKpis.totalQtd).toLocaleString('pt-BR')} />
+                <KPICard icon={Package} label="Produtos Únicos" value={String(prodKpis.totalProdutos)} />
+              </div>
+
+              <div className="hidden md:block">
+                <DataTable columns={produtoColumns} data={productRanking.slice(0, 50)} rowClassName={(row: any) => row.posicao <= 3 ? 'bg-primary/5' : ''} />
+              </div>
+
+              <div className="md:hidden space-y-3">
+                {productRanking.slice(0, 50).map((p) => (
+                  <div key={p.descricao_produto} className={`bg-card border border-border rounded-lg p-4 shadow-card ${p.posicao <= 3 ? 'border-primary/40' : ''}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-lg">{medalha(p.posicao)}</span>
+                      <span className="font-bold text-foreground text-sm">{p.descricao_produto}</span>
+                    </div>
+                    <p className="text-xs text-secondary-foreground mb-2">{p.familia_produto} · {p.marca}</p>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Vendido: </span>
+                        <span className="font-semibold text-foreground">{formatBRL(p.total_vendido)}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Qtd: </span>
+                        <span className="text-foreground">{Math.round(p.quantidade).toLocaleString('pt-BR')}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
       )}
     </AppShell>

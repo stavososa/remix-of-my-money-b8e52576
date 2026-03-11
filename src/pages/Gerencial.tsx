@@ -53,7 +53,6 @@ interface ProcessedVenda {
 export default function Gerencial() {
   const [filtroUnidade, setFiltroUnidade] = useState<string>('all');
   const [filtroVendedor, setFiltroVendedor] = useState<string>('all');
-  const [filtroProduto, setFiltroProduto] = useState<string>('all');
   const [filtroFamilia, setFiltroFamilia] = useState<string>('all');
   const [filtroMarca, setFiltroMarca] = useState<string>('all');
 
@@ -155,8 +154,7 @@ export default function Gerencial() {
     const unidades = [...new Set(vendasProcessadas.map(v => v.unidade_nome))].filter(n => n !== 'Sem Unidade').sort();
     const familias = [...new Set(vendasProcessadas.map(v => v.familia_produto))].filter(f => f !== 'Outros').sort();
     const marcas = [...new Set(vendasProcessadas.map(v => v.marca))].filter(m => m !== 'Sem Marca').sort();
-    const produtos = [...new Set(vendasProcessadas.map(v => v.descricao_produto))].filter(Boolean).sort();
-    return { vendedores, unidades, familias, marcas, produtos };
+    return { vendedores, unidades, familias, marcas };
   }, [vendasProcessadas]);
 
   // Apply filters
@@ -164,12 +162,11 @@ export default function Gerencial() {
     return vendasProcessadas.filter(v => {
       if (filtroUnidade !== 'all' && v.unidade_nome !== filtroUnidade) return false;
       if (filtroVendedor !== 'all' && v.vendedor_nome !== filtroVendedor) return false;
-      if (filtroProduto !== 'all' && v.descricao_produto !== filtroProduto) return false;
       if (filtroFamilia !== 'all' && v.familia_produto !== filtroFamilia) return false;
       if (filtroMarca !== 'all' && v.marca !== filtroMarca) return false;
       return true;
     });
-  }, [vendasProcessadas, filtroUnidade, filtroVendedor, filtroProduto, filtroFamilia, filtroMarca]);
+  }, [vendasProcessadas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca]);
 
   // KPIs
   const kpis = useMemo(() => {
@@ -230,13 +227,11 @@ export default function Gerencial() {
     ...(filtroVendedor !== 'all' ? [{ label: `Vendedor: ${filtroVendedor}`, clear: () => setFiltroVendedor('all') }] : []),
     ...(filtroFamilia !== 'all' ? [{ label: `Família: ${filtroFamilia}`, clear: () => setFiltroFamilia('all') }] : []),
     ...(filtroMarca !== 'all' ? [{ label: `Marca: ${filtroMarca}`, clear: () => setFiltroMarca('all') }] : []),
-    ...(filtroProduto !== 'all' ? [{ label: `Produto: ${filtroProduto.substring(0, 30)}...`, clear: () => setFiltroProduto('all') }] : []),
   ];
 
   const clearAllFilters = () => {
     setFiltroUnidade('all');
     setFiltroVendedor('all');
-    setFiltroProduto('all');
     setFiltroFamilia('all');
     setFiltroMarca('all');
   };
@@ -284,7 +279,6 @@ export default function Gerencial() {
           <FilterSelect label="Vendedor" value={filtroVendedor} onChange={setFiltroVendedor} options={filterOptions.vendedores.map(v => ({ value: v, label: v }))} allLabel="Todos os Vendedores" />
           <FilterSelect label="Família" value={filtroFamilia} onChange={setFiltroFamilia} options={filterOptions.familias.map(f => ({ value: f, label: f }))} allLabel="Todas as Famílias" />
           <FilterSelect label="Marca" value={filtroMarca} onChange={setFiltroMarca} options={filterOptions.marcas.map(m => ({ value: m, label: m }))} allLabel="Todas as Marcas" />
-          <FilterSelect label="Produto" value={filtroProduto} onChange={setFiltroProduto} options={filterOptions.produtos.map(p => ({ value: p, label: p.length > 40 ? p.substring(0, 40) + '…' : p }))} allLabel="Todos os Produtos" />
           {activeFilters.length > 0 && (
             <button onClick={clearAllFilters} className="text-xs text-muted-foreground hover:text-foreground transition-colors underline">
               Limpar filtros
