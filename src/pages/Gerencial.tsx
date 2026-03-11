@@ -36,13 +36,19 @@ function parsePct(val: unknown): number {
 
 const PAGE_SIZE = 1000;
 
-async function fetchAllVendas() {
+async function fetchVendasByPeriod(ano: number, mes: number) {
+  const startDate = `${ano}-${String(mes).padStart(2, '0')}-01`;
+  const lastDay = new Date(ano, mes, 0).getDate();
+  const endDate = `${ano}-${String(mes).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
   const allRows: any[] = [];
   let offset = 0;
   while (true) {
     const { data, error } = await supabase
       .from('vendas')
       .select('*')
+      .gte('data_emissao', startDate)
+      .lte('data_emissao', endDate)
       .order('data_emissao', { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1);
     if (error) throw error;
