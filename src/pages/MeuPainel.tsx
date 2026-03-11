@@ -147,10 +147,10 @@ export default function MeuPainel() {
       const { data } = await supabase
         .from('vendas')
         .select('data_emissao, total_mercadoria, vendedor_nome')
-        .not('data_emissao', 'is', null)
         .order('data_emissao', { ascending: true });
-      return data ?? [];
+      return (data ?? []).filter(r => r.data_emissao);
     },
+    staleTime: 0,
   });
 
   const { data: vendasGeraisRaw } = useQuery({
