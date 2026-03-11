@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { KPICard } from '@/components/KPICard';
 import { DataTable } from '@/components/DataTable';
-import { usePeriod } from '@/contexts/PeriodContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { DollarSign, Users, Percent, TrendingUp, Package, X, Calendar, Filter } from 'lucide-react';
@@ -29,9 +28,12 @@ function parsePct(val: string | null | undefined): number {
   return isNaN(n) ? 0 : n;
 }
 
+const MONTH_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
 interface ProcessedVenda {
   id: number;
   data_emissao: string;
+  mesAno: string; // "YYYY-MM"
   dia: number;
   vendedor_nome: string;
   unidade_nome: string;
@@ -46,7 +48,7 @@ interface ProcessedVenda {
 }
 
 export default function Gerencial() {
-  const { periodoAno, periodoMes } = usePeriod();
+  const [filtroMesAno, setFiltroMesAno] = useState<string>('');
   const [filtroUnidade, setFiltroUnidade] = useState<string>('all');
   const [filtroDia, setFiltroDia] = useState<string>('all');
   const [filtroVendedor, setFiltroVendedor] = useState<string>('all');
@@ -54,18 +56,13 @@ export default function Gerencial() {
   const [filtroFamilia, setFiltroFamilia] = useState<string>('all');
   const [filtroMarca, setFiltroMarca] = useState<string>('all');
 
-  // Fetch vendas filtered by period
+  // Fetch ALL vendas (no date filter)
   const { data: vendasRaw = [], isLoading: loadV } = useQuery({
-    queryKey: ['vendas', periodoAno, periodoMes],
+    queryKey: ['vendas-all'],
     queryFn: async () => {
-      const startDate = `${periodoAno}-${String(periodoMes).padStart(2, '0')}-01`;
-      const endMonth = periodoMes === 12 ? 1 : periodoMes + 1;
-      const endYear = periodoMes === 12 ? periodoAno + 1 : periodoAno;
-      const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
       const { data } = await supabase
         .from('vendas').select('*')
-        .gte('data_emissao', startDate)
-        .lt('data_emissao', endDate);
+        .order('data_emissao', { ascending: false });
       return data ?? [];
     },
   });
