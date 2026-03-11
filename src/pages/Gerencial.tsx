@@ -62,9 +62,12 @@ export default function Gerencial() {
     queryFn: async () => {
       const { data } = await supabase
         .from('vendas').select('*')
-        .order('data_emissao', { ascending: false });
+        .order('data_emissao', { ascending: false })
+        .limit(5000);
       return data ?? [];
     },
+    staleTime: 0,
+    refetchOnMount: 'always' as const,
   });
 
   // Fetch controle_pj for vendor->unit mapping
@@ -74,6 +77,7 @@ export default function Gerencial() {
       const { data } = await supabase.from('controle_pj').select('*');
       return data ?? [];
     },
+    staleTime: 0,
   });
 
   const isLoading = loadV || loadC;
