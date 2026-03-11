@@ -16,16 +16,20 @@ import {
   Table, TableHeader, TableBody, TableHead, TableRow, TableCell,
 } from '@/components/ui/table';
 
-const parseMoneyBR = (str: string | null | undefined): number => {
-  if (!str) return 0;
-  const cleaned = str.replace(/[R$\s.]/g, '').replace(',', '.');
+const parseMoneyBR = (str: unknown): number => {
+  if (str == null) return 0;
+  if (typeof str === 'number') return str;
+  const s = String(str);
+  const cleaned = s.replace(/[R$\s.]/g, '').replace(',', '.');
   const val = parseFloat(cleaned);
   return isNaN(val) ? 0 : val;
 };
 
-const parsePctBR = (str: string | null | undefined): number => {
-  if (!str) return 0;
-  const cleaned = str.replace('%', '').replace(/\s/g, '').replace(',', '.');
+const parsePctBR = (str: unknown): number => {
+  if (str == null) return 0;
+  if (typeof str === 'number') return str;
+  const s = String(str);
+  const cleaned = s.replace('%', '').replace(/\s/g, '').replace(',', '.');
   const val = parseFloat(cleaned);
   return isNaN(val) ? 0 : val;
 };
