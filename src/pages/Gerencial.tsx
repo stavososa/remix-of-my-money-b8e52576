@@ -14,16 +14,20 @@ const fmt = (v: number | null | undefined) =>
 const fmtPct = (v: number | null | undefined) =>
   v != null ? `${Number(v).toFixed(1)}%` : '—';
 
-function parseBRL(val: string | null | undefined): number {
-  if (!val) return 0;
-  const cleaned = val.replace(/R\$\s?/g, '').replace(/\./g, '').replace(',', '.').trim();
+function parseBRL(val: unknown): number {
+  if (val == null) return 0;
+  if (typeof val === 'number') return val;
+  const s = String(val);
+  const cleaned = s.replace(/R\$\s?/g, '').replace(/\./g, '').replace(',', '.').trim();
   const n = parseFloat(cleaned);
   return isNaN(n) ? 0 : n;
 }
 
-function parsePct(val: string | null | undefined): number {
-  if (!val) return 0;
-  const cleaned = val.replace('%', '').replace(',', '.').trim();
+function parsePct(val: unknown): number {
+  if (val == null) return 0;
+  if (typeof val === 'number') return val;
+  const s = String(val);
+  const cleaned = s.replace('%', '').replace(',', '.').trim();
   const n = parseFloat(cleaned);
   return isNaN(n) ? 0 : n;
 }
