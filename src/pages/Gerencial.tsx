@@ -159,8 +159,12 @@ export default function Gerencial() {
 
   // Available months
   const mesesDisponiveis = useMemo(() => {
-    const set = new Set(vendasProcessadas.map(v => v.mesAno).filter(Boolean));
-    return [...set].sort().reverse();
+    const set = new Set(vendasProcessadas.map(v => v.mesAno));
+    // Sort real months descending, put "sem-data" at end
+    const arr = [...set];
+    const real = arr.filter(m => m !== 'sem-data').sort().reverse();
+    const semData = arr.includes('sem-data') ? ['sem-data'] : [];
+    return [...real, ...semData];
   }, [vendasProcessadas]);
 
   // Auto-select first available month
