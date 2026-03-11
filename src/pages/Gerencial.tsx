@@ -455,4 +455,3 @@ function FilterSelect({ label, value, onChange, options, allLabel, hideAll }: {
     </select>
   );
 }
-}
