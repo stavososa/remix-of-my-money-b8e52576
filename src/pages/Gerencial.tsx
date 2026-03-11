@@ -166,7 +166,7 @@ export default function Gerencial() {
       if (filtroMarca !== 'all' && v.marca !== filtroMarca) return false;
       return true;
     });
-  }, [vendasProcessadas, filtroUnidade, filtroVendedor, filtroProduto, filtroFamilia, filtroMarca]);
+  }, [vendasProcessadas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca]);
 
   // KPIs
   const kpis = useMemo(() => {
