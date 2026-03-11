@@ -36,13 +36,19 @@ function parsePct(val: unknown): number {
 
 const PAGE_SIZE = 1000;
 
-async function fetchAllVendas() {
+async function fetchVendasByPeriod(ano: number, mes: number) {
+  const startDate = `${ano}-${String(mes).padStart(2, '0')}-01`;
+  const lastDay = new Date(ano, mes, 0).getDate();
+  const endDate = `${ano}-${String(mes).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
   const allRows: any[] = [];
   let offset = 0;
   while (true) {
     const { data, error } = await supabase
       .from('vendas')
       .select('*')
+      .gte('data_emissao', startDate)
+      .lte('data_emissao', endDate)
       .order('data_emissao', { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1);
     if (error) throw error;
@@ -78,10 +84,10 @@ export default function Gerencial() {
   const [filtroFamilia, setFiltroFamilia] = useState<string>('all');
   const [filtroMarca, setFiltroMarca] = useState<string>('all');
 
-  // Fetch ALL vendas with pagination
+  // Fetch vendas filtered by period server-side
   const { data: vendasRaw = [], isLoading: loadV } = useQuery({
-    queryKey: ['vendas-all'],
-    queryFn: fetchAllVendas,
+    queryKey: ['vendas-period', periodoAno, periodoMes],
+    queryFn: () => fetchVendasByPeriod(periodoAno, periodoMes),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -90,7 +96,7 @@ export default function Gerencial() {
     queryKey: ['controle_pj'],
     queryFn: async () => {
       const { data } = await supabase.from('controle_pj').select('*');
-      return data ?? [];
+      return (data ?? []) as any[];
     },
     staleTime: 5 * 60 * 1000,
   });
@@ -129,25 +135,23 @@ export default function Gerencial() {
     return 'Sem Unidade';
   };
 
-  // Process vendas
+  // Process vendas (already filtered by period from server)
   const vendasProcessadas: ProcessedVenda[] = useMemo(() => {
-    return vendasRaw.map(v => {
+    return vendasRaw.map((v: any) => {
       const vendNome = v.vendedor_nome ?? '';
       const unidade = resolveUnidade(vendNome);
       const dataStr = v.data_emissao ?? '';
       let dia = 0;
-      let mesAno = 'sem-data';
       if (dataStr) {
         const parts = dataStr.split('-');
         if (parts.length >= 3) {
           dia = parseInt(parts[2], 10);
-          mesAno = `${parts[0]}-${parts[1]}`;
         }
       }
       return {
         id: v.id,
         data_emissao: dataStr,
-        mesAno,
+        mesAno: '',
         dia,
         vendedor_nome: vendNome,
         unidade_nome: unidade,
@@ -163,32 +167,27 @@ export default function Gerencial() {
     });
   }, [vendasRaw, vendedorUnidadeMap, unidadesConhecidas]);
 
-  // Filter by period first
-  const periodoKey = `${periodoAno}-${String(periodoMes).padStart(2, '0')}`;
-
-  const vendasDoPeriodo = useMemo(() => {
-    return vendasProcessadas.filter(v => v.mesAno === periodoKey);
-  }, [vendasProcessadas, periodoKey]);
+  // No client-side period filter needed — server already filtered
 
   // Filter options from period data
   const filterOptions = useMemo(() => {
-    const vendedores = [...new Set(vendasDoPeriodo.map(v => v.vendedor_nome))].filter(Boolean).sort();
-    const unidades = [...new Set(vendasDoPeriodo.map(v => v.unidade_nome))].filter(n => n !== 'Sem Unidade').sort();
-    const familias = [...new Set(vendasDoPeriodo.map(v => v.familia_produto))].filter(f => f !== 'Outros').sort();
-    const marcas = [...new Set(vendasDoPeriodo.map(v => v.marca))].filter(m => m !== 'Sem Marca').sort();
+    const vendedores = [...new Set(vendasProcessadas.map(v => v.vendedor_nome))].filter(Boolean).sort();
+    const unidades = [...new Set(vendasProcessadas.map(v => v.unidade_nome))].filter((n): n is string => n !== 'Sem Unidade').sort();
+    const familias = [...new Set(vendasProcessadas.map(v => v.familia_produto))].filter((f): f is string => f !== 'Outros').sort();
+    const marcas = [...new Set(vendasProcessadas.map(v => v.marca))].filter((m): m is string => m !== 'Sem Marca').sort();
     return { vendedores, unidades, familias, marcas };
-  }, [vendasDoPeriodo]);
+  }, [vendasProcessadas]);
 
-  // Apply filters on period-filtered data
+  // Apply filters
   const vendasFiltradas = useMemo(() => {
-    return vendasDoPeriodo.filter(v => {
+    return vendasProcessadas.filter(v => {
       if (filtroUnidade !== 'all' && v.unidade_nome !== filtroUnidade) return false;
       if (filtroVendedor !== 'all' && v.vendedor_nome !== filtroVendedor) return false;
       if (filtroFamilia !== 'all' && v.familia_produto !== filtroFamilia) return false;
       if (filtroMarca !== 'all' && v.marca !== filtroMarca) return false;
       return true;
     });
-  }, [vendasDoPeriodo, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca]);
+  }, [vendasProcessadas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca]);
 
   // KPIs
   const kpis = useMemo(() => {
@@ -333,7 +332,7 @@ export default function Gerencial() {
           <div className="bg-card border border-border rounded-lg p-6 shadow-card">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-secondary-foreground">Progresso de Faturamento</h3>
-              <span className="text-xs text-muted-foreground">{vendasFiltradas.length} de {vendasDoPeriodo.length} vendas</span>
+              <span className="text-xs text-muted-foreground">{vendasFiltradas.length} de {vendasProcessadas.length} vendas</span>
             </div>
             <ResponsiveContainer width="100%" height={320}>
               <AreaChart data={chartProgresso} margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
