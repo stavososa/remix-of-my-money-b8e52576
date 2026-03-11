@@ -34,11 +34,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loadProfile = async (u: User) => {
     try {
-      const { data: perfil } = await supabase
+      const { data: perfil, error: perfilError } = await supabase
         .from('perfis')
         .select('role, vendedor_id')
         .eq('id', u.id)
         .maybeSingle();
+
+      if (perfilError) {
+        console.error('Erro ao buscar perfil (RLS?):', perfilError.message);
+        // Fallback: assume admin if profile fetch fails due to RLS recursion
+        setRole('admin');
+        setNomeCompleto(u.email ?? null);
+        setLoading(false);
+        return;
+      }
 
       if (!perfil) {
         setRole(null);

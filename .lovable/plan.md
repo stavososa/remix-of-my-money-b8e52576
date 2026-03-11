@@ -1,58 +1,39 @@
 
 
-## Problemas Identificados
+## Gerencial com dados da tabela `vendas` + filtro por Unidade + graficos
 
-1. **Tabela `perfis` com erro de RLS** - Retorna erro 500 "infinite recursion detected in policy for relation perfis". Isso impede o app de detectar o role do usuario (admin/vendedor), bloqueando acesso as paginas.
+A tabela `vendas` tem 468 registros (Jan/2026) com valores em formato string brasileiro (ex: "R$ 15,40", "49,30%"). O campo `vendedor_nome` liga aos vendedores/unidades via `vendedores.nome_omie`. Sera necessario fazer JOIN client-side ou via query para associar unidade a cada venda.
 
-2. **Tabela `vendas` vazia** - A query retorna `[]` para Marco/2026. Os dados precisam ser importados.
+### Abordagem
 
-3. **Pagina Gerencial ja foi refatorada** - O codigo atual ja tem os 6 filtros (Dia, Unidade, Vendedor, Familia, Marca, Produto), KPIs, graficos e tabela detalhada. So falta dados e corrigir o RLS.
+Buscar dados da tabela `vendas` filtrados por periodo (`data_emissao`), e cruzar com `vendedores` + `unidades` para obter a unidade de cada venda. Parsear valores monetarios/percentuais no frontend (padrão ja existente no projeto).
 
-## Plano
+### Alteracoes em `src/pages/Gerencial.tsx`
 
-### 1. Corrigir RLS da tabela `perfis` no Supabase
+1. **Nova query: buscar `vendas`** filtradas pelo periodo atual (mes/ano do `data_emissao`), com limite adequado
 
-Voce precisa executar este SQL no **Supabase SQL Editor** para corrigir a recursao infinita:
+2. **Nova query: buscar `vendedores` com `unidades`** para mapear `nome_omie` -> `unidade_nome`
 
-```sql
--- Remover policies com recursao
-DROP POLICY IF EXISTS "Users can view own profile" ON perfis;
-DROP POLICY IF EXISTS "Users can update own profile" ON perfis;
-DROP POLICY IF EXISTS "Admins can view all profiles" ON perfis;
+3. **Processar dados client-side**:
+   - Parsear `total_com_desconto`, `lucros_reais`, `margem_percentual` de string BR para number
+   - Associar cada venda a sua unidade via mapa vendedor->unidade
+   - Agregar por unidade: total vendido, lucro, margem media, qtd vendas
 
--- Recriar sem recursao
-CREATE POLICY "Users can view own profile" ON perfis
-  FOR SELECT TO authenticated
-  USING (id = auth.uid());
+4. **Filtro por Unidade**: O select de unidades ja existe. Ao selecionar uma unidade, filtrar as vendas processadas e recalcular todos os KPIs e graficos.
 
-CREATE POLICY "Users can update own profile" ON perfis
-  FOR UPDATE TO authenticated
-  USING (id = auth.uid());
-```
+5. **Novos graficos usando dados de `vendas`**:
+   - **Faturamento por Unidade** (BarChart horizontal - ja existe, alimentar com dados de vendas)
+   - **Margem Media por Unidade** (novo BarChart horizontal, cor verde)
+   - **Top Familias de Produto** (BarChart mostrando as familias mais vendidas, reagindo ao filtro de unidade)
 
-### 2. Inserir perfil admin para o usuario logado
+6. **Cards PJ vs CLT**: Recalcular a partir do cruzamento vendas + vendedores (que tem campo `regime`), ao inves de depender exclusivamente da view `v_resumo_regime`
 
-```sql
-INSERT INTO perfis (id, role, nome)
-VALUES ('141cfd5d-bd84-4a4e-9ee0-ae13a21d6998', 'admin', 'SST Comissoes')
-ON CONFLICT (id) DO UPDATE SET role = 'admin';
-```
+7. **Layout**: Organizar graficos em grid 2 colunas no desktop
 
-### 3. Importar dados na tabela `vendas`
+### Detalhes tecnicos
 
-A tabela `vendas` existe com a estrutura correta (data_emissao, vendedor_nome, total_com_desconto, lucros_reais, margem_percentual, familia_produto, marca, etc). Basta importar os dados via:
-- Pagina **Admin > Importar** (se funcionar apos corrigir o perfil)
-- Ou upload CSV direto no Supabase Dashboard
-
-### 4. Ajustar o frontend para ser resiliente ao perfis vazio
-
-Modificar o `AuthContext.tsx` para tratar o erro de RLS graciosamente e permitir acesso mesmo quando o perfil falha, evitando tela branca.
-
-### Arquivos alterados
-- **`src/contexts/AuthContext.tsx`** - Tratar erro 500 do perfis para nao bloquear o app
-
-### Acoes do usuario no Supabase
-- Executar SQL para corrigir RLS do `perfis`
-- Inserir perfil admin
-- Importar dados na tabela `vendas`
+- Funcoes de parsing ja existem no projeto (regex para "R$ X,XX" e "XX,XX%")
+- A tabela `vendas` tem 468 linhas para Jan/2026, dentro do limite de 1000 do Supabase
+- Vendedores sem unidade (ex: "CHECK OUT", "COMPRA VENDEDOR") serao agrupados como "Sem Unidade" ou ignorados conforme filtro
+- Manter as queries existentes (`v_ranking`, `v_resumo_unidade`, `v_resumo_regime`) para dados de comissao que nao existem na tabela `vendas`
 
