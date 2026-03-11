@@ -62,9 +62,12 @@ export default function Gerencial() {
     queryFn: async () => {
       const { data } = await supabase
         .from('vendas').select('*')
-        .order('data_emissao', { ascending: false });
+        .order('data_emissao', { ascending: false })
+        .limit(5000);
       return data ?? [];
     },
+    staleTime: 0,
+    refetchOnMount: 'always' as const,
   });
 
   // Fetch controle_pj for vendor->unit mapping
@@ -74,28 +77,60 @@ export default function Gerencial() {
       const { data } = await supabase.from('controle_pj').select('*');
       return data ?? [];
     },
+    staleTime: 0,
   });
 
   const isLoading = loadV || loadC;
 
-  // Build vendor -> unit map from controle_pj
+  // Known unit names for fallback extraction from vendedor_nome
+  const unidadesConhecidas = useMemo(() => {
+    return [...new Set(controlePj.map(cp => cp.unidade).filter(Boolean))] as string[];
+  }, [controlePj]);
+
+  // Build vendor -> unit map from controle_pj (case-insensitive, multiple strategies)
   const vendedorUnidadeMap = useMemo(() => {
     const map = new Map<string, string>();
     for (const cp of controlePj) {
-      if (cp.nome_vendas) map.set(cp.nome_vendas.toUpperCase(), cp.unidade ?? 'Sem Unidade');
-      if (cp.nome) map.set(cp.nome.toUpperCase(), cp.unidade ?? 'Sem Unidade');
+      const unidade = cp.unidade ?? 'Sem Unidade';
+      // Strategy 1: exact nome_vendas match
+      if ((cp as any).nome_vendas) map.set(((cp as any).nome_vendas as string).toUpperCase().trim(), unidade);
+      // Strategy 2: exact nome match
+      if (cp.nome) map.set(cp.nome.toUpperCase().trim(), unidade);
     }
     return map;
   }, [controlePj]);
 
+  // Enhanced vendor->unit lookup with partial matching and fallback
+  const resolveUnidade = (vendedorNome: string): string => {
+    const upper = vendedorNome.toUpperCase().trim();
+    // 1. Exact match
+    if (vendedorUnidadeMap.has(upper)) return vendedorUnidadeMap.get(upper)!;
+    // 2. Normalize accents and try again
+    const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+    const normalizedInput = normalize(vendedorNome);
+    for (const [key, val] of vendedorUnidadeMap.entries()) {
+      if (normalize(key) === normalizedInput) return val;
+    }
+    // 3. Partial match: check if vendor name contains a known controle_pj name
+    for (const [key, val] of vendedorUnidadeMap.entries()) {
+      const normKey = normalize(key);
+      if (normalizedInput.includes(normKey) || normKey.includes(normalizedInput)) return val;
+    }
+    // 4. Fallback: extract known unit name from vendedor_nome (e.g., "CHECKOUT FREGUESIA" -> FREGUESIA)
+    for (const unidade of unidadesConhecidas) {
+      if (normalizedInput.includes(normalize(unidade))) return unidade;
+    }
+    return 'Sem Unidade';
+  };
+
   // Process vendas
   const vendasProcessadas: ProcessedVenda[] = useMemo(() => {
     return vendasRaw.map(v => {
-      const vendNome = (v.vendedor_nome ?? '').toUpperCase();
-      const unidade = vendedorUnidadeMap.get(vendNome) ?? 'Sem Unidade';
+      const vendNome = v.vendedor_nome ?? '';
+      const unidade = resolveUnidade(vendNome);
       const dataStr = v.data_emissao ?? '';
       let dia = 0;
-      let mesAno = '';
+      let mesAno = 'sem-data';
       if (dataStr) {
         const parts = dataStr.split('-');
         if (parts.length >= 3) {
@@ -108,7 +143,7 @@ export default function Gerencial() {
         data_emissao: dataStr,
         mesAno,
         dia,
-        vendedor_nome: v.vendedor_nome ?? '',
+        vendedor_nome: vendNome,
         unidade_nome: unidade,
         familia_produto: v.familia_produto ?? 'Outros',
         descricao_produto: v.descricao_produto ?? '',
@@ -120,12 +155,16 @@ export default function Gerencial() {
         nota_fiscal: v.nota_fiscal ?? '',
       };
     });
-  }, [vendasRaw, vendedorUnidadeMap]);
+  }, [vendasRaw, vendedorUnidadeMap, unidadesConhecidas]);
 
   // Available months
   const mesesDisponiveis = useMemo(() => {
-    const set = new Set(vendasProcessadas.map(v => v.mesAno).filter(Boolean));
-    return [...set].sort().reverse();
+    const set = new Set(vendasProcessadas.map(v => v.mesAno));
+    // Sort real months descending, put "sem-data" at end
+    const arr = [...set];
+    const real = arr.filter(m => m !== 'sem-data').sort().reverse();
+    const semData = arr.includes('sem-data') ? ['sem-data'] : [];
+    return [...real, ...semData];
   }, [vendasProcessadas]);
 
   // Auto-select first available month
@@ -242,6 +281,7 @@ export default function Gerencial() {
   };
 
   const formatMesAno = (mesAno: string) => {
+    if (mesAno === 'sem-data') return 'Sem Data';
     const [year, month] = mesAno.split('-');
     const idx = parseInt(month, 10) - 1;
     return `${MONTH_NAMES[idx] ?? month}/${year}`;

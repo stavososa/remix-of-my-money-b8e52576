@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { KPICard } from '@/components/KPICard';
 import { DataTable } from '@/components/DataTable';
@@ -105,6 +105,7 @@ export default function MeuPainel() {
         .order('posicao', { ascending: true });
       return data ?? [];
     },
+    staleTime: 0,
   });
 
   const { data: controlePj } = useQuery({
@@ -113,9 +114,19 @@ export default function MeuPainel() {
       const { data } = await supabase.from('controle_pj').select('*');
       return data ?? [];
     },
+    staleTime: 0,
   });
 
-  const nomeVendasList = (controlePj ?? []).map(c => (c as any).nome_vendas).filter(Boolean) as string[];
+  // Build nome lookup: use both nome_vendas and nome (case-insensitive)
+  const nomeVendasList = useMemo(() => {
+    const pjList = controlePj ?? [];
+    const names: string[] = [];
+    for (const c of pjList) {
+      if ((c as any).nome_vendas) names.push((c as any).nome_vendas);
+      if (c.nome) names.push(c.nome);
+    }
+    return [...new Set(names.filter(Boolean))];
+  }, [controlePj]);
 
   const { data: vendasCountRaw } = useQuery({
     queryKey: ['vendas-count-pj', nomeVendasList.sort().join(',')],
@@ -123,10 +134,10 @@ export default function MeuPainel() {
     queryFn: async () => {
       const { data } = await supabase
         .from('vendas')
-        .select('vendedor_nome, total_com_desconto')
-        .in('vendedor_nome', nomeVendasList);
+        .select('vendedor_nome, total_com_desconto');
       return data ?? [];
     },
+    staleTime: 0,
   });
 
   // Vendas com data (para gráfico cronológico)
@@ -136,10 +147,10 @@ export default function MeuPainel() {
       const { data } = await supabase
         .from('vendas')
         .select('data_emissao, total_mercadoria, vendedor_nome')
-        .not('data_emissao', 'is', null)
         .order('data_emissao', { ascending: true });
-      return data ?? [];
+      return (data ?? []).filter(r => r.data_emissao);
     },
+    staleTime: 0,
   });
 
   const { data: vendasGeraisRaw } = useQuery({
@@ -148,6 +159,7 @@ export default function MeuPainel() {
       const { data } = await supabase.from('vendas_gerais').select('total_mercadoria');
       return data ?? [];
     },
+    staleTime: 0,
   });
 
   // ── Admin: all sales ──
@@ -158,9 +170,11 @@ export default function MeuPainel() {
       const { data } = await supabase
         .from('vendas')
         .select('data_emissao, total_com_desconto, lucros_reais, margem_percentual, nota_fiscal, vendedor_nome, descricao_produto, marca, quantidade')
-        .order('data_emissao', { ascending: false });
+        .order('data_emissao', { ascending: false })
+        .limit(5000);
       return data ?? [];
     },
+    staleTime: 0,
   });
 
   // ── Vendedor: individual sales ──
@@ -225,20 +239,32 @@ export default function MeuPainel() {
   const rankingPj = (() => {
     const pjList = controlePj ?? [];
     const vendasRows = vendasCountRaw ?? [];
+    // Normalize helper
+    const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+    // Build count/revenue maps by normalized vendedor_nome
     const countMap: Record<string, number> = {};
     const revenueMap: Record<string, number> = {};
     vendasRows.forEach(v => {
       const nome = v.vendedor_nome ?? '';
-      countMap[nome] = (countMap[nome] ?? 0) + 1;
-      revenueMap[nome] = (revenueMap[nome] ?? 0) + parseMoneyBR(v.total_com_desconto);
+      const key = norm(nome);
+      countMap[key] = (countMap[key] ?? 0) + 1;
+      revenueMap[key] = (revenueMap[key] ?? 0) + parseMoneyBR(v.total_com_desconto);
     });
-    const ranked = pjList.map(pj => ({
-      nome: pj.nome,
-      unidade: pj.unidade ?? '—',
-      nome_vendas: (pj as any).nome_vendas as string | null,
-      qtd_vendas: (pj as any).nome_vendas ? (countMap[(pj as any).nome_vendas] ?? 0) : 0,
-      total_arrecadado: (pj as any).nome_vendas ? (revenueMap[(pj as any).nome_vendas] ?? 0) : 0,
-    }));
+    const ranked = pjList.map(pj => {
+      const nomeVendas = (pj as any).nome_vendas as string | null;
+      // Try nome_vendas first, then nome
+      const key1 = nomeVendas ? norm(nomeVendas) : '';
+      const key2 = pj.nome ? norm(pj.nome) : '';
+      const qtd = (key1 && countMap[key1]) ? countMap[key1] : (key2 && countMap[key2]) ? countMap[key2] : 0;
+      const total = (key1 && revenueMap[key1]) ? revenueMap[key1] : (key2 && revenueMap[key2]) ? revenueMap[key2] : 0;
+      return {
+        nome: pj.nome,
+        unidade: pj.unidade ?? '—',
+        nome_vendas: nomeVendas,
+        qtd_vendas: qtd,
+        total_arrecadado: total,
+      };
+    });
     ranked.sort((a, b) => b.qtd_vendas - a.qtd_vendas);
     return ranked.map((r, i) => ({ ...r, posicao: i + 1 }));
   })();

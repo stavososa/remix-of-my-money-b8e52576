@@ -1,40 +1,39 @@
 
 
-## Diagnostico
+## Gerencial com dados da tabela `vendas` + filtro por Unidade + graficos
 
-Os dados existem na tabela `vendas` (conforme screenshot), mas **as queries do app retornam `[]`**. Confirmado nas network requests:
+A tabela `vendas` tem 468 registros (Jan/2026) com valores em formato string brasileiro (ex: "R$ 15,40", "49,30%"). O campo `vendedor_nome` liga aos vendedores/unidades via `vendedores.nome_omie`. Sera necessario fazer JOIN client-side ou via query para associar unidade a cada venda.
 
-- `GET /vendas?select=data_emissao,...&order=data_emissao.desc` → `[]` (Status 200)
-- `GET /vendas?select=data_emissao,...&data_emissao=not.is.null` → `[]` (Status 200)
+### Abordagem
 
-**Causa provavel**: A coluna `data_emissao` esta **NULL** em todos os registros. A ordenacao por `data_emissao` funciona mas nao filtra dados. Porem, a query sem filtro tambem retorna `[]`, o que indica que **a RLS pode ter sido desativada APOS a captura das requests**, ou ha um problema de cache.
+Buscar dados da tabela `vendas` filtrados por periodo (`data_emissao`), e cruzar com `vendedores` + `unidades` para obter a unidade de cada venda. Parsear valores monetarios/percentuais no frontend (padrão ja existente no projeto).
 
-Alem disso, `controle_pj.nome_vendas` esta **NULL** para todos os vendedores, entao o mapeamento vendedor-unidade nao funciona.
+### Alteracoes em `src/pages/Gerencial.tsx`
 
-## Plano
+1. **Nova query: buscar `vendas`** filtradas pelo periodo atual (mes/ano do `data_emissao`), com limite adequado
 
-### 1. Tornar Gerencial.tsx resiliente a `data_emissao` nula
+2. **Nova query: buscar `vendedores` com `unidades`** para mapear `nome_omie` -> `unidade_nome`
 
-- Quando `data_emissao` for null, agrupar como `mesAno = "sem-data"` e `dia = 0`
-- No filtro de Mes, mostrar "Sem Data" como opcao quando houver registros sem data
-- Garantir que KPIs e graficos funcionam mesmo sem data_emissao
+3. **Processar dados client-side**:
+   - Parsear `total_com_desconto`, `lucros_reais`, `margem_percentual` de string BR para number
+   - Associar cada venda a sua unidade via mapa vendedor->unidade
+   - Agregar por unidade: total vendido, lucro, margem media, qtd vendas
 
-### 2. Corrigir mapeamento vendedor → unidade
+4. **Filtro por Unidade**: O select de unidades ja existe. Ao selecionar uma unidade, filtrar as vendas processadas e recalcular todos os KPIs e graficos.
 
-Atualmente usa `controle_pj.nome_vendas` (que esta null). Mudar para:
-- Comparar `vendas.vendedor_nome` (ex: "ANA FRANCA FREGUESIA") com `controle_pj.nome` (ex: "Ana França Freguesia") usando comparacao case-insensitive
-- Tambem tentar match parcial: verificar se o nome do vendedor contem partes do nome do controle_pj
-- Fallback: tentar extrair unidade do proprio `vendedor_nome` (ex: "CHECKOUT FREGUESIA" → buscar "FREGUESIA" nas unidades conhecidas)
+5. **Novos graficos usando dados de `vendas`**:
+   - **Faturamento por Unidade** (BarChart horizontal - ja existe, alimentar com dados de vendas)
+   - **Margem Media por Unidade** (novo BarChart horizontal, cor verde)
+   - **Top Familias de Produto** (BarChart mostrando as familias mais vendidas, reagindo ao filtro de unidade)
 
-### 3. Corrigir MeuPainel.tsx (crash no console)
+6. **Cards PJ vs CLT**: Recalcular a partir do cruzamento vendas + vendedores (que tem campo `regime`), ao inves de depender exclusivamente da view `v_resumo_regime`
 
-O MeuPainel esta crashando. Verificar e corrigir o erro (provavelmente relacionado a dados nulos das queries de vendas/perfis).
+7. **Layout**: Organizar graficos em grid 2 colunas no desktop
 
-### 4. Forcar refetch apos mudanca de RLS
+### Detalhes tecnicos
 
-Adicionar `staleTime: 0` ou `refetchOnMount: 'always'` nas queries de vendas para garantir dados frescos.
-
-### Arquivos alterados
-- `src/pages/Gerencial.tsx` — resilencia a data_emissao nula, novo mapeamento vendedor-unidade
-- `src/pages/MeuPainel.tsx` — fix do crash, mesmo mapeamento resiliente
+- Funcoes de parsing ja existem no projeto (regex para "R$ X,XX" e "XX,XX%")
+- A tabela `vendas` tem 468 linhas para Jan/2026, dentro do limite de 1000 do Supabase
+- Vendedores sem unidade (ex: "CHECK OUT", "COMPRA VENDEDOR") serao agrupados como "Sem Unidade" ou ignorados conforme filtro
+- Manter as queries existentes (`v_ranking`, `v_resumo_unidade`, `v_resumo_regime`) para dados de comissao que nao existem na tabela `vendas`
 
