@@ -117,7 +117,16 @@ export default function MeuPainel() {
     staleTime: 0,
   });
 
-  const nomeVendasList = (controlePj ?? []).map(c => (c as any).nome_vendas).filter(Boolean) as string[];
+  // Build nome lookup: use both nome_vendas and nome (case-insensitive)
+  const nomeVendasList = useMemo(() => {
+    const pjList = controlePj ?? [];
+    const names: string[] = [];
+    for (const c of pjList) {
+      if ((c as any).nome_vendas) names.push((c as any).nome_vendas);
+      if (c.nome) names.push(c.nome);
+    }
+    return [...new Set(names.filter(Boolean))];
+  }, [controlePj]);
 
   const { data: vendasCountRaw } = useQuery({
     queryKey: ['vendas-count-pj', nomeVendasList.sort().join(',')],
@@ -125,10 +134,10 @@ export default function MeuPainel() {
     queryFn: async () => {
       const { data } = await supabase
         .from('vendas')
-        .select('vendedor_nome, total_com_desconto')
-        .in('vendedor_nome', nomeVendasList);
+        .select('vendedor_nome, total_com_desconto');
       return data ?? [];
     },
+    staleTime: 0,
   });
 
   // Vendas com data (para gráfico cronológico)
