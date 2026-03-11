@@ -53,7 +53,6 @@ interface ProcessedVenda {
 export default function Gerencial() {
   const [filtroUnidade, setFiltroUnidade] = useState<string>('all');
   const [filtroVendedor, setFiltroVendedor] = useState<string>('all');
-  const [filtroProduto, setFiltroProduto] = useState<string>('all');
   const [filtroFamilia, setFiltroFamilia] = useState<string>('all');
   const [filtroMarca, setFiltroMarca] = useState<string>('all');
 
