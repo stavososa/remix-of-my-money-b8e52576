@@ -171,23 +171,23 @@ export default function Gerencial() {
 
   // Filter options from period data
   const filterOptions = useMemo(() => {
-    const vendedores = [...new Set(vendasDoPeriodo.map(v => v.vendedor_nome))].filter(Boolean).sort();
-    const unidades = [...new Set(vendasDoPeriodo.map(v => v.unidade_nome))].filter(n => n !== 'Sem Unidade').sort();
-    const familias = [...new Set(vendasDoPeriodo.map(v => v.familia_produto))].filter(f => f !== 'Outros').sort();
-    const marcas = [...new Set(vendasDoPeriodo.map(v => v.marca))].filter(m => m !== 'Sem Marca').sort();
+    const vendedores = [...new Set(vendasProcessadas.map(v => v.vendedor_nome))].filter(Boolean).sort();
+    const unidades = [...new Set(vendasProcessadas.map(v => v.unidade_nome))].filter((n): n is string => n !== 'Sem Unidade').sort();
+    const familias = [...new Set(vendasProcessadas.map(v => v.familia_produto))].filter((f): f is string => f !== 'Outros').sort();
+    const marcas = [...new Set(vendasProcessadas.map(v => v.marca))].filter((m): m is string => m !== 'Sem Marca').sort();
     return { vendedores, unidades, familias, marcas };
-  }, [vendasDoPeriodo]);
+  }, [vendasProcessadas]);
 
-  // Apply filters on period-filtered data
+  // Apply filters
   const vendasFiltradas = useMemo(() => {
-    return vendasDoPeriodo.filter(v => {
+    return vendasProcessadas.filter(v => {
       if (filtroUnidade !== 'all' && v.unidade_nome !== filtroUnidade) return false;
       if (filtroVendedor !== 'all' && v.vendedor_nome !== filtroVendedor) return false;
       if (filtroFamilia !== 'all' && v.familia_produto !== filtroFamilia) return false;
       if (filtroMarca !== 'all' && v.marca !== filtroMarca) return false;
       return true;
     });
-  }, [vendasDoPeriodo, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca]);
+  }, [vendasProcessadas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca]);
 
   // KPIs
   const kpis = useMemo(() => {
