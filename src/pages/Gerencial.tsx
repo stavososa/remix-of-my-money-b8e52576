@@ -332,7 +332,7 @@ export default function Gerencial() {
           <div className="bg-card border border-border rounded-lg p-6 shadow-card">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-secondary-foreground">Progresso de Faturamento</h3>
-              <span className="text-xs text-muted-foreground">{vendasFiltradas.length} de {vendasDoPeriodo.length} vendas</span>
+              <span className="text-xs text-muted-foreground">{vendasFiltradas.length} de {vendasProcessadas.length} vendas</span>
             </div>
             <ResponsiveContainer width="100%" height={320}>
               <AreaChart data={chartProgresso} margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
