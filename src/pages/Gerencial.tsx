@@ -126,11 +126,11 @@ export default function Gerencial() {
   // Process vendas
   const vendasProcessadas: ProcessedVenda[] = useMemo(() => {
     return vendasRaw.map(v => {
-      const vendNome = (v.vendedor_nome ?? '').toUpperCase();
-      const unidade = vendedorUnidadeMap.get(vendNome) ?? 'Sem Unidade';
+      const vendNome = v.vendedor_nome ?? '';
+      const unidade = resolveUnidade(vendNome);
       const dataStr = v.data_emissao ?? '';
       let dia = 0;
-      let mesAno = '';
+      let mesAno = 'sem-data';
       if (dataStr) {
         const parts = dataStr.split('-');
         if (parts.length >= 3) {
@@ -143,7 +143,7 @@ export default function Gerencial() {
         data_emissao: dataStr,
         mesAno,
         dia,
-        vendedor_nome: v.vendedor_nome ?? '',
+        vendedor_nome: vendNome,
         unidade_nome: unidade,
         familia_produto: v.familia_produto ?? 'Outros',
         descricao_produto: v.descricao_produto ?? '',
@@ -155,7 +155,7 @@ export default function Gerencial() {
         nota_fiscal: v.nota_fiscal ?? '',
       };
     });
-  }, [vendasRaw, vendedorUnidadeMap]);
+  }, [vendasRaw, vendedorUnidadeMap, unidadesConhecidas]);
 
   // Available months
   const mesesDisponiveis = useMemo(() => {
