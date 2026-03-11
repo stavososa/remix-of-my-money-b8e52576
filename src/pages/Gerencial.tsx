@@ -154,8 +154,7 @@ export default function Gerencial() {
     const unidades = [...new Set(vendasProcessadas.map(v => v.unidade_nome))].filter(n => n !== 'Sem Unidade').sort();
     const familias = [...new Set(vendasProcessadas.map(v => v.familia_produto))].filter(f => f !== 'Outros').sort();
     const marcas = [...new Set(vendasProcessadas.map(v => v.marca))].filter(m => m !== 'Sem Marca').sort();
-    const produtos = [...new Set(vendasProcessadas.map(v => v.descricao_produto))].filter(Boolean).sort();
-    return { vendedores, unidades, familias, marcas, produtos };
+    return { vendedores, unidades, familias, marcas };
   }, [vendasProcessadas]);
 
   // Apply filters
