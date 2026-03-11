@@ -1,28 +1,39 @@
 
 
-## Plano: Filtro de Mes Local + Todos os Filtros Funcionando
+## Gerencial com dados da tabela `vendas` + filtro por Unidade + graficos
 
-### Problema
-A query atual usa `PeriodContext` (Marco/2026) mas os dados sao de Janeiro/2026. Resultado: dashboard vazio.
+A tabela `vendas` tem 468 registros (Jan/2026) com valores em formato string brasileiro (ex: "R$ 15,40", "49,30%"). O campo `vendedor_nome` liga aos vendedores/unidades via `vendedores.nome_omie`. Sera necessario fazer JOIN client-side ou via query para associar unidade a cada venda.
 
-### Solucao
+### Abordagem
 
-Alterar `src/pages/Gerencial.tsx`:
+Buscar dados da tabela `vendas` filtrados por periodo (`data_emissao`), e cruzar com `vendedores` + `unidades` para obter a unidade de cada venda. Parsear valores monetarios/percentuais no frontend (padrão ja existente no projeto).
 
-1. **Buscar TODAS as vendas** sem filtro de periodo na query Supabase (remover `.gte`/`.lt` de `data_emissao`)
+### Alteracoes em `src/pages/Gerencial.tsx`
 
-2. **Adicionar filtro local de Mes/Ano** como primeiro dropdown na barra de filtros:
-   - Extrair meses unicos dos dados (`data_emissao` -> `YYYY-MM`)
-   - Dropdown com opcoes como "Janeiro/2026", "Fevereiro/2026", etc.
-   - Valor default: primeiro mes disponivel nos dados
-   - Ao trocar o mes, resetar os demais filtros
+1. **Nova query: buscar `vendas`** filtradas pelo periodo atual (mes/ano do `data_emissao`), com limite adequado
 
-3. **Manter todos os 6 filtros existentes** (Dia, Unidade, Vendedor, Familia, Marca, Produto) reagindo ao mes selecionado:
-   - As opcoes de cada filtro sao recalculadas com base no mes selecionado
-   - Filtros em cascata: selecionar mes -> atualiza opcoes de dia, vendedor, etc.
+2. **Nova query: buscar `vendedores` com `unidades`** para mapear `nome_omie` -> `unidade_nome`
 
-4. **Remover dependencia do `PeriodContext`** nesta pagina (o filtro de periodo sera local)
+3. **Processar dados client-side**:
+   - Parsear `total_com_desconto`, `lucros_reais`, `margem_percentual` de string BR para number
+   - Associar cada venda a sua unidade via mapa vendedor->unidade
+   - Agregar por unidade: total vendido, lucro, margem media, qtd vendas
 
-### Arquivo alterado
-- **`src/pages/Gerencial.tsx`** - Query sem filtro de periodo, novo dropdown de Mes/Ano, filtros em cascata baseados no mes selecionado
+4. **Filtro por Unidade**: O select de unidades ja existe. Ao selecionar uma unidade, filtrar as vendas processadas e recalcular todos os KPIs e graficos.
+
+5. **Novos graficos usando dados de `vendas`**:
+   - **Faturamento por Unidade** (BarChart horizontal - ja existe, alimentar com dados de vendas)
+   - **Margem Media por Unidade** (novo BarChart horizontal, cor verde)
+   - **Top Familias de Produto** (BarChart mostrando as familias mais vendidas, reagindo ao filtro de unidade)
+
+6. **Cards PJ vs CLT**: Recalcular a partir do cruzamento vendas + vendedores (que tem campo `regime`), ao inves de depender exclusivamente da view `v_resumo_regime`
+
+7. **Layout**: Organizar graficos em grid 2 colunas no desktop
+
+### Detalhes tecnicos
+
+- Funcoes de parsing ja existem no projeto (regex para "R$ X,XX" e "XX,XX%")
+- A tabela `vendas` tem 468 linhas para Jan/2026, dentro do limite de 1000 do Supabase
+- Vendedores sem unidade (ex: "CHECK OUT", "COMPRA VENDEDOR") serao agrupados como "Sem Unidade" ou ignorados conforme filtro
+- Manter as queries existentes (`v_ranking`, `v_resumo_unidade`, `v_resumo_regime`) para dados de comissao que nao existem na tabela `vendas`
 

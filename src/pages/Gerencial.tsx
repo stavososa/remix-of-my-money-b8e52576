@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { KPICard } from '@/components/KPICard';
 import { DataTable } from '@/components/DataTable';
-import { usePeriod } from '@/contexts/PeriodContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { DollarSign, Users, Percent, TrendingUp, Package, X, Calendar, Filter } from 'lucide-react';
@@ -29,9 +28,12 @@ function parsePct(val: string | null | undefined): number {
   return isNaN(n) ? 0 : n;
 }
 
+const MONTH_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
 interface ProcessedVenda {
   id: number;
   data_emissao: string;
+  mesAno: string; // "YYYY-MM"
   dia: number;
   vendedor_nome: string;
   unidade_nome: string;
@@ -46,7 +48,7 @@ interface ProcessedVenda {
 }
 
 export default function Gerencial() {
-  const { periodoAno, periodoMes } = usePeriod();
+  const [filtroMesAno, setFiltroMesAno] = useState<string>('');
   const [filtroUnidade, setFiltroUnidade] = useState<string>('all');
   const [filtroDia, setFiltroDia] = useState<string>('all');
   const [filtroVendedor, setFiltroVendedor] = useState<string>('all');
@@ -54,18 +56,13 @@ export default function Gerencial() {
   const [filtroFamilia, setFiltroFamilia] = useState<string>('all');
   const [filtroMarca, setFiltroMarca] = useState<string>('all');
 
-  // Fetch vendas filtered by period
+  // Fetch ALL vendas (no date filter)
   const { data: vendasRaw = [], isLoading: loadV } = useQuery({
-    queryKey: ['vendas', periodoAno, periodoMes],
+    queryKey: ['vendas-all'],
     queryFn: async () => {
-      const startDate = `${periodoAno}-${String(periodoMes).padStart(2, '0')}-01`;
-      const endMonth = periodoMes === 12 ? 1 : periodoMes + 1;
-      const endYear = periodoMes === 12 ? periodoAno + 1 : periodoAno;
-      const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
       const { data } = await supabase
         .from('vendas').select('*')
-        .gte('data_emissao', startDate)
-        .lt('data_emissao', endDate);
+        .order('data_emissao', { ascending: false });
       return data ?? [];
     },
   });
@@ -98,13 +95,18 @@ export default function Gerencial() {
       const unidade = vendedorUnidadeMap.get(vendNome) ?? 'Sem Unidade';
       const dataStr = v.data_emissao ?? '';
       let dia = 0;
+      let mesAno = '';
       if (dataStr) {
         const parts = dataStr.split('-');
-        if (parts.length >= 3) dia = parseInt(parts[2], 10);
+        if (parts.length >= 3) {
+          dia = parseInt(parts[2], 10);
+          mesAno = `${parts[0]}-${parts[1]}`;
+        }
       }
       return {
         id: v.id,
         data_emissao: dataStr,
+        mesAno,
         dia,
         vendedor_nome: v.vendedor_nome ?? '',
         unidade_nome: unidade,
@@ -120,20 +122,35 @@ export default function Gerencial() {
     });
   }, [vendasRaw, vendedorUnidadeMap]);
 
-  // Unique filter values
-  const filterOptions = useMemo(() => {
-    const dias = [...new Set(vendasProcessadas.map(v => v.dia))].filter(d => d > 0).sort((a, b) => a - b);
-    const vendedores = [...new Set(vendasProcessadas.map(v => v.vendedor_nome))].filter(Boolean).sort();
-    const unidades = [...new Set(vendasProcessadas.map(v => v.unidade_nome))].filter(n => n !== 'Sem Unidade').sort();
-    const familias = [...new Set(vendasProcessadas.map(v => v.familia_produto))].filter(f => f !== 'Outros').sort();
-    const marcas = [...new Set(vendasProcessadas.map(v => v.marca))].filter(m => m !== 'Sem Marca').sort();
-    const produtos = [...new Set(vendasProcessadas.map(v => v.descricao_produto))].filter(Boolean).sort();
-    return { dias, vendedores, unidades, familias, marcas, produtos };
+  // Available months
+  const mesesDisponiveis = useMemo(() => {
+    const set = new Set(vendasProcessadas.map(v => v.mesAno).filter(Boolean));
+    return [...set].sort().reverse();
   }, [vendasProcessadas]);
 
-  // Apply all filters
+  // Auto-select first available month
+  const mesAnoSelecionado = filtroMesAno && mesesDisponiveis.includes(filtroMesAno) ? filtroMesAno : mesesDisponiveis[0] ?? '';
+
+  // Vendas filtered by month first
+  const vendasDoMes = useMemo(() => {
+    if (!mesAnoSelecionado) return vendasProcessadas;
+    return vendasProcessadas.filter(v => v.mesAno === mesAnoSelecionado);
+  }, [vendasProcessadas, mesAnoSelecionado]);
+
+  // Unique filter values (based on selected month)
+  const filterOptions = useMemo(() => {
+    const dias = [...new Set(vendasDoMes.map(v => v.dia))].filter(d => d > 0).sort((a, b) => a - b);
+    const vendedores = [...new Set(vendasDoMes.map(v => v.vendedor_nome))].filter(Boolean).sort();
+    const unidades = [...new Set(vendasDoMes.map(v => v.unidade_nome))].filter(n => n !== 'Sem Unidade').sort();
+    const familias = [...new Set(vendasDoMes.map(v => v.familia_produto))].filter(f => f !== 'Outros').sort();
+    const marcas = [...new Set(vendasDoMes.map(v => v.marca))].filter(m => m !== 'Sem Marca').sort();
+    const produtos = [...new Set(vendasDoMes.map(v => v.descricao_produto))].filter(Boolean).sort();
+    return { dias, vendedores, unidades, familias, marcas, produtos };
+  }, [vendasDoMes]);
+
+  // Apply all filters (on top of month-filtered data)
   const vendasFiltradas = useMemo(() => {
-    return vendasProcessadas.filter(v => {
+    return vendasDoMes.filter(v => {
       if (filtroUnidade !== 'all' && v.unidade_nome !== filtroUnidade) return false;
       if (filtroDia !== 'all' && v.dia !== Number(filtroDia)) return false;
       if (filtroVendedor !== 'all' && v.vendedor_nome !== filtroVendedor) return false;
@@ -142,7 +159,7 @@ export default function Gerencial() {
       if (filtroMarca !== 'all' && v.marca !== filtroMarca) return false;
       return true;
     });
-  }, [vendasProcessadas, filtroUnidade, filtroDia, filtroVendedor, filtroProduto, filtroFamilia, filtroMarca]);
+  }, [vendasDoMes, filtroUnidade, filtroDia, filtroVendedor, filtroProduto, filtroFamilia, filtroMarca]);
 
   // KPIs
   const kpis = useMemo(() => {
@@ -202,8 +219,8 @@ export default function Gerencial() {
 
   // Active filters for chips
   const activeFilters = [
-    ...(filtroUnidade !== 'all' ? [{ label: `Unidade: ${filtroUnidade}`, clear: () => setFiltroUnidade('all') }] : []),
     ...(filtroDia !== 'all' ? [{ label: `Dia: ${filtroDia}`, clear: () => setFiltroDia('all') }] : []),
+    ...(filtroUnidade !== 'all' ? [{ label: `Unidade: ${filtroUnidade}`, clear: () => setFiltroUnidade('all') }] : []),
     ...(filtroVendedor !== 'all' ? [{ label: `Vendedor: ${filtroVendedor}`, clear: () => setFiltroVendedor('all') }] : []),
     ...(filtroFamilia !== 'all' ? [{ label: `Família: ${filtroFamilia}`, clear: () => setFiltroFamilia('all') }] : []),
     ...(filtroMarca !== 'all' ? [{ label: `Marca: ${filtroMarca}`, clear: () => setFiltroMarca('all') }] : []),
@@ -217,6 +234,17 @@ export default function Gerencial() {
     setFiltroProduto('all');
     setFiltroFamilia('all');
     setFiltroMarca('all');
+  };
+
+  const handleMesChange = (v: string) => {
+    setFiltroMesAno(v);
+    clearAllFilters();
+  };
+
+  const formatMesAno = (mesAno: string) => {
+    const [year, month] = mesAno.split('-');
+    const idx = parseInt(month, 10) - 1;
+    return `${MONTH_NAMES[idx] ?? month}/${year}`;
   };
 
   // Detail table columns
@@ -266,6 +294,7 @@ export default function Gerencial() {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            <FilterSelect label="Mês" value={mesAnoSelecionado} onChange={handleMesChange} options={mesesDisponiveis.map(m => ({ value: m, label: formatMesAno(m) }))} allLabel="" hideAll />
             <FilterSelect label="Dia" value={filtroDia} onChange={setFiltroDia} options={filterOptions.dias.map(d => ({ value: String(d), label: String(d) }))} allLabel="Todos os Dias" />
             <FilterSelect label="Unidade" value={filtroUnidade} onChange={setFiltroUnidade} options={filterOptions.unidades.map(u => ({ value: u, label: u }))} allLabel="Todas as Unidades" />
             <FilterSelect label="Vendedor" value={filtroVendedor} onChange={setFiltroVendedor} options={filterOptions.vendedores.map(v => ({ value: v, label: v }))} allLabel="Todos os Vendedores" />
@@ -406,12 +435,13 @@ export default function Gerencial() {
 }
 
 // --- Filter Select Sub-component ---
-function FilterSelect({ label, value, onChange, options, allLabel }: {
+function FilterSelect({ label, value, onChange, options, allLabel, hideAll }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: { value: string; label: string }[];
   allLabel: string;
+  hideAll?: boolean;
 }) {
   return (
     <select
@@ -420,7 +450,7 @@ function FilterSelect({ label, value, onChange, options, allLabel }: {
       className="bg-secondary border border-border rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring min-w-[140px] max-w-[220px]"
       title={label}
     >
-      <option value="all">{allLabel}</option>
+      {!hideAll && <option value="all">{allLabel}</option>}
       {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>
   );
