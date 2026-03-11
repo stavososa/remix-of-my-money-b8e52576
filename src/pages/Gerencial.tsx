@@ -84,10 +84,10 @@ export default function Gerencial() {
   const [filtroFamilia, setFiltroFamilia] = useState<string>('all');
   const [filtroMarca, setFiltroMarca] = useState<string>('all');
 
-  // Fetch ALL vendas with pagination
+  // Fetch vendas filtered by period server-side
   const { data: vendasRaw = [], isLoading: loadV } = useQuery({
-    queryKey: ['vendas-all'],
-    queryFn: fetchAllVendas,
+    queryKey: ['vendas-period', periodoAno, periodoMes],
+    queryFn: () => fetchVendasByPeriod(periodoAno, periodoMes),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -96,7 +96,7 @@ export default function Gerencial() {
     queryKey: ['controle_pj'],
     queryFn: async () => {
       const { data } = await supabase.from('controle_pj').select('*');
-      return data ?? [];
+      return (data ?? []) as any[];
     },
     staleTime: 5 * 60 * 1000,
   });
