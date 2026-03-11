@@ -82,15 +82,46 @@ export default function Gerencial() {
 
   const isLoading = loadV || loadC;
 
-  // Build vendor -> unit map from controle_pj
+  // Known unit names for fallback extraction from vendedor_nome
+  const unidadesConhecidas = useMemo(() => {
+    return [...new Set(controlePj.map(cp => cp.unidade).filter(Boolean))] as string[];
+  }, [controlePj]);
+
+  // Build vendor -> unit map from controle_pj (case-insensitive, multiple strategies)
   const vendedorUnidadeMap = useMemo(() => {
     const map = new Map<string, string>();
     for (const cp of controlePj) {
-      if (cp.nome_vendas) map.set(cp.nome_vendas.toUpperCase(), cp.unidade ?? 'Sem Unidade');
-      if (cp.nome) map.set(cp.nome.toUpperCase(), cp.unidade ?? 'Sem Unidade');
+      const unidade = cp.unidade ?? 'Sem Unidade';
+      // Strategy 1: exact nome_vendas match
+      if ((cp as any).nome_vendas) map.set(((cp as any).nome_vendas as string).toUpperCase().trim(), unidade);
+      // Strategy 2: exact nome match
+      if (cp.nome) map.set(cp.nome.toUpperCase().trim(), unidade);
     }
     return map;
   }, [controlePj]);
+
+  // Enhanced vendor->unit lookup with partial matching and fallback
+  const resolveUnidade = (vendedorNome: string): string => {
+    const upper = vendedorNome.toUpperCase().trim();
+    // 1. Exact match
+    if (vendedorUnidadeMap.has(upper)) return vendedorUnidadeMap.get(upper)!;
+    // 2. Normalize accents and try again
+    const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+    const normalizedInput = normalize(vendedorNome);
+    for (const [key, val] of vendedorUnidadeMap.entries()) {
+      if (normalize(key) === normalizedInput) return val;
+    }
+    // 3. Partial match: check if vendor name contains a known controle_pj name
+    for (const [key, val] of vendedorUnidadeMap.entries()) {
+      const normKey = normalize(key);
+      if (normalizedInput.includes(normKey) || normKey.includes(normalizedInput)) return val;
+    }
+    // 4. Fallback: extract known unit name from vendedor_nome (e.g., "CHECKOUT FREGUESIA" -> FREGUESIA)
+    for (const unidade of unidadesConhecidas) {
+      if (normalizedInput.includes(normalize(unidade))) return unidade;
+    }
+    return 'Sem Unidade';
+  };
 
   // Process vendas
   const vendasProcessadas: ProcessedVenda[] = useMemo(() => {
