@@ -294,6 +294,7 @@ export default function Gerencial() {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            <FilterSelect label="Mês" value={mesAnoSelecionado} onChange={handleMesChange} options={mesesDisponiveis.map(m => ({ value: m, label: formatMesAno(m) }))} allLabel="" hideAll />
             <FilterSelect label="Dia" value={filtroDia} onChange={setFiltroDia} options={filterOptions.dias.map(d => ({ value: String(d), label: String(d) }))} allLabel="Todos os Dias" />
             <FilterSelect label="Unidade" value={filtroUnidade} onChange={setFiltroUnidade} options={filterOptions.unidades.map(u => ({ value: u, label: u }))} allLabel="Todas as Unidades" />
             <FilterSelect label="Vendedor" value={filtroVendedor} onChange={setFiltroVendedor} options={filterOptions.vendedores.map(v => ({ value: v, label: v }))} allLabel="Todos os Vendedores" />
