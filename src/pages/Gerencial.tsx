@@ -4,10 +4,11 @@ import { KPICard } from '@/components/KPICard';
 import { DataTable } from '@/components/DataTable';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
+import { usePeriod } from '@/contexts/PeriodContext';
 import { DollarSign, Users, Percent, TrendingUp, Package, X } from 'lucide-react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell,
-  LineChart, Line,
+  AreaChart, Area, Line,
 } from 'recharts';
 
 const fmt = (v: number | null | undefined) =>
@@ -33,6 +34,26 @@ function parsePct(val: unknown): number {
   return isNaN(n) ? 0 : n;
 }
 
+const PAGE_SIZE = 1000;
+
+async function fetchAllVendas() {
+  const allRows: any[] = [];
+  let offset = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from('vendas')
+      .select('*')
+      .order('data_emissao', { ascending: true })
+      .range(offset, offset + PAGE_SIZE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    allRows.push(...data);
+    if (data.length < PAGE_SIZE) break;
+    offset += PAGE_SIZE;
+  }
+  return allRows;
+}
+
 interface ProcessedVenda {
   id: number;
   data_emissao: string;
@@ -51,23 +72,17 @@ interface ProcessedVenda {
 }
 
 export default function Gerencial() {
+  const { periodoAno, periodoMes } = usePeriod();
   const [filtroUnidade, setFiltroUnidade] = useState<string>('all');
   const [filtroVendedor, setFiltroVendedor] = useState<string>('all');
   const [filtroFamilia, setFiltroFamilia] = useState<string>('all');
   const [filtroMarca, setFiltroMarca] = useState<string>('all');
 
-  // Fetch ALL vendas
+  // Fetch ALL vendas with pagination
   const { data: vendasRaw = [], isLoading: loadV } = useQuery({
     queryKey: ['vendas-all'],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('vendas').select('*')
-        .order('data_emissao', { ascending: true })
-        .limit(5000);
-      return data ?? [];
-    },
-    staleTime: 0,
-    refetchOnMount: 'always' as const,
+    queryFn: fetchAllVendas,
+    staleTime: 5 * 60 * 1000,
   });
 
   // Fetch controle_pj for vendor->unit mapping
@@ -77,7 +92,7 @@ export default function Gerencial() {
       const { data } = await supabase.from('controle_pj').select('*');
       return data ?? [];
     },
-    staleTime: 0,
+    staleTime: 5 * 60 * 1000,
   });
 
   const isLoading = loadV || loadC;
@@ -148,25 +163,32 @@ export default function Gerencial() {
     });
   }, [vendasRaw, vendedorUnidadeMap, unidadesConhecidas]);
 
-  // Filter options from ALL data
-  const filterOptions = useMemo(() => {
-    const vendedores = [...new Set(vendasProcessadas.map(v => v.vendedor_nome))].filter(Boolean).sort();
-    const unidades = [...new Set(vendasProcessadas.map(v => v.unidade_nome))].filter(n => n !== 'Sem Unidade').sort();
-    const familias = [...new Set(vendasProcessadas.map(v => v.familia_produto))].filter(f => f !== 'Outros').sort();
-    const marcas = [...new Set(vendasProcessadas.map(v => v.marca))].filter(m => m !== 'Sem Marca').sort();
-    return { vendedores, unidades, familias, marcas };
-  }, [vendasProcessadas]);
+  // Filter by period first
+  const periodoKey = `${periodoAno}-${String(periodoMes).padStart(2, '0')}`;
 
-  // Apply filters
+  const vendasDoPeriodo = useMemo(() => {
+    return vendasProcessadas.filter(v => v.mesAno === periodoKey);
+  }, [vendasProcessadas, periodoKey]);
+
+  // Filter options from period data
+  const filterOptions = useMemo(() => {
+    const vendedores = [...new Set(vendasDoPeriodo.map(v => v.vendedor_nome))].filter(Boolean).sort();
+    const unidades = [...new Set(vendasDoPeriodo.map(v => v.unidade_nome))].filter(n => n !== 'Sem Unidade').sort();
+    const familias = [...new Set(vendasDoPeriodo.map(v => v.familia_produto))].filter(f => f !== 'Outros').sort();
+    const marcas = [...new Set(vendasDoPeriodo.map(v => v.marca))].filter(m => m !== 'Sem Marca').sort();
+    return { vendedores, unidades, familias, marcas };
+  }, [vendasDoPeriodo]);
+
+  // Apply filters on period-filtered data
   const vendasFiltradas = useMemo(() => {
-    return vendasProcessadas.filter(v => {
+    return vendasDoPeriodo.filter(v => {
       if (filtroUnidade !== 'all' && v.unidade_nome !== filtroUnidade) return false;
       if (filtroVendedor !== 'all' && v.vendedor_nome !== filtroVendedor) return false;
       if (filtroFamilia !== 'all' && v.familia_produto !== filtroFamilia) return false;
       if (filtroMarca !== 'all' && v.marca !== filtroMarca) return false;
       return true;
     });
-  }, [vendasProcessadas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca]);
+  }, [vendasDoPeriodo, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca]);
 
   // KPIs
   const kpis = useMemo(() => {
@@ -180,19 +202,29 @@ export default function Gerencial() {
     return { faturamento, lucroTotal, qtdVendas, margemMedia, vendedoresUnicos };
   }, [vendasFiltradas]);
 
-  // Line chart: daily revenue progress
+  // Chart: daily + cumulative revenue
   const chartProgresso = useMemo(() => {
-    const map = new Map<string, number>();
+    const map = new Map<string, { fat: number; lucro: number }>();
     for (const v of vendasFiltradas) {
       if (!v.data_emissao) continue;
-      map.set(v.data_emissao, (map.get(v.data_emissao) ?? 0) + v.total_com_desconto);
+      const existing = map.get(v.data_emissao) ?? { fat: 0, lucro: 0 };
+      existing.fat += v.total_com_desconto;
+      existing.lucro += v.lucros_reais;
+      map.set(v.data_emissao, existing);
     }
-    return [...map.entries()]
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([data, total]) => ({
-        data: data.split('-').reverse().join('/'),
-        total,
-      }));
+    const sorted = [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    let acumulado = 0;
+    return sorted.map(([data, vals]) => {
+      acumulado += vals.fat;
+      const parts = data.split('-');
+      const label = parts.length >= 3 ? `${parts[2]}/${parts[1]}` : data;
+      return {
+        data: label,
+        faturamentoDia: vals.fat,
+        lucroDia: vals.lucro,
+        acumulado,
+      };
+    });
   }, [vendasFiltradas]);
 
   // Chart: Top Famílias
@@ -262,15 +294,13 @@ export default function Gerencial() {
   return (
     <AppShell title="Gerencial">
       <div className="space-y-6">
-        {/* Header with filters top-right */}
-        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 flex-1">
-            <KPICard icon={DollarSign} label="Faturamento" value={fmt(kpis.faturamento)} />
-            <KPICard icon={TrendingUp} label="Lucro Total" value={fmt(kpis.lucroTotal)} />
-            <KPICard icon={Percent} label="Margem Média" value={fmtPct(kpis.margemMedia)} />
-            <KPICard icon={Users} label="Vendedores" value={String(kpis.vendedoresUnicos)} />
-            <KPICard icon={Package} label="Qtd Vendas" value={String(kpis.qtdVendas)} />
-          </div>
+        {/* KPIs */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          <KPICard icon={DollarSign} label="Faturamento" value={fmt(kpis.faturamento)} />
+          <KPICard icon={TrendingUp} label="Lucro Total" value={fmt(kpis.lucroTotal)} />
+          <KPICard icon={Percent} label="Margem Média" value={fmtPct(kpis.margemMedia)} />
+          <KPICard icon={Users} label="Vendedores" value={String(kpis.vendedoresUnicos)} />
+          <KPICard icon={Package} label="Qtd Vendas" value={String(kpis.qtdVendas)} />
         </div>
 
         {/* Filters inline */}
@@ -298,18 +328,40 @@ export default function Gerencial() {
           </div>
         )}
 
-        {/* Line Chart - Progresso Diário */}
+        {/* Area Chart - Progresso Diário + Acumulado */}
         {chartProgresso.length > 0 && (
           <div className="bg-card border border-border rounded-lg p-6 shadow-card">
-            <h3 className="text-sm font-semibold text-secondary-foreground mb-4">Progresso de Faturamento Diário</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={chartProgresso} margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-secondary-foreground">Progresso de Faturamento</h3>
+              <span className="text-xs text-muted-foreground">{vendasFiltradas.length} de {vendasDoPeriodo.length} vendas</span>
+            </div>
+            <ResponsiveContainer width="100%" height={320}>
+              <AreaChart data={chartProgresso} margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
+                <defs>
+                  <linearGradient id="gradFat" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="gradAcum" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(142 71% 45%)" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="hsl(142 71% 45%)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="data" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} angle={-45} textAnchor="end" height={60} />
-                <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} labelStyle={{ color: 'hsl(var(--foreground))' }} formatter={(v: number) => [fmt(v), 'Faturamento']} />
-                <Line type="monotone" dataKey="total" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: 'hsl(var(--primary))', r: 3 }} activeDot={{ r: 5 }} />
-              </LineChart>
+                <XAxis dataKey="data" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} interval="preserveStartEnd" />
+                <YAxis yAxisId="dia" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} />
+                <YAxis yAxisId="acum" orientation="right" tick={{ fill: 'hsl(142 71% 45%)', fontSize: 11 }} tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} />
+                <Tooltip
+                  contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }}
+                  labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}
+                  formatter={(v: number, name: string) => [
+                    fmt(v),
+                    name === 'faturamentoDia' ? 'Fat. Dia' : name === 'acumulado' ? 'Acumulado' : 'Lucro Dia',
+                  ]}
+                />
+                <Area yAxisId="dia" type="monotone" dataKey="faturamentoDia" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#gradFat)" dot={false} activeDot={{ r: 4, fill: 'hsl(var(--primary))' }} />
+                <Line yAxisId="acum" type="monotone" dataKey="acumulado" stroke="hsl(142 71% 45%)" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         )}
@@ -351,7 +403,7 @@ export default function Gerencial() {
           )}
         </div>
 
-        {/* Detailed Sales Table with internal scroll */}
+        {/* Detailed Sales Table */}
         <div>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-secondary-foreground">Vendas Detalhadas ({vendasFiltradas.length} registros)</h3>
