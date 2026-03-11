@@ -281,6 +281,7 @@ export default function Gerencial() {
   };
 
   const formatMesAno = (mesAno: string) => {
+    if (mesAno === 'sem-data') return 'Sem Data';
     const [year, month] = mesAno.split('-');
     const idx = parseInt(month, 10) - 1;
     return `${MONTH_NAMES[idx] ?? month}/${year}`;
