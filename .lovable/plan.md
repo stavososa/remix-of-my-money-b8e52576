@@ -1,36 +1,39 @@
 
 
-## Plano: Redesign do Dashboard Gerencial
+## Gerencial com dados da tabela `vendas` + filtro por Unidade + graficos
+
+A tabela `vendas` tem 468 registros (Jan/2026) com valores em formato string brasileiro (ex: "R$ 15,40", "49,30%"). O campo `vendedor_nome` liga aos vendedores/unidades via `vendedores.nome_omie`. Sera necessario fazer JOIN client-side ou via query para associar unidade a cada venda.
+
+### Abordagem
+
+Buscar dados da tabela `vendas` filtrados por periodo (`data_emissao`), e cruzar com `vendedores` + `unidades` para obter a unidade de cada venda. Parsear valores monetarios/percentuais no frontend (padrão ja existente no projeto).
 
 ### Alteracoes em `src/pages/Gerencial.tsx`
 
-**1. Remover cards de unidades**
-- Remover toda a secao "Unidades que Mais Venderam" (cards com medalhas, linhas 362-391)
-- Remover os graficos "Faturamento por Unidade" e "Margem Media por Unidade" (linhas 394-430)
-- Remover o `dadosPorUnidade` useMemo (nao mais necessario)
+1. **Nova query: buscar `vendas`** filtradas pelo periodo atual (mes/ano do `data_emissao`), com limite adequado
 
-**2. Remover filtros de Dia e Mes, mover filtros para cima a direita**
-- Remover `filtroDia` e o dropdown de "Mes/Ano" da barra de filtros
-- Manter filtros: Unidade, Vendedor, Familia, Marca, Produto
-- Posicionar os selects ao lado do titulo "Gerencial" no topo, alinhados a direita (inline com o header)
-- Remover a caixa de filtros separada, integrar no topo da pagina
+2. **Nova query: buscar `vendedores` com `unidades`** para mapear `nome_omie` -> `unidade_nome`
 
-**3. Tabela com scroll interno**
-- Envolver a `DataTable` em um container com `max-h-[500px] overflow-y-auto` para scroll vertical interno
-- Manter header da tabela sticky
+3. **Processar dados client-side**:
+   - Parsear `total_com_desconto`, `lucros_reais`, `margem_percentual` de string BR para number
+   - Associar cada venda a sua unidade via mapa vendedor->unidade
+   - Agregar por unidade: total vendido, lucro, margem media, qtd vendas
 
-**4. Grafico linear de progresso**
-- Adicionar `LineChart` (recharts) mostrando faturamento diario ao longo do tempo
-- Agregar `vendasFiltradas` por `data_emissao`, somando `total_com_desconto` por dia
-- O grafico reage a todos os filtros selecionados
-- Eixo X = datas, Eixo Y = faturamento acumulado ou diario
+4. **Filtro por Unidade**: O select de unidades ja existe. Ao selecionar uma unidade, filtrar as vendas processadas e recalcular todos os KPIs e graficos.
 
-**5. Garantir todos os dados**
-- Remover filtro de mes na query (ja feito) -- buscar TODOS os dados sem pre-filtro de mesAno
-- Remover a logica de `vendasDoMes` que filtra por mes selecionado
-- Os filterOptions sao calculados sobre TODAS as vendas (ou vendas filtradas em cascata)
-- Isso garante que todos os meses, dias, familias, produtos e vendedores aparecam
+5. **Novos graficos usando dados de `vendas`**:
+   - **Faturamento por Unidade** (BarChart horizontal - ja existe, alimentar com dados de vendas)
+   - **Margem Media por Unidade** (novo BarChart horizontal, cor verde)
+   - **Top Familias de Produto** (BarChart mostrando as familias mais vendidas, reagindo ao filtro de unidade)
 
-### Arquivo alterado
-- `src/pages/Gerencial.tsx` -- redesign completo da UI
+6. **Cards PJ vs CLT**: Recalcular a partir do cruzamento vendas + vendedores (que tem campo `regime`), ao inves de depender exclusivamente da view `v_resumo_regime`
+
+7. **Layout**: Organizar graficos em grid 2 colunas no desktop
+
+### Detalhes tecnicos
+
+- Funcoes de parsing ja existem no projeto (regex para "R$ X,XX" e "XX,XX%")
+- A tabela `vendas` tem 468 linhas para Jan/2026, dentro do limite de 1000 do Supabase
+- Vendedores sem unidade (ex: "CHECK OUT", "COMPRA VENDEDOR") serao agrupados como "Sem Unidade" ou ignorados conforme filtro
+- Manter as queries existentes (`v_ranking`, `v_resumo_unidade`, `v_resumo_regime`) para dados de comissao que nao existem na tabela `vendas`
 
