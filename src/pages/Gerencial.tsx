@@ -219,8 +219,8 @@ export default function Gerencial() {
 
   // Active filters for chips
   const activeFilters = [
-    ...(filtroUnidade !== 'all' ? [{ label: `Unidade: ${filtroUnidade}`, clear: () => setFiltroUnidade('all') }] : []),
     ...(filtroDia !== 'all' ? [{ label: `Dia: ${filtroDia}`, clear: () => setFiltroDia('all') }] : []),
+    ...(filtroUnidade !== 'all' ? [{ label: `Unidade: ${filtroUnidade}`, clear: () => setFiltroUnidade('all') }] : []),
     ...(filtroVendedor !== 'all' ? [{ label: `Vendedor: ${filtroVendedor}`, clear: () => setFiltroVendedor('all') }] : []),
     ...(filtroFamilia !== 'all' ? [{ label: `Família: ${filtroFamilia}`, clear: () => setFiltroFamilia('all') }] : []),
     ...(filtroMarca !== 'all' ? [{ label: `Marca: ${filtroMarca}`, clear: () => setFiltroMarca('all') }] : []),
@@ -234,6 +234,17 @@ export default function Gerencial() {
     setFiltroProduto('all');
     setFiltroFamilia('all');
     setFiltroMarca('all');
+  };
+
+  const handleMesChange = (v: string) => {
+    setFiltroMesAno(v);
+    clearAllFilters();
+  };
+
+  const formatMesAno = (mesAno: string) => {
+    const [year, month] = mesAno.split('-');
+    const idx = parseInt(month, 10) - 1;
+    return `${MONTH_NAMES[idx] ?? month}/${year}`;
   };
 
   // Detail table columns
