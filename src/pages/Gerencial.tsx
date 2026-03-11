@@ -135,25 +135,23 @@ export default function Gerencial() {
     return 'Sem Unidade';
   };
 
-  // Process vendas
+  // Process vendas (already filtered by period from server)
   const vendasProcessadas: ProcessedVenda[] = useMemo(() => {
-    return vendasRaw.map(v => {
+    return vendasRaw.map((v: any) => {
       const vendNome = v.vendedor_nome ?? '';
       const unidade = resolveUnidade(vendNome);
       const dataStr = v.data_emissao ?? '';
       let dia = 0;
-      let mesAno = 'sem-data';
       if (dataStr) {
         const parts = dataStr.split('-');
         if (parts.length >= 3) {
           dia = parseInt(parts[2], 10);
-          mesAno = `${parts[0]}-${parts[1]}`;
         }
       }
       return {
         id: v.id,
         data_emissao: dataStr,
-        mesAno,
+        mesAno: '',
         dia,
         vendedor_nome: vendNome,
         unidade_nome: unidade,
@@ -169,12 +167,7 @@ export default function Gerencial() {
     });
   }, [vendasRaw, vendedorUnidadeMap, unidadesConhecidas]);
 
-  // Filter by period first
-  const periodoKey = `${periodoAno}-${String(periodoMes).padStart(2, '0')}`;
-
-  const vendasDoPeriodo = useMemo(() => {
-    return vendasProcessadas.filter(v => v.mesAno === periodoKey);
-  }, [vendasProcessadas, periodoKey]);
+  // No client-side period filter needed — server already filtered
 
   // Filter options from period data
   const filterOptions = useMemo(() => {
