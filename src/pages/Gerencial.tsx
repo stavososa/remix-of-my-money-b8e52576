@@ -95,13 +95,18 @@ export default function Gerencial() {
       const unidade = vendedorUnidadeMap.get(vendNome) ?? 'Sem Unidade';
       const dataStr = v.data_emissao ?? '';
       let dia = 0;
+      let mesAno = '';
       if (dataStr) {
         const parts = dataStr.split('-');
-        if (parts.length >= 3) dia = parseInt(parts[2], 10);
+        if (parts.length >= 3) {
+          dia = parseInt(parts[2], 10);
+          mesAno = `${parts[0]}-${parts[1]}`;
+        }
       }
       return {
         id: v.id,
         data_emissao: dataStr,
+        mesAno,
         dia,
         vendedor_nome: v.vendedor_nome ?? '',
         unidade_nome: unidade,
@@ -117,20 +122,35 @@ export default function Gerencial() {
     });
   }, [vendasRaw, vendedorUnidadeMap]);
 
-  // Unique filter values
-  const filterOptions = useMemo(() => {
-    const dias = [...new Set(vendasProcessadas.map(v => v.dia))].filter(d => d > 0).sort((a, b) => a - b);
-    const vendedores = [...new Set(vendasProcessadas.map(v => v.vendedor_nome))].filter(Boolean).sort();
-    const unidades = [...new Set(vendasProcessadas.map(v => v.unidade_nome))].filter(n => n !== 'Sem Unidade').sort();
-    const familias = [...new Set(vendasProcessadas.map(v => v.familia_produto))].filter(f => f !== 'Outros').sort();
-    const marcas = [...new Set(vendasProcessadas.map(v => v.marca))].filter(m => m !== 'Sem Marca').sort();
-    const produtos = [...new Set(vendasProcessadas.map(v => v.descricao_produto))].filter(Boolean).sort();
-    return { dias, vendedores, unidades, familias, marcas, produtos };
+  // Available months
+  const mesesDisponiveis = useMemo(() => {
+    const set = new Set(vendasProcessadas.map(v => v.mesAno).filter(Boolean));
+    return [...set].sort().reverse();
   }, [vendasProcessadas]);
 
-  // Apply all filters
+  // Auto-select first available month
+  const mesAnoSelecionado = filtroMesAno && mesesDisponiveis.includes(filtroMesAno) ? filtroMesAno : mesesDisponiveis[0] ?? '';
+
+  // Vendas filtered by month first
+  const vendasDoMes = useMemo(() => {
+    if (!mesAnoSelecionado) return vendasProcessadas;
+    return vendasProcessadas.filter(v => v.mesAno === mesAnoSelecionado);
+  }, [vendasProcessadas, mesAnoSelecionado]);
+
+  // Unique filter values (based on selected month)
+  const filterOptions = useMemo(() => {
+    const dias = [...new Set(vendasDoMes.map(v => v.dia))].filter(d => d > 0).sort((a, b) => a - b);
+    const vendedores = [...new Set(vendasDoMes.map(v => v.vendedor_nome))].filter(Boolean).sort();
+    const unidades = [...new Set(vendasDoMes.map(v => v.unidade_nome))].filter(n => n !== 'Sem Unidade').sort();
+    const familias = [...new Set(vendasDoMes.map(v => v.familia_produto))].filter(f => f !== 'Outros').sort();
+    const marcas = [...new Set(vendasDoMes.map(v => v.marca))].filter(m => m !== 'Sem Marca').sort();
+    const produtos = [...new Set(vendasDoMes.map(v => v.descricao_produto))].filter(Boolean).sort();
+    return { dias, vendedores, unidades, familias, marcas, produtos };
+  }, [vendasDoMes]);
+
+  // Apply all filters (on top of month-filtered data)
   const vendasFiltradas = useMemo(() => {
-    return vendasProcessadas.filter(v => {
+    return vendasDoMes.filter(v => {
       if (filtroUnidade !== 'all' && v.unidade_nome !== filtroUnidade) return false;
       if (filtroDia !== 'all' && v.dia !== Number(filtroDia)) return false;
       if (filtroVendedor !== 'all' && v.vendedor_nome !== filtroVendedor) return false;
@@ -139,7 +159,7 @@ export default function Gerencial() {
       if (filtroMarca !== 'all' && v.marca !== filtroMarca) return false;
       return true;
     });
-  }, [vendasProcessadas, filtroUnidade, filtroDia, filtroVendedor, filtroProduto, filtroFamilia, filtroMarca]);
+  }, [vendasDoMes, filtroUnidade, filtroDia, filtroVendedor, filtroProduto, filtroFamilia, filtroMarca]);
 
   // KPIs
   const kpis = useMemo(() => {
