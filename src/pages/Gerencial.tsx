@@ -435,12 +435,13 @@ export default function Gerencial() {
 }
 
 // --- Filter Select Sub-component ---
-function FilterSelect({ label, value, onChange, options, allLabel }: {
+function FilterSelect({ label, value, onChange, options, allLabel, hideAll }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: { value: string; label: string }[];
   allLabel: string;
+  hideAll?: boolean;
 }) {
   return (
     <select
@@ -449,8 +450,9 @@ function FilterSelect({ label, value, onChange, options, allLabel }: {
       className="bg-secondary border border-border rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring min-w-[140px] max-w-[220px]"
       title={label}
     >
-      <option value="all">{allLabel}</option>
+      {!hideAll && <option value="all">{allLabel}</option>}
       {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>
   );
+}
 }
