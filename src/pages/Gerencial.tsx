@@ -232,7 +232,6 @@ export default function Gerencial() {
   const clearAllFilters = () => {
     setFiltroUnidade('all');
     setFiltroVendedor('all');
-    setFiltroProduto('all');
     setFiltroFamilia('all');
     setFiltroMarca('all');
   };
