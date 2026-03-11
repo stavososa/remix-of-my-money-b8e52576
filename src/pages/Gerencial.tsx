@@ -227,7 +227,6 @@ export default function Gerencial() {
     ...(filtroVendedor !== 'all' ? [{ label: `Vendedor: ${filtroVendedor}`, clear: () => setFiltroVendedor('all') }] : []),
     ...(filtroFamilia !== 'all' ? [{ label: `Família: ${filtroFamilia}`, clear: () => setFiltroFamilia('all') }] : []),
     ...(filtroMarca !== 'all' ? [{ label: `Marca: ${filtroMarca}`, clear: () => setFiltroMarca('all') }] : []),
-    ...(filtroProduto !== 'all' ? [{ label: `Produto: ${filtroProduto.substring(0, 30)}...`, clear: () => setFiltroProduto('all') }] : []),
   ];
 
   const clearAllFilters = () => {
