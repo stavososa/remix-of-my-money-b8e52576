@@ -105,6 +105,7 @@ export default function MeuPainel() {
         .order('posicao', { ascending: true });
       return data ?? [];
     },
+    staleTime: 0,
   });
 
   const { data: controlePj } = useQuery({
