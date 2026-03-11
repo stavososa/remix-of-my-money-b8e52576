@@ -279,7 +279,6 @@ export default function Gerencial() {
           <FilterSelect label="Vendedor" value={filtroVendedor} onChange={setFiltroVendedor} options={filterOptions.vendedores.map(v => ({ value: v, label: v }))} allLabel="Todos os Vendedores" />
           <FilterSelect label="Família" value={filtroFamilia} onChange={setFiltroFamilia} options={filterOptions.familias.map(f => ({ value: f, label: f }))} allLabel="Todas as Famílias" />
           <FilterSelect label="Marca" value={filtroMarca} onChange={setFiltroMarca} options={filterOptions.marcas.map(m => ({ value: m, label: m }))} allLabel="Todas as Marcas" />
-          <FilterSelect label="Produto" value={filtroProduto} onChange={setFiltroProduto} options={filterOptions.produtos.map(p => ({ value: p, label: p.length > 40 ? p.substring(0, 40) + '…' : p }))} allLabel="Todos os Produtos" />
           {activeFilters.length > 0 && (
             <button onClick={clearAllFilters} className="text-xs text-muted-foreground hover:text-foreground transition-colors underline">
               Limpar filtros
