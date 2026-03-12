@@ -121,7 +121,7 @@ export default function Gerencial() {
     for (const [key, uni] of vendedorUnidadeMap.entries()) {
       if (norm.includes(key) || key.includes(norm)) return uni;
     }
-    return 'Sem Unidade';
+    return 'Sem Filial';
   }, [vendedorUnidadeMap]);
 
   // ===== FULL PERIOD DATA (for KPIs & charts) =====
