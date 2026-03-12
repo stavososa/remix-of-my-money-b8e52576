@@ -192,27 +192,6 @@ export default function Ranking() {
       .map((item, i) => ({ ...item, posicao: i + 1 }));
   }, [vendasRaw]);
 
-  // Top 10 charts for Vendedores tab
-  const chartVendedores = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const row of vendasRaw) {
-      const vend = row.vendedor_nome ?? 'Desconhecido';
-      map.set(vend, (map.get(vend) ?? 0) + parseBRL(row.total_com_desconto));
-    }
-    return [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, value]) => ({ name, value }));
-  }, [vendasRaw]);
-
-  const chartProdutos = useMemo(() => {
-    return productRanking.slice(0, 10).map(p => ({ name: p.descricao_produto, value: p.total_vendido }));
-  }, [productRanking]);
-
-  const chartFamilias = useMemo(() => {
-    return familiaRanking.slice(0, 10).map(f => ({ name: f.name, value: f.total_vendido }));
-  }, [familiaRanking]);
-
-  const chartMarcas = useMemo(() => {
-    return marcaRanking.slice(0, 10).map(m => ({ name: m.name, value: m.total_vendido }));
-  }, [marcaRanking]);
 
   const top1 = ranking[0] ?? null;
 
