@@ -270,25 +270,17 @@ export default function Gerencial() {
       const offset = (tabelaPagina - 1) * TABLE_PAGE_SIZE;
       let query = supabase
         .from('vendas')
-        .select('id, data_emissao, vendedor_nome, descricao_produto, familia_produto, marca, nota_fiscal, total_com_desconto, lucros_reais, margem_percentual', { count: 'exact' })
+        .select('id, data_emissao, vendedor_nome, descricao_produto, familia_produto, marca, nota_fiscal, total_com_desconto, lucros_reais, margem_percentual, local_estoque', { count: 'exact' })
         .gte('data_emissao', startDate)
         .lte('data_emissao', endDate)
         .order('data_emissao', { ascending: false })
         .order('id', { ascending: false })
         .range(offset, offset + TABLE_PAGE_SIZE - 1);
 
+      if (filtroUnidade !== 'all') query = query.eq('local_estoque', filtroUnidade);
       if (filtroVendedor !== 'all') query = query.eq('vendedor_nome', filtroVendedor);
       if (filtroFamilia !== 'all') query = query.eq('familia_produto', filtroFamilia);
       if (filtroMarca !== 'all') query = query.eq('marca', filtroMarca);
-
-      if (filtroUnidade !== 'all') {
-        if (vendedoresUnidade && vendedoresUnidade.length > 0) {
-          query = query.in('vendedor_nome', vendedoresUnidade);
-        } else {
-          // Unit selected but no vendors mapped → force empty result
-          query = query.eq('vendedor_nome', '__NONEXISTENT__');
-        }
-      }
 
       if (searchDebounced) {
         const term = `%${searchDebounced}%`;
@@ -302,7 +294,6 @@ export default function Gerencial() {
       return { rows: data ?? [], totalCount: count ?? 0 };
     },
     staleTime: 60 * 1000,
-    enabled: !!controlePj,
   });
 
   const vendasRows = vendasResult?.rows ?? [];
