@@ -53,7 +53,7 @@ export default function Gerencial() {
   const { data: resumo, isLoading: loadResumo } = useQuery({
     queryKey: ['gerencial-resumo', rpcFilters],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('rpc_gerencial_resumo', rpcFilters as any);
+      const { data, error } = await (supabase.rpc as any)('rpc_gerencial_resumo', rpcFilters);
       if (error) throw error;
       return data as any;
     },
