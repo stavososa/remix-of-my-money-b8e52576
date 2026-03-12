@@ -5,7 +5,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { usePeriod } from '@/contexts/PeriodContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { Trophy, DollarSign, Users, Receipt, Crown, Package, ShoppingCart, BarChart3 } from 'lucide-react';
+import { Trophy, DollarSign, Users, Receipt, Crown, Package, ShoppingCart, Tag, Layers } from 'lucide-react';
 import { DataTable } from '@/components/DataTable';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,6 +40,13 @@ function parseBRL(val: unknown): number {
   return isNaN(n) ? 0 : n;
 }
 
+interface RankedItem {
+  posicao: number;
+  name: string;
+  total_vendido: number;
+  quantidade: number;
+}
+
 interface ProductRank {
   posicao: number;
   descricao_produto: string;
@@ -63,6 +70,37 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     </div>
   );
 };
+
+function RankingTable({ data, nameLabel }: { data: RankedItem[]; nameLabel: string }) {
+  const columns = [
+    { key: 'posicao' as const, label: '#', render: (v: number) => <span className={v <= 3 ? 'text-lg' : ''}>{medalha(v)}</span> },
+    { key: 'name' as const, label: nameLabel },
+    { key: 'total_vendido' as const, label: 'Total Vendido', align: 'right' as const, render: (v: number) => formatBRL(v) },
+    { key: 'quantidade' as const, label: 'Quantidade', align: 'right' as const, render: (v: number) => Math.round(v).toLocaleString('pt-BR') },
+  ];
+
+  return (
+    <>
+      <div className="hidden md:block">
+        <DataTable columns={columns} data={data.slice(0, 50)} rowClassName={(row: any) => row.posicao <= 3 ? 'bg-primary/5' : ''} />
+      </div>
+      <div className="md:hidden space-y-3">
+        {data.slice(0, 50).map((item) => (
+          <div key={item.name} className={`bg-card border border-border rounded-lg p-4 shadow-card ${item.posicao <= 3 ? 'border-primary/40' : ''}`}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-lg">{medalha(item.posicao)}</span>
+              <span className="font-bold text-foreground text-sm">{item.name}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div><span className="text-muted-foreground">Vendido: </span><span className="font-semibold text-foreground">{formatBRL(item.total_vendido)}</span></div>
+              <div><span className="text-muted-foreground">Qtd: </span><span className="text-foreground">{Math.round(item.quantidade).toLocaleString('pt-BR')}</span></div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
 
 export default function Ranking() {
   const { periodoAno, periodoMes } = usePeriod();
@@ -130,7 +168,41 @@ export default function Ranking() {
       .map((item, i) => ({ ...item, posicao: i + 1 }));
   }, [vendasRaw]);
 
-  // Top 10 charts
+  // Agrupar marcas
+  const marcaRanking: RankedItem[] = useMemo(() => {
+    const map = new Map<string, { total: number; qtd: number }>();
+    for (const v of vendasRaw) {
+      const marca = v.marca ?? 'Sem Marca';
+      const existing = map.get(marca);
+      const total = parseBRL(v.total_com_desconto);
+      const qtd = parseBRL(v.quantidade);
+      if (existing) { existing.total += total; existing.qtd += qtd; }
+      else map.set(marca, { total, qtd });
+    }
+    return [...map.entries()]
+      .map(([name, d]) => ({ name, total_vendido: d.total, quantidade: d.qtd, posicao: 0 }))
+      .sort((a, b) => b.total_vendido - a.total_vendido)
+      .map((item, i) => ({ ...item, posicao: i + 1 }));
+  }, [vendasRaw]);
+
+  // Agrupar famílias
+  const familiaRanking: RankedItem[] = useMemo(() => {
+    const map = new Map<string, { total: number; qtd: number }>();
+    for (const v of vendasRaw) {
+      const fam = v.familia_produto ?? 'Outros';
+      const existing = map.get(fam);
+      const total = parseBRL(v.total_com_desconto);
+      const qtd = parseBRL(v.quantidade);
+      if (existing) { existing.total += total; existing.qtd += qtd; }
+      else map.set(fam, { total, qtd });
+    }
+    return [...map.entries()]
+      .map(([name, d]) => ({ name, total_vendido: d.total, quantidade: d.qtd, posicao: 0 }))
+      .sort((a, b) => b.total_vendido - a.total_vendido)
+      .map((item, i) => ({ ...item, posicao: i + 1 }));
+  }, [vendasRaw]);
+
+  // Top 10 charts for Vendedores tab
   const chartVendedores = useMemo(() => {
     const map = new Map<string, number>();
     for (const row of vendasRaw) {
@@ -140,23 +212,17 @@ export default function Ranking() {
     return [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, value]) => ({ name, value }));
   }, [vendasRaw]);
 
+  const chartProdutos = useMemo(() => {
+    return productRanking.slice(0, 10).map(p => ({ name: p.descricao_produto, value: p.total_vendido }));
+  }, [productRanking]);
+
   const chartFamilias = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const row of vendasRaw) {
-      const fam = row.familia_produto ?? 'Outros';
-      map.set(fam, (map.get(fam) ?? 0) + parseBRL(row.total_com_desconto));
-    }
-    return [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, value]) => ({ name, value }));
-  }, [vendasRaw]);
+    return familiaRanking.slice(0, 10).map(f => ({ name: f.name, value: f.total_vendido }));
+  }, [familiaRanking]);
 
   const chartMarcas = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const row of vendasRaw) {
-      const marca = row.marca ?? 'Sem Marca';
-      map.set(marca, (map.get(marca) ?? 0) + parseBRL(row.total_com_desconto));
-    }
-    return [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, value]) => ({ name, value }));
-  }, [vendasRaw]);
+    return marcaRanking.slice(0, 10).map(m => ({ name: m.name, value: m.total_vendido }));
+  }, [marcaRanking]);
 
   const top1 = ranking[0] ?? null;
 
@@ -173,6 +239,18 @@ export default function Ranking() {
     const totalQtd = productRanking.reduce((s, p) => s + p.quantidade, 0);
     return { totalVendido, totalQtd, totalProdutos: productRanking.length };
   }, [productRanking]);
+
+  const marcaKpis = useMemo(() => {
+    const totalVendido = marcaRanking.reduce((s, m) => s + m.total_vendido, 0);
+    const totalQtd = marcaRanking.reduce((s, m) => s + m.quantidade, 0);
+    return { totalVendido, totalQtd, totalMarcas: marcaRanking.length };
+  }, [marcaRanking]);
+
+  const familiaKpis = useMemo(() => {
+    const totalVendido = familiaRanking.reduce((s, f) => s + f.total_vendido, 0);
+    const totalQtd = familiaRanking.reduce((s, f) => s + f.quantidade, 0);
+    return { totalVendido, totalQtd, totalFamilias: familiaRanking.length };
+  }, [familiaRanking]);
 
   const vendedorColumns = [
     { key: 'posicao' as const, label: '#', render: (v: number | null) => <span className={v != null && v <= 3 ? 'text-lg' : ''}>{medalha(v)}</span> },
@@ -193,6 +271,27 @@ export default function Ranking() {
     { key: 'total_vendido' as const, label: 'Total Vendido', align: 'right' as const, render: (v: number) => formatBRL(v) },
     { key: 'quantidade' as const, label: 'Quantidade', align: 'right' as const, render: (v: number) => Math.round(v).toLocaleString('pt-BR') },
   ];
+
+  const renderChart = (data: { name: string; value: number }[], title: string, color: string, fullWidth?: boolean) => (
+    <Card className={`border-border ${fullWidth ? 'lg:col-span-2' : ''}`}>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-semibold text-foreground">{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="h-[300px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data} layout="vertical" margin={{ left: 10 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 20% 20%)" />
+              <XAxis type="number" tickFormatter={v => fmtCompact(v)} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
+              <YAxis dataKey="name" type="category" width={140} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar dataKey="value" name="Faturamento" fill={color} radius={[0, 4, 4, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   return (
     <AppShell title="Ranking">
@@ -232,9 +331,13 @@ export default function Ranking() {
                 <Package className="h-4 w-4" />
                 Produtos
               </TabsTrigger>
-              <TabsTrigger value="tops" className="flex-1 sm:flex-none gap-2">
-                <BarChart3 className="h-4 w-4" />
-                Top Rankings
+              <TabsTrigger value="marcas" className="flex-1 sm:flex-none gap-2">
+                <Tag className="h-4 w-4" />
+                Marcas
+              </TabsTrigger>
+              <TabsTrigger value="familias" className="flex-1 sm:flex-none gap-2">
+                <Layers className="h-4 w-4" />
+                Famílias
               </TabsTrigger>
             </TabsList>
 
@@ -271,6 +374,14 @@ export default function Ranking() {
                   </div>
                 ))}
               </div>
+
+              {/* Top 10 Charts */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {renderChart(chartVendedores, 'Top 10 Vendedores por Faturamento', 'hsl(38 90% 55%)', true)}
+                {renderChart(chartProdutos, 'Top 10 Produtos por Faturamento', 'hsl(150 60% 45%)')}
+                {renderChart(chartFamilias, 'Top 10 Famílias por Faturamento', 'hsl(200 80% 50%)')}
+                {renderChart(chartMarcas, 'Top 10 Marcas por Faturamento', 'hsl(280 60% 55%)')}
+              </div>
             </TabsContent>
 
             {/* Tab Produtos */}
@@ -302,69 +413,24 @@ export default function Ranking() {
               </div>
             </TabsContent>
 
-            {/* Tab Top Rankings */}
-            <TabsContent value="tops" className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Top 10 Vendedores */}
-                <Card className="border-border lg:col-span-2">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-semibold text-foreground">Top 10 Vendedores por Faturamento</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-[300px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={chartVendedores} layout="vertical" margin={{ left: 10 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 20% 20%)" />
-                          <XAxis type="number" tickFormatter={v => fmtCompact(v)} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
-                          <YAxis dataKey="name" type="category" width={140} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
-                          <Tooltip content={<CustomTooltip />} />
-                          <Bar dataKey="value" name="Faturamento" fill="hsl(38 90% 55%)" radius={[0, 4, 4, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Top 10 Famílias */}
-                <Card className="border-border">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-semibold text-foreground">Top 10 Famílias</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-[300px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={chartFamilias} layout="vertical" margin={{ left: 10 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 20% 20%)" />
-                          <XAxis type="number" tickFormatter={v => fmtCompact(v)} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
-                          <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
-                          <Tooltip content={<CustomTooltip />} />
-                          <Bar dataKey="value" name="Faturamento" fill="hsl(200 80% 50%)" radius={[0, 4, 4, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Top 10 Marcas */}
-                <Card className="border-border">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-semibold text-foreground">Top 10 Marcas</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-[300px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={chartMarcas} layout="vertical" margin={{ left: 10 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 20% 20%)" />
-                          <XAxis type="number" tickFormatter={v => fmtCompact(v)} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
-                          <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
-                          <Tooltip content={<CustomTooltip />} />
-                          <Bar dataKey="value" name="Faturamento" fill="hsl(280 60% 55%)" radius={[0, 4, 4, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
+            {/* Tab Marcas */}
+            <TabsContent value="marcas" className="space-y-6">
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                <KPICard icon={DollarSign} label="Total Vendido" value={formatBRL(marcaKpis.totalVendido)} />
+                <KPICard icon={ShoppingCart} label="Qtd Total Vendida" value={Math.round(marcaKpis.totalQtd).toLocaleString('pt-BR')} />
+                <KPICard icon={Tag} label="Marcas Únicas" value={String(marcaKpis.totalMarcas)} />
               </div>
+              <RankingTable data={marcaRanking} nameLabel="Marca" />
+            </TabsContent>
+
+            {/* Tab Famílias */}
+            <TabsContent value="familias" className="space-y-6">
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                <KPICard icon={DollarSign} label="Total Vendido" value={formatBRL(familiaKpis.totalVendido)} />
+                <KPICard icon={ShoppingCart} label="Qtd Total Vendida" value={Math.round(familiaKpis.totalQtd).toLocaleString('pt-BR')} />
+                <KPICard icon={Layers} label="Famílias Únicas" value={String(familiaKpis.totalFamilias)} />
+              </div>
+              <RankingTable data={familiaRanking} nameLabel="Família" />
             </TabsContent>
           </Tabs>
         </div>
