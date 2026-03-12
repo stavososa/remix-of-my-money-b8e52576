@@ -13,6 +13,7 @@ interface DataTableProps<T> {
   data: T[];
   rowClassName?: (row: T) => string;
   pageSize?: number;
+  maxHeight?: string;
   // Server-side pagination props
   serverPagination?: {
     totalCount: number;
@@ -21,7 +22,7 @@ interface DataTableProps<T> {
   };
 }
 
-export function DataTable<T extends Record<string, any>>({ columns, data, rowClassName, pageSize, serverPagination }: DataTableProps<T>) {
+export function DataTable<T extends Record<string, any>>({ columns, data, rowClassName, pageSize, maxHeight, serverPagination }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<keyof T | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -81,7 +82,7 @@ export function DataTable<T extends Record<string, any>>({ columns, data, rowCla
 
   return (
     <div>
-      <div className="overflow-x-auto rounded-lg border border-border">
+      <div className="overflow-x-auto rounded-lg border border-border" style={maxHeight ? { maxHeight, overflowY: 'auto' } : undefined}>
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-secondary">

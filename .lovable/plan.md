@@ -1,59 +1,39 @@
 
-Objetivo: corrigir o filtro de Unidade (que hoje falha em vários casos), manter a tabela com no máximo 30 registros por página com scroll interno, e trocar os gráficos por Unidade para formatos circulares mais legíveis.
 
-Plano de implementação
+## Gerencial com dados da tabela `vendas` + filtro por Unidade + graficos
 
-1) Corrigir filtro de Unidade (principal problema atual)
-- Em `Gerencial.tsx`, criar uma função única de normalização de nomes (uppercase + trim + remoção de acentos).
-- Rebuild do mapeamento `vendedor -> unidade` usando `controle_pj` com chave normalizada para cobrir diferenças de escrita.
-- Separar dois usos:
-  - mapeamento para exibição/KPIs/gráficos (normalizado),
-  - lista exata de `vendedor_nome` (texto original vindo de `vendas`) para filtro SQL `.in(...)`.
-- Ajustar `vendedoresUnidade` para usar nomes reais de `vendas` (não uppercased), evitando falha por case-sensitive no Postgres.
-- Manter regra de segurança atual: se unidade selecionada não tiver vendedores válidos no período, retornar vazio propositalmente.
-- Garantir multifiltro com AND entre Unidade + Vendedor + Família + Marca + Busca.
+A tabela `vendas` tem 468 registros (Jan/2026) com valores em formato string brasileiro (ex: "R$ 15,40", "49,30%"). O campo `vendedor_nome` liga aos vendedores/unidades via `vendedores.nome_omie`. Sera necessario fazer JOIN client-side ou via query para associar unidade a cada venda.
 
-2) Melhorar usabilidade dos filtros (incluindo mês)
-- Manter reset de paginação ao trocar período/filtros (já existe, preservar).
-- Ajustar opções de Unidade para mostrar apenas unidades com vendedores presentes no período selecionado (evita seleção “sem efeito”).
-- Preservar compatibilidade com filtro de mês/ano global (`PeriodFilter` + `usePeriod`) sem regressão.
+### Abordagem
 
-3) Tabela com scroll interno e limite de 30
-- `TABLE_PAGE_SIZE` permanece em 30.
-- Em `DataTable.tsx`, adicionar prop opcional de altura máxima (ex.: `maxHeight`).
-- Aplicar `overflow-y-auto` no container da tabela quando `maxHeight` for informado.
-- Em `Gerencial.tsx`, passar `maxHeight` para a tabela de “Vendas Detalhadas” (ex.: ~500–560px), mantendo paginação fora da área rolável.
+Buscar dados da tabela `vendas` filtrados por periodo (`data_emissao`), e cruzar com `vendedores` + `unidades` para obter a unidade de cada venda. Parsear valores monetarios/percentuais no frontend (padrão ja existente no projeto).
 
-4) Trocar gráficos “por Unidade” para formatos circulares mais entendíveis
-- Substituir os dois gráficos por unidade para não ficarem com o mesmo formato:
-  - Faturamento por Unidade -> Pizza/Rosca (participação no faturamento).
-  - Margem Média por Unidade -> Circular (Radial/Donut por unidade, com tooltip em %).
-- Manter agregação pelos dados já filtrados (`filteredAll`), respeitando todos os filtros ativos.
-- Melhorias de leitura:
-  - limitar a top N unidades + “Outras” quando necessário,
-  - legenda clara,
-  - tooltip com moeda/% formatado.
+### Alteracoes em `src/pages/Gerencial.tsx`
 
-Detalhes técnicos (resumo)
-```text
-Fonte de verdade:
-- Período (mês/ano): usePeriod
-- Dataset completo para KPIs/gráficos: allVendas -> filteredAll
-- Dataset paginado da tabela: query server-side com mesmos filtros
+1. **Nova query: buscar `vendas`** filtradas pelo periodo atual (mes/ano do `data_emissao`), com limite adequado
 
-Correção-chave:
-- Nunca usar vendedor uppercased diretamente no .in('vendedor_nome', ...)
-- Usar normalização só para casar nomes
-- Usar valor original de vendas para filtro SQL
-```
+2. **Nova query: buscar `vendedores` com `unidades`** para mapear `nome_omie` -> `unidade_nome`
 
-Critérios de aceite
-- Filtro de Unidade altera KPIs, gráficos e tabela corretamente.
-- Multifiltro (Unidade + Família + Marca + Vendedor + busca) funciona em conjunto.
-- Troca de mês/ano atualiza tudo sem “filtro fantasma”.
-- Tabela não cresce verticalmente além da altura definida e mantém 30 registros por página.
-- Gráficos por Unidade estão em formato circular e mais legíveis.
+3. **Processar dados client-side**:
+   - Parsear `total_com_desconto`, `lucros_reais`, `margem_percentual` de string BR para number
+   - Associar cada venda a sua unidade via mapa vendedor->unidade
+   - Agregar por unidade: total vendido, lucro, margem media, qtd vendas
 
-Arquivos impactados
-- `src/pages/Gerencial.tsx`
-- `src/components/DataTable.tsx`
+4. **Filtro por Unidade**: O select de unidades ja existe. Ao selecionar uma unidade, filtrar as vendas processadas e recalcular todos os KPIs e graficos.
+
+5. **Novos graficos usando dados de `vendas`**:
+   - **Faturamento por Unidade** (BarChart horizontal - ja existe, alimentar com dados de vendas)
+   - **Margem Media por Unidade** (novo BarChart horizontal, cor verde)
+   - **Top Familias de Produto** (BarChart mostrando as familias mais vendidas, reagindo ao filtro de unidade)
+
+6. **Cards PJ vs CLT**: Recalcular a partir do cruzamento vendas + vendedores (que tem campo `regime`), ao inves de depender exclusivamente da view `v_resumo_regime`
+
+7. **Layout**: Organizar graficos em grid 2 colunas no desktop
+
+### Detalhes tecnicos
+
+- Funcoes de parsing ja existem no projeto (regex para "R$ X,XX" e "XX,XX%")
+- A tabela `vendas` tem 468 linhas para Jan/2026, dentro do limite de 1000 do Supabase
+- Vendedores sem unidade (ex: "CHECK OUT", "COMPRA VENDEDOR") serao agrupados como "Sem Unidade" ou ignorados conforme filtro
+- Manter as queries existentes (`v_ranking`, `v_resumo_unidade`, `v_resumo_regime`) para dados de comissao que nao existem na tabela `vendas`
+

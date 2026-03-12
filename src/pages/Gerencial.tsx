@@ -11,7 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar,
-  XAxis, YAxis, Tooltip, CartesianGrid,
+  PieChart, Pie, Cell,
+  XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from 'recharts';
 
 const parseMoneyBR = (str: unknown): number => {
@@ -37,6 +38,15 @@ const fmt = (v: number) =>
 const fmtCompact = (v: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 }).format(v);
 const fmtPct = (v: number) => `${v.toFixed(1)}%`;
+
+const normalize = (s: string) =>
+  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+
+const PIE_COLORS = [
+  'hsl(38 90% 55%)', 'hsl(200 80% 50%)', 'hsl(142 71% 45%)', 'hsl(280 60% 55%)',
+  'hsl(350 75% 55%)', 'hsl(170 65% 45%)', 'hsl(45 85% 50%)', 'hsl(220 70% 55%)',
+  'hsl(310 60% 50%)', 'hsl(90 60% 45%)',
+];
 
 const TABLE_PAGE_SIZE = 30;
 
@@ -102,27 +112,21 @@ export default function Gerencial() {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Normalized map: normalized_name -> unidade
   const vendedorUnidadeMap = useMemo(() => {
     const map = new Map<string, string>();
     if (!controlePj) return map;
     for (const cp of controlePj) {
-      const key = (cp.nome_vendas ?? cp.nome).toUpperCase().trim();
+      const key = normalize(cp.nome_vendas ?? cp.nome);
       if (cp.unidade) map.set(key, cp.unidade);
     }
     return map;
   }, [controlePj]);
 
-  const vendedoresUnidade = useMemo(() => {
-    if (filtroUnidade === 'all') return null;
-    const names: string[] = [];
-    if (!controlePj) return names;
-    for (const cp of controlePj) {
-      if (cp.unidade === filtroUnidade) {
-        names.push((cp.nome_vendas ?? cp.nome).toUpperCase().trim());
-      }
-    }
-    return names;
-  }, [filtroUnidade, controlePj]);
+  // Get unidade for a vendor name
+  const getUnidade = useCallback((vendedorNome: string) => {
+    return vendedorUnidadeMap.get(normalize(vendedorNome)) ?? 'Sem Unidade';
+  }, [vendedorUnidadeMap]);
 
   // ===== FULL PERIOD DATA (for KPIs & charts) =====
   const { data: allVendas, isLoading: loadAll } = useQuery({
@@ -150,21 +154,33 @@ export default function Gerencial() {
     enabled: !!controlePj,
   });
 
+  // Real vendor names from allVendas that belong to selected unit
+  const vendedoresUnidade = useMemo(() => {
+    if (filtroUnidade === 'all') return null;
+    if (!allVendas) return [];
+    const realNames = new Set<string>();
+    for (const row of allVendas) {
+      const vn = row.vendedor_nome ?? '';
+      if (getUnidade(vn) === filtroUnidade) {
+        realNames.add(vn);
+      }
+    }
+    return [...realNames];
+  }, [filtroUnidade, allVendas, getUnidade]);
+
   // Apply client-side filters to full dataset
   const filteredAll = useMemo(() => {
     if (!allVendas) return [];
     return allVendas.filter(row => {
-      const vendKey = (row.vendedor_nome ?? '').toUpperCase().trim();
       if (filtroUnidade !== 'all') {
-        const unidade = vendedorUnidadeMap.get(vendKey);
-        if (unidade !== filtroUnidade) return false;
+        if (getUnidade(row.vendedor_nome ?? '') !== filtroUnidade) return false;
       }
       if (filtroVendedor !== 'all' && row.vendedor_nome !== filtroVendedor) return false;
       if (filtroFamilia !== 'all' && row.familia_produto !== filtroFamilia) return false;
       if (filtroMarca !== 'all' && row.marca !== filtroMarca) return false;
       return true;
     });
-  }, [allVendas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, vendedorUnidadeMap]);
+  }, [allVendas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, getUnidade]);
 
   // ===== KPIs =====
   const kpis = useMemo(() => {
@@ -236,6 +252,42 @@ export default function Gerencial() {
       .map(([name, value]) => ({ name, value }));
   }, [filteredAll]);
 
+  // ===== Chart: Faturamento por Unidade (Pie) =====
+  const chartFatUnidade = useMemo(() => {
+    if (!allVendas) return [];
+    const map = new Map<string, number>();
+    for (const row of allVendas) {
+      const uni = getUnidade(row.vendedor_nome ?? '');
+      map.set(uni, (map.get(uni) ?? 0) + parseMoneyBR(row.total_com_desconto));
+    }
+    const sorted = [...map.entries()].sort((a, b) => b[1] - a[1]);
+    if (sorted.length <= 8) return sorted.map(([name, value]) => ({ name, value }));
+    const top = sorted.slice(0, 7);
+    const others = sorted.slice(7).reduce((s, [, v]) => s + v, 0);
+    return [...top.map(([name, value]) => ({ name, value })), { name: 'Outras', value: others }];
+  }, [allVendas, getUnidade]);
+
+  // ===== Chart: Margem Média por Unidade (Donut) =====
+  const chartMargemUnidade = useMemo(() => {
+    if (!allVendas) return [];
+    const map = new Map<string, { somaMargemPond: number; somaFat: number }>();
+    for (const row of allVendas) {
+      const uni = getUnidade(row.vendedor_nome ?? '');
+      const fat = parseMoneyBR(row.total_com_desconto);
+      const margem = parsePctBR(row.margem_percentual);
+      const cur = map.get(uni) ?? { somaMargemPond: 0, somaFat: 0 };
+      cur.somaMargemPond += margem * fat;
+      cur.somaFat += fat;
+      map.set(uni, cur);
+    }
+    return [...map.entries()]
+      .map(([name, { somaMargemPond, somaFat }]) => ({
+        name,
+        value: somaFat > 0 ? Math.round((somaMargemPond / somaFat) * 10) / 10 : 0,
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [allVendas, getUnidade]);
+
   // Fetch filter options
   const { data: filterOptions } = useQuery({
     queryKey: ['gerencial-filters', periodoAno, periodoMes],
@@ -257,10 +309,20 @@ export default function Gerencial() {
         if (row.marca && row.marca !== 'Sem Marca') marcas.add(row.marca);
       }
       const unidades = new Set<string>();
-      if (controlePj) {
-        for (const cp of controlePj) {
-          if (cp.unidade) unidades.add(cp.unidade);
+      for (const row of data ?? []) {
+        if (row.vendedor_nome) {
+          vendedores.add(row.vendedor_nome);
+          if (controlePj) {
+            const nk = normalize(row.vendedor_nome);
+            for (const cp of controlePj) {
+              if (normalize(cp.nome_vendas ?? cp.nome) === nk && cp.unidade) {
+                unidades.add(cp.unidade);
+              }
+            }
+          }
         }
+        if (row.familia_produto && row.familia_produto !== 'Outros') familias.add(row.familia_produto);
+        if (row.marca && row.marca !== 'Sem Marca') marcas.add(row.marca);
       }
       return {
         vendedores: [...vendedores].sort(),
@@ -319,17 +381,14 @@ export default function Gerencial() {
   const vendasTotalCount = vendasResult?.totalCount ?? 0;
 
   const mappedRows = useMemo(() => {
-    return vendasRows.map(row => {
-      const vendedorKey = (row.vendedor_nome ?? '').toUpperCase().trim();
-      return {
-        ...row,
-        unidade_nome: vendedorUnidadeMap.get(vendedorKey) ?? 'Sem Unidade',
-        total_parsed: parseMoneyBR(row.total_com_desconto),
-        lucro_parsed: parseMoneyBR(row.lucros_reais),
-        margem_parsed: parsePctBR(row.margem_percentual),
-      };
-    });
-  }, [vendasRows, vendedorUnidadeMap]);
+    return vendasRows.map(row => ({
+      ...row,
+      unidade_nome: getUnidade(row.vendedor_nome ?? ''),
+      total_parsed: parseMoneyBR(row.total_com_desconto),
+      lucro_parsed: parseMoneyBR(row.lucros_reais),
+      margem_parsed: parsePctBR(row.margem_percentual),
+    }));
+  }, [vendasRows, getUnidade]);
 
   const handleFilterChange = (setter: (v: string) => void) => (v: string) => {
     setter(v);
@@ -453,6 +512,46 @@ export default function Gerencial() {
             </CardContent>
           </Card>
 
+          {/* Faturamento por Unidade - Pie */}
+          <Card className="border-border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold text-foreground">Faturamento por Unidade</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[260px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={chartFatUnidade} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={95} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false} fontSize={10}>
+                      {chartFatUnidade.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip formatter={(v: number) => fmt(v)} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Margem Média por Unidade - Donut */}
+          <Card className="border-border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold text-foreground">Margem Média por Unidade</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[260px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={chartMargemUnidade} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={95} label={({ name, value }) => `${name} ${fmtPct(value)}`} labelLine={false} fontSize={10}>
+                      {chartMargemUnidade.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip formatter={(v: number) => fmtPct(v)} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Top 10 Famílias */}
           <Card className="border-border">
             <CardHeader className="pb-2">
@@ -515,6 +614,7 @@ export default function Gerencial() {
             columns={detailColumns}
             data={mappedRows}
             pageSize={TABLE_PAGE_SIZE}
+            maxHeight="500px"
             serverPagination={{
               totalCount: vendasTotalCount,
               currentPage: tabelaPagina,
