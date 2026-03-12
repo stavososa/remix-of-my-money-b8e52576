@@ -99,35 +99,6 @@ export default function Gerencial() {
   const endDay = new Date(periodoAno, periodoMes, 0).getDate();
   const endDate = `${periodoAno}-${String(periodoMes).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
 
-  // Fetch controle_pj for unidade mapping
-  const { data: controlePj } = useQuery({
-    queryKey: ['controle-pj'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('controle_pj')
-        .select('nome, nome_vendas, unidade');
-      if (error) throw error;
-      return data ?? [];
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-
-  // Normalized map: normalized_name -> unidade
-  const vendedorUnidadeMap = useMemo(() => {
-    const map = new Map<string, string>();
-    if (!controlePj) return map;
-    for (const cp of controlePj) {
-      const key = normalize(cp.nome_vendas ?? cp.nome);
-      if (cp.unidade) map.set(key, cp.unidade);
-    }
-    return map;
-  }, [controlePj]);
-
-  // Get unidade for a vendor name
-  const getUnidade = useCallback((vendedorNome: string) => {
-    return vendedorUnidadeMap.get(normalize(vendedorNome)) ?? 'Sem Unidade';
-  }, [vendedorUnidadeMap]);
-
   // ===== FULL PERIOD DATA (for KPIs & charts) =====
   const { data: allVendas, isLoading: loadAll } = useQuery({
     queryKey: ['gerencial-all-vendas', periodoAno, periodoMes],
@@ -138,7 +109,7 @@ export default function Gerencial() {
       while (true) {
         const { data, error } = await supabase
           .from('vendas')
-          .select('data_emissao, vendedor_nome, total_com_desconto, lucros_reais, margem_percentual, familia_produto, marca')
+          .select('data_emissao, vendedor_nome, total_com_desconto, lucros_reais, margem_percentual, familia_produto, marca, local_estoque')
           .gte('data_emissao', startDate)
           .lte('data_emissao', endDate)
           .range(from, from + step - 1);
@@ -151,22 +122,7 @@ export default function Gerencial() {
       return allData;
     },
     staleTime: 2 * 60 * 1000,
-    enabled: !!controlePj,
   });
-
-  // Real vendor names from allVendas that belong to selected unit
-  const vendedoresUnidade = useMemo(() => {
-    if (filtroUnidade === 'all') return null;
-    if (!allVendas) return [];
-    const realNames = new Set<string>();
-    for (const row of allVendas) {
-      const vn = row.vendedor_nome ?? '';
-      if (getUnidade(vn) === filtroUnidade) {
-        realNames.add(vn);
-      }
-    }
-    return [...realNames];
-  }, [filtroUnidade, allVendas, getUnidade]);
 
   // Apply client-side filters to full dataset
   const filteredAll = useMemo(() => {
