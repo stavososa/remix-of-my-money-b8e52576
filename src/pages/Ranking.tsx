@@ -326,13 +326,6 @@ export default function Ranking() {
                 ))}
               </div>
 
-              {/* Top 10 Charts */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {renderChart(chartVendedores, 'Top 10 Vendedores por Faturamento', 'hsl(38 90% 55%)', true)}
-                {renderChart(chartProdutos, 'Top 10 Produtos por Faturamento', 'hsl(150 60% 45%)')}
-                {renderChart(chartFamilias, 'Top 10 Famílias por Faturamento', 'hsl(200 80% 50%)')}
-                {renderChart(chartMarcas, 'Top 10 Marcas por Faturamento', 'hsl(280 60% 55%)')}
-              </div>
             </TabsContent>
 
             {/* Tab Produtos */}
