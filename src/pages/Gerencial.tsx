@@ -128,15 +128,13 @@ export default function Gerencial() {
   const filteredAll = useMemo(() => {
     if (!allVendas) return [];
     return allVendas.filter(row => {
-      if (filtroUnidade !== 'all') {
-        if (getUnidade(row.vendedor_nome ?? '') !== filtroUnidade) return false;
-      }
+      if (filtroUnidade !== 'all' && (row.local_estoque ?? '') !== filtroUnidade) return false;
       if (filtroVendedor !== 'all' && row.vendedor_nome !== filtroVendedor) return false;
       if (filtroFamilia !== 'all' && row.familia_produto !== filtroFamilia) return false;
       if (filtroMarca !== 'all' && row.marca !== filtroMarca) return false;
       return true;
     });
-  }, [allVendas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, getUnidade]);
+  }, [allVendas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca]);
 
   // ===== KPIs =====
   const kpis = useMemo(() => {
