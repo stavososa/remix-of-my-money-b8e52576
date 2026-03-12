@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { KPICard } from '@/components/KPICard';
 import { DataTable } from '@/components/DataTable';
@@ -64,6 +64,17 @@ export default function Gerencial() {
   const [buscaTabela, setBuscaTabela] = useState('');
   const [searchDebounced, setSearchDebounced] = useState('');
   const [tabelaPagina, setTabelaPagina] = useState(1);
+
+  // Reset filters and page when period changes
+  useEffect(() => {
+    setFiltroUnidade('all');
+    setFiltroVendedor('all');
+    setFiltroFamilia('all');
+    setFiltroMarca('all');
+    setBuscaTabela('');
+    setSearchDebounced('');
+    setTabelaPagina(1);
+  }, [periodoAno, periodoMes]);
 
   const searchTimer = useCallback((val: string) => {
     setBuscaTabela(val);
@@ -186,18 +197,31 @@ export default function Gerencial() {
     });
   }, [filteredAll]);
 
-  // ===== Chart: Faturamento por Unidade =====
-  const chartUnidade = useMemo(() => {
+  // ===== Chart: Top 10 Vendedores =====
+  const chartVendedores = useMemo(() => {
     const map = new Map<string, number>();
     for (const row of filteredAll) {
-      const vendKey = (row.vendedor_nome ?? '').toUpperCase().trim();
-      const unidade = vendedorUnidadeMap.get(vendKey) ?? 'Sem Unidade';
-      map.set(unidade, (map.get(unidade) ?? 0) + parseMoneyBR(row.total_com_desconto));
+      const vend = row.vendedor_nome ?? 'Desconhecido';
+      map.set(vend, (map.get(vend) ?? 0) + parseMoneyBR(row.total_com_desconto));
     }
     return [...map.entries()]
       .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
       .map(([name, value]) => ({ name, value }));
-  }, [filteredAll, vendedorUnidadeMap]);
+  }, [filteredAll]);
+
+  // ===== Chart: Top 10 Marcas =====
+  const chartMarcas = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of filteredAll) {
+      const marca = row.marca ?? 'Sem Marca';
+      map.set(marca, (map.get(marca) ?? 0) + parseMoneyBR(row.total_com_desconto));
+    }
+    return [...map.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([name, value]) => ({ name, value }));
+  }, [filteredAll]);
 
   // ===== Chart: Top 10 Famílias =====
   const chartFamilias = useMemo(() => {
@@ -211,27 +235,6 @@ export default function Gerencial() {
       .slice(0, 10)
       .map(([name, value]) => ({ name, value }));
   }, [filteredAll]);
-
-  // ===== Chart: Margem por Unidade =====
-  const chartMargemUnidade = useMemo(() => {
-    const map = new Map<string, { somaMargemPond: number; somaFat: number }>();
-    for (const row of filteredAll) {
-      const vendKey = (row.vendedor_nome ?? '').toUpperCase().trim();
-      const unidade = vendedorUnidadeMap.get(vendKey) ?? 'Sem Unidade';
-      const fat = parseMoneyBR(row.total_com_desconto);
-      const margem = parsePctBR(row.margem_percentual);
-      const cur = map.get(unidade) ?? { somaMargemPond: 0, somaFat: 0 };
-      cur.somaMargemPond += margem * fat;
-      cur.somaFat += fat;
-      map.set(unidade, cur);
-    }
-    return [...map.entries()]
-      .map(([name, { somaMargemPond, somaFat }]) => ({
-        name,
-        margem: somaFat > 0 ? somaMargemPond / somaFat : 0,
-      }))
-      .sort((a, b) => b.margem - a.margem);
-  }, [filteredAll, vendedorUnidadeMap]);
 
   // Fetch filter options
   const { data: filterOptions } = useQuery({
@@ -288,11 +291,13 @@ export default function Gerencial() {
       if (filtroFamilia !== 'all') query = query.eq('familia_produto', filtroFamilia);
       if (filtroMarca !== 'all') query = query.eq('marca', filtroMarca);
 
-      if (vendedoresUnidade && vendedoresUnidade.length > 0) {
-        const namesForFilter = controlePj
-          ?.filter(cp => cp.unidade === filtroUnidade)
-          .map(cp => cp.nome_vendas ?? cp.nome) ?? [];
-        if (namesForFilter.length > 0) query = query.in('vendedor_nome', namesForFilter);
+      if (filtroUnidade !== 'all') {
+        if (vendedoresUnidade && vendedoresUnidade.length > 0) {
+          query = query.in('vendedor_nome', vendedoresUnidade);
+        } else {
+          // Unit selected but no vendors mapped → force empty result
+          query = query.eq('vendedor_nome', '__NONEXISTENT__');
+        }
       }
 
       if (searchDebounced) {
@@ -428,18 +433,18 @@ export default function Gerencial() {
             </CardContent>
           </Card>
 
-          {/* Faturamento por Unidade */}
+          {/* Top 10 Vendedores */}
           <Card className="border-border">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-foreground">Faturamento por Unidade</CardTitle>
+              <CardTitle className="text-sm font-semibold text-foreground">Top 10 Vendedores</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-[260px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartUnidade} layout="vertical" margin={{ left: 10 }}>
+                  <BarChart data={chartVendedores} layout="vertical" margin={{ left: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 20% 20%)" />
                     <XAxis type="number" tickFormatter={v => fmtCompact(v)} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
-                    <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 11, fill: 'hsl(215 15% 55%)' }} />
+                    <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
                     <Tooltip content={<CustomTooltip />} />
                     <Bar dataKey="value" name="Faturamento" fill="hsl(38 90% 55%)" radius={[0, 4, 4, 0]} />
                   </BarChart>
@@ -468,20 +473,20 @@ export default function Gerencial() {
             </CardContent>
           </Card>
 
-          {/* Margem por Unidade */}
+          {/* Top 10 Marcas */}
           <Card className="border-border">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-foreground">Margem Média por Unidade</CardTitle>
+              <CardTitle className="text-sm font-semibold text-foreground">Top 10 Marcas</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-[260px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartMargemUnidade} layout="vertical" margin={{ left: 10 }}>
+                  <BarChart data={chartMarcas} layout="vertical" margin={{ left: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 20% 20%)" />
-                    <XAxis type="number" tickFormatter={v => fmtPct(v)} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
-                    <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 11, fill: 'hsl(215 15% 55%)' }} />
+                    <XAxis type="number" tickFormatter={v => fmtCompact(v)} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
+                    <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
                     <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="margem" name="Margem" fill="hsl(142 71% 45%)" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="value" name="Faturamento" fill="hsl(280 60% 55%)" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
