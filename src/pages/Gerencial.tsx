@@ -226,7 +226,7 @@ export default function Gerencial() {
     if (!allVendas) return [];
     const map = new Map<string, { somaMargemPond: number; somaFat: number }>();
     for (const row of allVendas) {
-      const uni = getUnidade(row.vendedor_nome ?? '');
+      const uni = row.local_estoque ?? 'Sem Unidade';
       const fat = parseMoneyBR(row.total_com_desconto);
       const margem = parsePctBR(row.margem_percentual);
       const cur = map.get(uni) ?? { somaMargemPond: 0, somaFat: 0 };
@@ -240,7 +240,7 @@ export default function Gerencial() {
         value: somaFat > 0 ? Math.round((somaMargemPond / somaFat) * 10) / 10 : 0,
       }))
       .sort((a, b) => b.value - a.value);
-  }, [allVendas, getUnidade]);
+  }, [allVendas]);
 
   // Fetch filter options
   const { data: filterOptions } = useQuery({
