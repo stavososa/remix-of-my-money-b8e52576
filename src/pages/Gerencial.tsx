@@ -213,7 +213,7 @@ export default function Gerencial() {
       if (row.familia_produto && row.familia_produto !== 'Outros') familias.add(row.familia_produto);
       if (row.marca && row.marca !== 'Sem Marca') marcas.add(row.marca);
       const uni = getUnidade(row.vendedor_nome);
-      if (uni !== 'Sem Unidade') unidades.add(uni);
+      if (uni !== 'Sem Filial') unidades.add(uni);
     }
     return {
       vendedores: [...vendedores].sort(),
