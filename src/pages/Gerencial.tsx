@@ -211,7 +211,7 @@ export default function Gerencial() {
     if (!allVendas) return [];
     const map = new Map<string, number>();
     for (const row of allVendas) {
-      const uni = getUnidade(row.vendedor_nome ?? '');
+      const uni = row.local_estoque ?? 'Sem Unidade';
       map.set(uni, (map.get(uni) ?? 0) + parseMoneyBR(row.total_com_desconto));
     }
     const sorted = [...map.entries()].sort((a, b) => b[1] - a[1]);
@@ -219,7 +219,7 @@ export default function Gerencial() {
     const top = sorted.slice(0, 7);
     const others = sorted.slice(7).reduce((s, [, v]) => s + v, 0);
     return [...top.map(([name, value]) => ({ name, value })), { name: 'Outras', value: others }];
-  }, [allVendas, getUnidade]);
+  }, [allVendas]);
 
   // ===== Chart: Margem Média por Unidade (Donut) =====
   const chartMargemUnidade = useMemo(() => {
