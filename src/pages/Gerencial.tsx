@@ -128,20 +128,6 @@ export default function Gerencial() {
     return vendedorUnidadeMap.get(normalize(vendedorNome)) ?? 'Sem Unidade';
   }, [vendedorUnidadeMap]);
 
-  // Real vendor names from allVendas that belong to selected unit
-  const vendedoresUnidade = useMemo(() => {
-    if (filtroUnidade === 'all') return null;
-    if (!allVendas) return [];
-    const realNames = new Set<string>();
-    for (const row of allVendas) {
-      const vn = row.vendedor_nome ?? '';
-      if (getUnidade(vn) === filtroUnidade) {
-        realNames.add(vn);
-      }
-    }
-    return [...realNames];
-  }, [filtroUnidade, allVendas, getUnidade]);
-
   // ===== FULL PERIOD DATA (for KPIs & charts) =====
   const { data: allVendas, isLoading: loadAll } = useQuery({
     queryKey: ['gerencial-all-vendas', periodoAno, periodoMes],
@@ -167,6 +153,20 @@ export default function Gerencial() {
     staleTime: 2 * 60 * 1000,
     enabled: !!controlePj,
   });
+
+  // Real vendor names from allVendas that belong to selected unit
+  const vendedoresUnidade = useMemo(() => {
+    if (filtroUnidade === 'all') return null;
+    if (!allVendas) return [];
+    const realNames = new Set<string>();
+    for (const row of allVendas) {
+      const vn = row.vendedor_nome ?? '';
+      if (getUnidade(vn) === filtroUnidade) {
+        realNames.add(vn);
+      }
+    }
+    return [...realNames];
+  }, [filtroUnidade, allVendas, getUnidade]);
 
   // Apply client-side filters to full dataset
   const filteredAll = useMemo(() => {
