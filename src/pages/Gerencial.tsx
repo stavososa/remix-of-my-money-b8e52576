@@ -191,6 +191,21 @@ export default function Gerencial() {
     });
   }, [vendasProcessadas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca]);
 
+  // Search filter for table
+  const vendasParaTabela = useMemo(() => {
+    if (!buscaTabela.trim()) return vendasFiltradas;
+    const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const termo = normalize(buscaTabela);
+    return vendasFiltradas.filter(v =>
+      normalize(v.vendedor_nome).includes(termo) ||
+      normalize(v.unidade_nome).includes(termo) ||
+      normalize(v.descricao_produto).includes(termo) ||
+      normalize(v.familia_produto).includes(termo) ||
+      normalize(v.marca).includes(termo) ||
+      normalize(v.nota_fiscal).includes(termo)
+    );
+  }, [vendasFiltradas, buscaTabela]);
+
   // KPIs
   const kpis = useMemo(() => {
     const faturamento = vendasFiltradas.reduce((s, v) => s + v.total_com_desconto, 0);
