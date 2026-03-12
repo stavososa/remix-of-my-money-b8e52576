@@ -1,32 +1,39 @@
 
 
-## Plano: Adicionar colunas Faturamento e Lucro Real em todas as abas do Ranking
+## Gerencial com dados da tabela `vendas` + filtro por Unidade + graficos
 
-### Contexto
-- A tabela `vendas` tem os campos `total_com_desconto` e `lucros_reais` (ambos strings BRL)
-- A view `v_ranking` já tem `total_vendido` e `lucro_total` para vendedores
-- Todas as abas precisam de colunas com valores arredondados estrategicamente
+A tabela `vendas` tem 468 registros (Jan/2026) com valores em formato string brasileiro (ex: "R$ 15,40", "49,30%"). O campo `vendedor_nome` liga aos vendedores/unidades via `vendedores.nome_omie`. Sera necessario fazer JOIN client-side ou via query para associar unidade a cada venda.
 
-### Alterações em `src/pages/Ranking.tsx`
+### Abordagem
 
-**1. Query `vendasRaw`**: adicionar `lucros_reais` ao select
+Buscar dados da tabela `vendas` filtrados por periodo (`data_emissao`), e cruzar com `vendedores` + `unidades` para obter a unidade de cada venda. Parsear valores monetarios/percentuais no frontend (padrão ja existente no projeto).
 
-**2. Vendedores tab** — Transformar em lista ranking igual às outras abas:
-- Já usa `v_ranking` que tem `total_vendido` e `lucro_total` — adicionar coluna "Lucro Real" usando `lucro_total`
-- Valores formatados com `fmtCompact` para arredondamento estratégico (ex: R$ 1,2 mi, R$ 45,3 mil)
+### Alteracoes em `src/pages/Gerencial.tsx`
 
-**3. Produtos, Marcas, Famílias** — Incluir `lucros_reais` na agregação:
-- Nos `useMemo` de agrupamento, somar também `parseBRL(v.lucros_reais)` como `lucro`
-- Atualizar interfaces `RankedItem` e `ProductRank` para incluir campo `lucro`
-- Adicionar colunas "Faturamento" (`total_com_desconto` → `total_vendido`) e "Lucro Real" nas tabelas
-- Usar `fmtCompact` para valores grandes (arredondamento inteligente)
+1. **Nova query: buscar `vendas`** filtradas pelo periodo atual (mes/ano do `data_emissao`), com limite adequado
 
-**4. Atualizar `RankingTable`** (componente compartilhado por Marcas e Famílias):
-- Adicionar coluna "Lucro Real" com `fmtCompact`
-- Atualizar cards mobile para exibir lucro
+2. **Nova query: buscar `vendedores` com `unidades`** para mapear `nome_omie` -> `unidade_nome`
 
-**5. Formatação estratégica**: usar `fmtCompact` (já existente) que formata como "R$ 1,2 mi", "R$ 45,3 mil" para manter a tabela limpa
+3. **Processar dados client-side**:
+   - Parsear `total_com_desconto`, `lucros_reais`, `margem_percentual` de string BR para number
+   - Associar cada venda a sua unidade via mapa vendedor->unidade
+   - Agregar por unidade: total vendido, lucro, margem media, qtd vendas
 
-### Arquivo alterado
-- `src/pages/Ranking.tsx`
+4. **Filtro por Unidade**: O select de unidades ja existe. Ao selecionar uma unidade, filtrar as vendas processadas e recalcular todos os KPIs e graficos.
+
+5. **Novos graficos usando dados de `vendas`**:
+   - **Faturamento por Unidade** (BarChart horizontal - ja existe, alimentar com dados de vendas)
+   - **Margem Media por Unidade** (novo BarChart horizontal, cor verde)
+   - **Top Familias de Produto** (BarChart mostrando as familias mais vendidas, reagindo ao filtro de unidade)
+
+6. **Cards PJ vs CLT**: Recalcular a partir do cruzamento vendas + vendedores (que tem campo `regime`), ao inves de depender exclusivamente da view `v_resumo_regime`
+
+7. **Layout**: Organizar graficos em grid 2 colunas no desktop
+
+### Detalhes tecnicos
+
+- Funcoes de parsing ja existem no projeto (regex para "R$ X,XX" e "XX,XX%")
+- A tabela `vendas` tem 468 linhas para Jan/2026, dentro do limite de 1000 do Supabase
+- Vendedores sem unidade (ex: "CHECK OUT", "COMPRA VENDEDOR") serao agrupados como "Sem Unidade" ou ignorados conforme filtro
+- Manter as queries existentes (`v_ranking`, `v_resumo_unidade`, `v_resumo_regime`) para dados de comissao que nao existem na tabela `vendas`
 

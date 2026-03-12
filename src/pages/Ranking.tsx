@@ -45,6 +45,7 @@ interface RankedItem {
   name: string;
   total_vendido: number;
   quantidade: number;
+  lucro: number;
 }
 
 interface ProductRank {
@@ -54,6 +55,7 @@ interface ProductRank {
   marca: string;
   total_vendido: number;
   quantidade: number;
+  lucro: number;
 }
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -75,7 +77,8 @@ function RankingTable({ data, nameLabel }: { data: RankedItem[]; nameLabel: stri
   const columns = [
     { key: 'posicao' as const, label: '#', render: (v: number) => <span className={v <= 3 ? 'text-lg' : ''}>{medalha(v)}</span> },
     { key: 'name' as const, label: nameLabel },
-    { key: 'total_vendido' as const, label: 'Total Vendido', align: 'right' as const, render: (v: number) => formatBRL(v) },
+    { key: 'total_vendido' as const, label: 'Faturamento', align: 'right' as const, render: (v: number) => fmtCompact(v) },
+    { key: 'lucro' as const, label: 'Lucro Real', align: 'right' as const, render: (v: number) => fmtCompact(v) },
     { key: 'quantidade' as const, label: 'Quantidade', align: 'right' as const, render: (v: number) => Math.round(v).toLocaleString('pt-BR') },
   ];
 
@@ -91,8 +94,9 @@ function RankingTable({ data, nameLabel }: { data: RankedItem[]; nameLabel: stri
               <span className="text-lg">{medalha(item.posicao)}</span>
               <span className="font-bold text-foreground text-sm">{item.name}</span>
             </div>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div><span className="text-muted-foreground">Vendido: </span><span className="font-semibold text-foreground">{formatBRL(item.total_vendido)}</span></div>
+            <div className="grid grid-cols-3 gap-2 text-sm">
+              <div><span className="text-muted-foreground">Faturamento: </span><span className="font-semibold text-foreground">{fmtCompact(item.total_vendido)}</span></div>
+              <div><span className="text-muted-foreground">Lucro: </span><span className="font-semibold text-foreground">{fmtCompact(item.lucro)}</span></div>
               <div><span className="text-muted-foreground">Qtd: </span><span className="text-foreground">{Math.round(item.quantidade).toLocaleString('pt-BR')}</span></div>
             </div>
           </div>
@@ -132,7 +136,7 @@ export default function Ranking() {
       while (true) {
         const { data } = await supabase
           .from('vendas')
-          .select('descricao_produto, familia_produto, marca, total_com_desconto, quantidade, vendedor_nome')
+          .select('descricao_produto, familia_produto, marca, total_com_desconto, quantidade, vendedor_nome, lucros_reais')
           .gte('data_emissao', inicioMes)
           .lte('data_emissao', fimMes)
           .range(from, from + PAGE - 1);
@@ -149,55 +153,59 @@ export default function Ranking() {
 
   // Agrupar produtos
   const productRanking: ProductRank[] = useMemo(() => {
-    const map = new Map<string, { total: number; qtd: number; familia: string; marca: string }>();
+    const map = new Map<string, { total: number; qtd: number; lucro: number; familia: string; marca: string }>();
     for (const v of vendasRaw) {
       const nome = v.descricao_produto ?? 'Sem Nome';
       const existing = map.get(nome);
       const total = parseBRL(v.total_com_desconto);
       const qtd = parseBRL(v.quantidade);
+      const lucro = parseBRL(v.lucros_reais);
       if (existing) {
         existing.total += total;
         existing.qtd += qtd;
+        existing.lucro += lucro;
       } else {
-        map.set(nome, { total, qtd, familia: v.familia_produto ?? 'Outros', marca: v.marca ?? 'Sem Marca' });
+        map.set(nome, { total, qtd, lucro, familia: v.familia_produto ?? 'Outros', marca: v.marca ?? 'Sem Marca' });
       }
     }
     return [...map.entries()]
-      .map(([nome, d]) => ({ descricao_produto: nome, familia_produto: d.familia, marca: d.marca, total_vendido: d.total, quantidade: d.qtd, posicao: 0 }))
+      .map(([nome, d]) => ({ descricao_produto: nome, familia_produto: d.familia, marca: d.marca, total_vendido: d.total, quantidade: d.qtd, lucro: d.lucro, posicao: 0 }))
       .sort((a, b) => b.total_vendido - a.total_vendido)
       .map((item, i) => ({ ...item, posicao: i + 1 }));
   }, [vendasRaw]);
 
   // Agrupar marcas
   const marcaRanking: RankedItem[] = useMemo(() => {
-    const map = new Map<string, { total: number; qtd: number }>();
+    const map = new Map<string, { total: number; qtd: number; lucro: number }>();
     for (const v of vendasRaw) {
       const marca = v.marca ?? 'Sem Marca';
       const existing = map.get(marca);
       const total = parseBRL(v.total_com_desconto);
       const qtd = parseBRL(v.quantidade);
-      if (existing) { existing.total += total; existing.qtd += qtd; }
-      else map.set(marca, { total, qtd });
+      const lucro = parseBRL(v.lucros_reais);
+      if (existing) { existing.total += total; existing.qtd += qtd; existing.lucro += lucro; }
+      else map.set(marca, { total, qtd, lucro });
     }
     return [...map.entries()]
-      .map(([name, d]) => ({ name, total_vendido: d.total, quantidade: d.qtd, posicao: 0 }))
+      .map(([name, d]) => ({ name, total_vendido: d.total, quantidade: d.qtd, lucro: d.lucro, posicao: 0 }))
       .sort((a, b) => b.total_vendido - a.total_vendido)
       .map((item, i) => ({ ...item, posicao: i + 1 }));
   }, [vendasRaw]);
 
   // Agrupar famílias
   const familiaRanking: RankedItem[] = useMemo(() => {
-    const map = new Map<string, { total: number; qtd: number }>();
+    const map = new Map<string, { total: number; qtd: number; lucro: number }>();
     for (const v of vendasRaw) {
       const fam = v.familia_produto ?? 'Outros';
       const existing = map.get(fam);
       const total = parseBRL(v.total_com_desconto);
       const qtd = parseBRL(v.quantidade);
-      if (existing) { existing.total += total; existing.qtd += qtd; }
-      else map.set(fam, { total, qtd });
+      const lucro = parseBRL(v.lucros_reais);
+      if (existing) { existing.total += total; existing.qtd += qtd; existing.lucro += lucro; }
+      else map.set(fam, { total, qtd, lucro });
     }
     return [...map.entries()]
-      .map(([name, d]) => ({ name, total_vendido: d.total, quantidade: d.qtd, posicao: 0 }))
+      .map(([name, d]) => ({ name, total_vendido: d.total, quantidade: d.qtd, lucro: d.lucro, posicao: 0 }))
       .sort((a, b) => b.total_vendido - a.total_vendido)
       .map((item, i) => ({ ...item, posicao: i + 1 }));
   }, [vendasRaw]);
@@ -257,8 +265,9 @@ export default function Ranking() {
     { key: 'vendedor_nome' as const, label: 'Vendedor' },
     { key: 'unidade_nome' as const, label: 'Unidade' },
     { key: 'regime' as const, label: 'Regime', render: (v: string | null) => v ? <StatusBadge status={v} /> : '—' },
-    { key: 'total_vendido' as const, label: 'Total Vendido', align: 'right' as const, render: (v: number | null) => formatBRL(v) },
-    { key: 'total_comissao' as const, label: 'Comissão', align: 'right' as const, render: (v: number | null) => formatBRL(v) },
+    { key: 'total_vendido' as const, label: 'Faturamento', align: 'right' as const, render: (v: number | null) => fmtCompact(v ?? 0) },
+    { key: 'lucro_total' as const, label: 'Lucro Real', align: 'right' as const, render: (v: number | null) => fmtCompact(v ?? 0) },
+    { key: 'total_comissao' as const, label: 'Comissão', align: 'right' as const, render: (v: number | null) => fmtCompact(v ?? 0) },
     { key: 'percentual_aplicado' as const, label: '% Comissão', align: 'right' as const, render: (v: number | null) => formatPct(v) },
     { key: 'qtd_notas' as const, label: 'Notas', align: 'right' as const },
   ];
@@ -268,7 +277,8 @@ export default function Ranking() {
     { key: 'descricao_produto' as const, label: 'Produto' },
     { key: 'familia_produto' as const, label: 'Família' },
     { key: 'marca' as const, label: 'Marca' },
-    { key: 'total_vendido' as const, label: 'Total Vendido', align: 'right' as const, render: (v: number) => formatBRL(v) },
+    { key: 'total_vendido' as const, label: 'Faturamento', align: 'right' as const, render: (v: number) => fmtCompact(v) },
+    { key: 'lucro' as const, label: 'Lucro Real', align: 'right' as const, render: (v: number) => fmtCompact(v) },
     { key: 'quantidade' as const, label: 'Quantidade', align: 'right' as const, render: (v: number) => Math.round(v).toLocaleString('pt-BR') },
   ];
 
@@ -366,9 +376,9 @@ export default function Ranking() {
                     </div>
                     <p className="text-xs text-secondary-foreground mb-2">{r.unidade_nome}</p>
                     <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div><span className="text-muted-foreground">Vendido: </span><span className="font-semibold text-foreground">{formatBRL(r.total_vendido)}</span></div>
-                      <div><span className="text-muted-foreground">Comissão: </span><span className="font-semibold text-foreground">{formatBRL(r.total_comissao)}</span></div>
-                      <div><span className="text-muted-foreground">%: </span><span className="text-foreground">{formatPct(r.percentual_aplicado)}</span></div>
+                      <div><span className="text-muted-foreground">Faturamento: </span><span className="font-semibold text-foreground">{fmtCompact(r.total_vendido ?? 0)}</span></div>
+                      <div><span className="text-muted-foreground">Lucro: </span><span className="font-semibold text-foreground">{fmtCompact(r.lucro_total ?? 0)}</span></div>
+                      <div><span className="text-muted-foreground">Comissão: </span><span className="font-semibold text-foreground">{fmtCompact(r.total_comissao ?? 0)}</span></div>
                       <div><span className="text-muted-foreground">Notas: </span><span className="text-foreground">{r.qtd_notas ?? 0}</span></div>
                     </div>
                   </div>
@@ -404,8 +414,9 @@ export default function Ranking() {
                       <span className="font-bold text-foreground text-sm">{p.descricao_produto}</span>
                     </div>
                     <p className="text-xs text-secondary-foreground mb-2">{p.familia_produto} · {p.marca}</p>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div><span className="text-muted-foreground">Vendido: </span><span className="font-semibold text-foreground">{formatBRL(p.total_vendido)}</span></div>
+                    <div className="grid grid-cols-3 gap-2 text-sm">
+                      <div><span className="text-muted-foreground">Faturamento: </span><span className="font-semibold text-foreground">{fmtCompact(p.total_vendido)}</span></div>
+                      <div><span className="text-muted-foreground">Lucro: </span><span className="font-semibold text-foreground">{fmtCompact(p.lucro)}</span></div>
                       <div><span className="text-muted-foreground">Qtd: </span><span className="text-foreground">{Math.round(p.quantidade).toLocaleString('pt-BR')}</span></div>
                     </div>
                   </div>
