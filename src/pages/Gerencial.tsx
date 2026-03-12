@@ -115,13 +115,13 @@ export default function Gerencial() {
   }, [controlePj]);
 
   const getUnidade = useCallback((vendedorNome: string): string => {
-    if (!vendedorNome) return 'Sem Unidade';
+    if (!vendedorNome) return 'Sem Filial';
     const norm = normalize(vendedorNome);
     if (vendedorUnidadeMap.has(norm)) return vendedorUnidadeMap.get(norm)!;
     for (const [key, uni] of vendedorUnidadeMap.entries()) {
       if (norm.includes(key) || key.includes(norm)) return uni;
     }
-    return 'Sem Unidade';
+    return 'Sem Filial';
   }, [vendedorUnidadeMap]);
 
   // ===== FULL PERIOD DATA (for KPIs & charts) =====
@@ -213,7 +213,7 @@ export default function Gerencial() {
       if (row.familia_produto && row.familia_produto !== 'Outros') familias.add(row.familia_produto);
       if (row.marca && row.marca !== 'Sem Marca') marcas.add(row.marca);
       const uni = getUnidade(row.vendedor_nome);
-      if (uni !== 'Sem Unidade') unidades.add(uni);
+      if (uni !== 'Sem Filial') unidades.add(uni);
     }
     return {
       vendedores: [...vendedores].sort(),
@@ -294,7 +294,7 @@ export default function Gerencial() {
   };
 
   const activeFilters = [
-    ...(filtroUnidade !== 'all' ? [{ label: `Unidade: ${filtroUnidade}`, clear: () => { setFiltroUnidade('all'); setTabelaPagina(1); } }] : []),
+    ...(filtroUnidade !== 'all' ? [{ label: `Filial: ${filtroUnidade}`, clear: () => { setFiltroUnidade('all'); setTabelaPagina(1); } }] : []),
     ...(filtroVendedor !== 'all' ? [{ label: `Vendedor: ${filtroVendedor}`, clear: () => { setFiltroVendedor('all'); setTabelaPagina(1); } }] : []),
     ...(filtroFamilia !== 'all' ? [{ label: `Família: ${filtroFamilia}`, clear: () => { setFiltroFamilia('all'); setTabelaPagina(1); } }] : []),
     ...(filtroMarca !== 'all' ? [{ label: `Marca: ${filtroMarca}`, clear: () => { setFiltroMarca('all'); setTabelaPagina(1); } }] : []),
@@ -311,7 +311,7 @@ export default function Gerencial() {
   const detailColumns = [
     { key: 'data_emissao' as const, label: 'Data', render: (v: string) => v ? v.split('-').reverse().join('/') : '—' },
     { key: 'vendedor_nome' as const, label: 'Vendedor' },
-    { key: 'unidade_nome' as const, label: 'Unidade' },
+    { key: 'unidade_nome' as const, label: 'Filial' },
     { key: 'descricao_produto' as const, label: 'Produto' },
     { key: 'familia_produto' as const, label: 'Família' },
     { key: 'marca' as const, label: 'Marca' },
@@ -327,7 +327,7 @@ export default function Gerencial() {
       <div className="space-y-6">
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-3">
-          <FilterSelect label="Unidade" value={filtroUnidade} onChange={handleFilterChange(setFiltroUnidade)} options={filtros.unidades.map(u => ({ value: u, label: u }))} allLabel="Todas as Unidades" />
+          <FilterSelect label="Filial" value={filtroUnidade} onChange={handleFilterChange(setFiltroUnidade)} options={filtros.unidades.map(u => ({ value: u, label: u }))} allLabel="Todas as Filiais" />
           <FilterSelect label="Vendedor" value={filtroVendedor} onChange={handleFilterChange(setFiltroVendedor)} options={filtros.vendedores.map(v => ({ value: v, label: v }))} allLabel="Todos os Vendedores" />
           <FilterSelect label="Família" value={filtroFamilia} onChange={handleFilterChange(setFiltroFamilia)} options={filtros.familias.map(f => ({ value: f, label: f }))} allLabel="Todas as Famílias" />
           <FilterSelect label="Marca" value={filtroMarca} onChange={handleFilterChange(setFiltroMarca)} options={filtros.marcas.map(m => ({ value: m, label: m }))} allLabel="Todas as Marcas" />
