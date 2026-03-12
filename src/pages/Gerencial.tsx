@@ -5,7 +5,8 @@ import { DataTable } from '@/components/DataTable';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { usePeriod } from '@/contexts/PeriodContext';
-import { DollarSign, Users, Percent, TrendingUp, Package, X } from 'lucide-react';
+import { DollarSign, Users, Percent, TrendingUp, Package, X, Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell,
   AreaChart, Area, Line,
