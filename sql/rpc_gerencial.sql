@@ -50,10 +50,10 @@ BEGIN
       COALESCE(v.marca, 'Sem Marca') AS marca,
       v.descricao_produto,
       v.nota_fiscal,
-      parse_brl(v.total_com_desconto) AS total_cd,
-      parse_brl(v.lucros_reais) AS lucro,
-      parse_brl(v.margem_percentual) AS margem,
-      parse_brl(v.quantidade) AS qtd
+      parse_brl(v.total_com_desconto::text) AS total_cd,
+      parse_brl(v.lucros_reais::text) AS lucro,
+      parse_brl(v.margem_percentual::text) AS margem,
+      parse_brl(v.quantidade::text) AS qtd
     FROM vendas v
     LEFT JOIN controle_pj cp
       ON UPPER(TRIM(COALESCE(cp.nome_vendas, cp.nome))) = UPPER(TRIM(v.vendedor_nome))
