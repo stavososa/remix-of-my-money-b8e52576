@@ -311,7 +311,7 @@ export default function Gerencial() {
   const detailColumns = [
     { key: 'data_emissao' as const, label: 'Data', render: (v: string) => v ? v.split('-').reverse().join('/') : '—' },
     { key: 'vendedor_nome' as const, label: 'Vendedor' },
-    { key: 'unidade_nome' as const, label: 'Unidade' },
+    { key: 'unidade_nome' as const, label: 'Filial' },
     { key: 'descricao_produto' as const, label: 'Produto' },
     { key: 'familia_produto' as const, label: 'Família' },
     { key: 'marca' as const, label: 'Marca' },
