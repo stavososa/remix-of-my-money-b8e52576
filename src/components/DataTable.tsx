@@ -82,7 +82,7 @@ export function DataTable<T extends Record<string, any>>({ columns, data, rowCla
 
   return (
     <div>
-      <div className="overflow-x-auto rounded-lg border border-border">
+      <div className="overflow-x-auto rounded-lg border border-border" style={maxHeight ? { maxHeight, overflowY: 'auto' } : undefined}>
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-secondary">
