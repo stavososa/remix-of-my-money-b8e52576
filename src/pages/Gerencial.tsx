@@ -99,35 +99,6 @@ export default function Gerencial() {
   const endDay = new Date(periodoAno, periodoMes, 0).getDate();
   const endDate = `${periodoAno}-${String(periodoMes).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
 
-  // Fetch controle_pj for unidade mapping
-  const { data: controlePj } = useQuery({
-    queryKey: ['controle-pj'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('controle_pj')
-        .select('nome, nome_vendas, unidade');
-      if (error) throw error;
-      return data ?? [];
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-
-  // Normalized map: normalized_name -> unidade
-  const vendedorUnidadeMap = useMemo(() => {
-    const map = new Map<string, string>();
-    if (!controlePj) return map;
-    for (const cp of controlePj) {
-      const key = normalize(cp.nome_vendas ?? cp.nome);
-      if (cp.unidade) map.set(key, cp.unidade);
-    }
-    return map;
-  }, [controlePj]);
-
-  // Get unidade for a vendor name
-  const getUnidade = useCallback((vendedorNome: string) => {
-    return vendedorUnidadeMap.get(normalize(vendedorNome)) ?? 'Sem Unidade';
-  }, [vendedorUnidadeMap]);
-
   // ===== FULL PERIOD DATA (for KPIs & charts) =====
   const { data: allVendas, isLoading: loadAll } = useQuery({
     queryKey: ['gerencial-all-vendas', periodoAno, periodoMes],
@@ -138,7 +109,7 @@ export default function Gerencial() {
       while (true) {
         const { data, error } = await supabase
           .from('vendas')
-          .select('data_emissao, vendedor_nome, total_com_desconto, lucros_reais, margem_percentual, familia_produto, marca')
+          .select('data_emissao, vendedor_nome, total_com_desconto, lucros_reais, margem_percentual, familia_produto, marca, local_estoque')
           .gte('data_emissao', startDate)
           .lte('data_emissao', endDate)
           .range(from, from + step - 1);
@@ -151,36 +122,19 @@ export default function Gerencial() {
       return allData;
     },
     staleTime: 2 * 60 * 1000,
-    enabled: !!controlePj,
   });
-
-  // Real vendor names from allVendas that belong to selected unit
-  const vendedoresUnidade = useMemo(() => {
-    if (filtroUnidade === 'all') return null;
-    if (!allVendas) return [];
-    const realNames = new Set<string>();
-    for (const row of allVendas) {
-      const vn = row.vendedor_nome ?? '';
-      if (getUnidade(vn) === filtroUnidade) {
-        realNames.add(vn);
-      }
-    }
-    return [...realNames];
-  }, [filtroUnidade, allVendas, getUnidade]);
 
   // Apply client-side filters to full dataset
   const filteredAll = useMemo(() => {
     if (!allVendas) return [];
     return allVendas.filter(row => {
-      if (filtroUnidade !== 'all') {
-        if (getUnidade(row.vendedor_nome ?? '') !== filtroUnidade) return false;
-      }
+      if (filtroUnidade !== 'all' && (row.local_estoque ?? '') !== filtroUnidade) return false;
       if (filtroVendedor !== 'all' && row.vendedor_nome !== filtroVendedor) return false;
       if (filtroFamilia !== 'all' && row.familia_produto !== filtroFamilia) return false;
       if (filtroMarca !== 'all' && row.marca !== filtroMarca) return false;
       return true;
     });
-  }, [allVendas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, getUnidade]);
+  }, [allVendas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca]);
 
   // ===== KPIs =====
   const kpis = useMemo(() => {
@@ -257,7 +211,7 @@ export default function Gerencial() {
     if (!allVendas) return [];
     const map = new Map<string, number>();
     for (const row of allVendas) {
-      const uni = getUnidade(row.vendedor_nome ?? '');
+      const uni = row.local_estoque ?? 'Sem Unidade';
       map.set(uni, (map.get(uni) ?? 0) + parseMoneyBR(row.total_com_desconto));
     }
     const sorted = [...map.entries()].sort((a, b) => b[1] - a[1]);
@@ -265,14 +219,14 @@ export default function Gerencial() {
     const top = sorted.slice(0, 7);
     const others = sorted.slice(7).reduce((s, [, v]) => s + v, 0);
     return [...top.map(([name, value]) => ({ name, value })), { name: 'Outras', value: others }];
-  }, [allVendas, getUnidade]);
+  }, [allVendas]);
 
   // ===== Chart: Margem Média por Unidade (Donut) =====
   const chartMargemUnidade = useMemo(() => {
     if (!allVendas) return [];
     const map = new Map<string, { somaMargemPond: number; somaFat: number }>();
     for (const row of allVendas) {
-      const uni = getUnidade(row.vendedor_nome ?? '');
+      const uni = row.local_estoque ?? 'Sem Unidade';
       const fat = parseMoneyBR(row.total_com_desconto);
       const margem = parsePctBR(row.margem_percentual);
       const cur = map.get(uni) ?? { somaMargemPond: 0, somaFat: 0 };
@@ -286,54 +240,28 @@ export default function Gerencial() {
         value: somaFat > 0 ? Math.round((somaMargemPond / somaFat) * 10) / 10 : 0,
       }))
       .sort((a, b) => b.value - a.value);
-  }, [allVendas, getUnidade]);
+  }, [allVendas]);
 
-  // Fetch filter options
-  const { data: filterOptions } = useQuery({
-    queryKey: ['gerencial-filters', periodoAno, periodoMes],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('vendas')
-        .select('vendedor_nome, familia_produto, marca')
-        .gte('data_emissao', startDate)
-        .lte('data_emissao', endDate)
-        .limit(10000);
-      if (error) throw error;
-
-      const vendedores = new Set<string>();
-      const familias = new Set<string>();
-      const marcas = new Set<string>();
-      for (const row of data ?? []) {
-        if (row.vendedor_nome) vendedores.add(row.vendedor_nome);
-        if (row.familia_produto && row.familia_produto !== 'Outros') familias.add(row.familia_produto);
-        if (row.marca && row.marca !== 'Sem Marca') marcas.add(row.marca);
-      }
-      const unidades = new Set<string>();
-      for (const row of data ?? []) {
-        if (row.vendedor_nome) {
-          vendedores.add(row.vendedor_nome);
-          if (controlePj) {
-            const nk = normalize(row.vendedor_nome);
-            for (const cp of controlePj) {
-              if (normalize(cp.nome_vendas ?? cp.nome) === nk && cp.unidade) {
-                unidades.add(cp.unidade);
-              }
-            }
-          }
-        }
-        if (row.familia_produto && row.familia_produto !== 'Outros') familias.add(row.familia_produto);
-        if (row.marca && row.marca !== 'Sem Marca') marcas.add(row.marca);
-      }
-      return {
-        vendedores: [...vendedores].sort(),
-        familias: [...familias].sort(),
-        marcas: [...marcas].sort(),
-        unidades: [...unidades].sort(),
-      };
-    },
-    staleTime: 2 * 60 * 1000,
-    enabled: !!controlePj,
-  });
+  // Fetch filter options from allVendas
+  const filterOptions = useMemo(() => {
+    if (!allVendas) return { vendedores: [], unidades: [], familias: [], marcas: [] };
+    const vendedores = new Set<string>();
+    const familias = new Set<string>();
+    const marcas = new Set<string>();
+    const unidades = new Set<string>();
+    for (const row of allVendas) {
+      if (row.vendedor_nome) vendedores.add(row.vendedor_nome);
+      if (row.familia_produto && row.familia_produto !== 'Outros') familias.add(row.familia_produto);
+      if (row.marca && row.marca !== 'Sem Marca') marcas.add(row.marca);
+      if (row.local_estoque) unidades.add(row.local_estoque);
+    }
+    return {
+      vendedores: [...vendedores].sort(),
+      familias: [...familias].sort(),
+      marcas: [...marcas].sort(),
+      unidades: [...unidades].sort(),
+    };
+  }, [allVendas]);
 
   // Fetch paginated vendas for table
   const { data: vendasResult, isLoading: loadVendas } = useQuery({
@@ -342,25 +270,17 @@ export default function Gerencial() {
       const offset = (tabelaPagina - 1) * TABLE_PAGE_SIZE;
       let query = supabase
         .from('vendas')
-        .select('id, data_emissao, vendedor_nome, descricao_produto, familia_produto, marca, nota_fiscal, total_com_desconto, lucros_reais, margem_percentual', { count: 'exact' })
+        .select('id, data_emissao, vendedor_nome, descricao_produto, familia_produto, marca, nota_fiscal, total_com_desconto, lucros_reais, margem_percentual, local_estoque', { count: 'exact' })
         .gte('data_emissao', startDate)
         .lte('data_emissao', endDate)
         .order('data_emissao', { ascending: false })
         .order('id', { ascending: false })
         .range(offset, offset + TABLE_PAGE_SIZE - 1);
 
+      if (filtroUnidade !== 'all') query = query.eq('local_estoque', filtroUnidade);
       if (filtroVendedor !== 'all') query = query.eq('vendedor_nome', filtroVendedor);
       if (filtroFamilia !== 'all') query = query.eq('familia_produto', filtroFamilia);
       if (filtroMarca !== 'all') query = query.eq('marca', filtroMarca);
-
-      if (filtroUnidade !== 'all') {
-        if (vendedoresUnidade && vendedoresUnidade.length > 0) {
-          query = query.in('vendedor_nome', vendedoresUnidade);
-        } else {
-          // Unit selected but no vendors mapped → force empty result
-          query = query.eq('vendedor_nome', '__NONEXISTENT__');
-        }
-      }
 
       if (searchDebounced) {
         const term = `%${searchDebounced}%`;
@@ -374,7 +294,6 @@ export default function Gerencial() {
       return { rows: data ?? [], totalCount: count ?? 0 };
     },
     staleTime: 60 * 1000,
-    enabled: !!controlePj,
   });
 
   const vendasRows = vendasResult?.rows ?? [];
@@ -383,12 +302,12 @@ export default function Gerencial() {
   const mappedRows = useMemo(() => {
     return vendasRows.map(row => ({
       ...row,
-      unidade_nome: getUnidade(row.vendedor_nome ?? ''),
+      unidade_nome: row.local_estoque ?? 'Sem Unidade',
       total_parsed: parseMoneyBR(row.total_com_desconto),
       lucro_parsed: parseMoneyBR(row.lucros_reais),
       margem_parsed: parsePctBR(row.margem_percentual),
     }));
-  }, [vendasRows, getUnidade]);
+  }, [vendasRows]);
 
   const handleFilterChange = (setter: (v: string) => void) => (v: string) => {
     setter(v);
@@ -421,8 +340,7 @@ export default function Gerencial() {
     { key: 'lucro_parsed' as const, label: 'Lucro', align: 'right' as const, render: (v: number) => fmt(v) },
     { key: 'margem_parsed' as const, label: 'Margem', align: 'right' as const, render: (v: number) => fmtPct(v) },
   ];
-
-  const filtros = filterOptions ?? { vendedores: [], unidades: [], familias: [], marcas: [] };
+  const filtros = filterOptions;
 
   return (
     <AppShell title="Gerencial">
