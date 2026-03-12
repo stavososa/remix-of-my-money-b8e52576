@@ -84,6 +84,7 @@ export default function Gerencial() {
   const [filtroVendedor, setFiltroVendedor] = useState<string>('all');
   const [filtroFamilia, setFiltroFamilia] = useState<string>('all');
   const [filtroMarca, setFiltroMarca] = useState<string>('all');
+  const [buscaTabela, setBuscaTabela] = useState('');
 
   // Fetch vendas filtered by period server-side
   const { data: vendasRaw = [], isLoading: loadV } = useQuery({
