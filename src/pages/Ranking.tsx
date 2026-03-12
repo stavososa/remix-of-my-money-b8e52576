@@ -243,26 +243,6 @@ export default function Ranking() {
     { key: 'quantidade' as const, label: 'Quantidade', align: 'right' as const, render: (v: number) => Math.round(v).toLocaleString('pt-BR') },
   ];
 
-  const renderChart = (data: { name: string; value: number }[], title: string, color: string, fullWidth?: boolean) => (
-    <Card className={`border-border ${fullWidth ? 'lg:col-span-2' : ''}`}>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-semibold text-foreground">{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} layout="vertical" margin={{ left: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 20% 20%)" />
-              <XAxis type="number" tickFormatter={v => fmtCompact(v)} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
-              <YAxis dataKey="name" type="category" width={140} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
-              <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="value" name="Faturamento" fill={color} radius={[0, 4, 4, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </CardContent>
-    </Card>
-  );
 
   return (
     <AppShell title="Ranking">
