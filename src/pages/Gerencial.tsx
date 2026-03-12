@@ -1,21 +1,33 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { AppShell } from '@/components/AppShell';
-import { KPICard } from '@/components/KPICard';
 import { DataTable } from '@/components/DataTable';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { usePeriod } from '@/contexts/PeriodContext';
-import { DollarSign, Users, Percent, TrendingUp, Package, X, Search } from 'lucide-react';
+import { X, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell,
-  AreaChart, Area, Line,
-} from 'recharts';
 
-const fmt = (v: number | null | undefined) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(v ?? 0));
-const fmtPct = (v: number | null | undefined) =>
-  v != null ? `${Number(v).toFixed(1)}%` : '—';
+const parseMoneyBR = (str: unknown): number => {
+  if (str == null) return 0;
+  if (typeof str === 'number') return str;
+  const s = String(str);
+  const cleaned = s.replace(/[R$\s.]/g, '').replace(',', '.');
+  const val = parseFloat(cleaned);
+  return isNaN(val) ? 0 : val;
+};
+
+const parsePctBR = (str: unknown): number => {
+  if (str == null) return 0;
+  if (typeof str === 'number') return str;
+  const s = String(str);
+  const cleaned = s.replace('%', '').replace(/\s/g, '').replace(',', '.');
+  const val = parseFloat(cleaned);
+  return isNaN(val) ? 0 : val;
+};
+
+const fmt = (v: number) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+const fmtPct = (v: number) => `${v.toFixed(1)}%`;
 
 const TABLE_PAGE_SIZE = 30;
 
@@ -26,13 +38,11 @@ export default function Gerencial() {
   const [filtroFamilia, setFiltroFamilia] = useState<string>('all');
   const [filtroMarca, setFiltroMarca] = useState<string>('all');
   const [buscaTabela, setBuscaTabela] = useState('');
+  const [searchDebounced, setSearchDebounced] = useState('');
   const [tabelaPagina, setTabelaPagina] = useState(1);
 
-  // Debounced search state
-  const [searchDebounced, setSearchDebounced] = useState('');
   const searchTimer = useCallback((val: string) => {
     setBuscaTabela(val);
-    // Simple debounce via setTimeout
     const id = setTimeout(() => {
       setSearchDebounced(val);
       setTabelaPagina(1);
@@ -40,71 +50,167 @@ export default function Gerencial() {
     return () => clearTimeout(id);
   }, []);
 
-  const rpcFilters = {
-    p_ano: periodoAno,
-    p_mes: periodoMes,
-    p_unidade: filtroUnidade !== 'all' ? filtroUnidade : null,
-    p_vendedor: filtroVendedor !== 'all' ? filtroVendedor : null,
-    p_familia: filtroFamilia !== 'all' ? filtroFamilia : null,
-    p_marca: filtroMarca !== 'all' ? filtroMarca : null,
-  };
+  // Date range for the period
+  const startDate = `${periodoAno}-${String(periodoMes).padStart(2, '0')}-01`;
+  const endDay = new Date(periodoAno, periodoMes, 0).getDate();
+  const endDate = `${periodoAno}-${String(periodoMes).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
 
-  // RPC: Summary (KPIs, charts, filter options)
-  const { data: resumo, isLoading: loadResumo } = useQuery({
-    queryKey: ['gerencial-resumo', rpcFilters],
+  // Fetch controle_pj for unidade mapping
+  const { data: controlePj } = useQuery({
+    queryKey: ['controle-pj'],
     queryFn: async () => {
-      const { data, error } = await (supabase.rpc as any)('rpc_gerencial_resumo', rpcFilters);
+      const { data, error } = await supabase
+        .from('controle_pj')
+        .select('nome, nome_vendas, unidade');
       if (error) throw error;
-      return data as any;
+      return data ?? [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Build vendedor→unidade map
+  const vendedorUnidadeMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!controlePj) return map;
+    for (const cp of controlePj) {
+      const key = (cp.nome_vendas ?? cp.nome).toUpperCase().trim();
+      if (cp.unidade) map.set(key, cp.unidade);
+    }
+    return map;
+  }, [controlePj]);
+
+  // Get vendedores for selected unidade
+  const vendedoresUnidade = useMemo(() => {
+    if (filtroUnidade === 'all') return null;
+    const names: string[] = [];
+    if (!controlePj) return names;
+    for (const cp of controlePj) {
+      if (cp.unidade === filtroUnidade) {
+        names.push((cp.nome_vendas ?? cp.nome).toUpperCase().trim());
+      }
+    }
+    return names;
+  }, [filtroUnidade, controlePj]);
+
+  // Fetch filter options (distinct values for the period)
+  const { data: filterOptions } = useQuery({
+    queryKey: ['gerencial-filters', periodoAno, periodoMes],
+    queryFn: async () => {
+      // Fetch all vendedor_nome, familia_produto, marca for the period
+      let query = supabase
+        .from('vendas')
+        .select('vendedor_nome, familia_produto, marca')
+        .gte('data_emissao', startDate)
+        .lte('data_emissao', endDate);
+
+      // Fetch up to 10000 rows for distinct values
+      const { data, error } = await query.limit(10000);
+      if (error) throw error;
+
+      const vendedores = new Set<string>();
+      const familias = new Set<string>();
+      const marcas = new Set<string>();
+
+      for (const row of data ?? []) {
+        if (row.vendedor_nome) vendedores.add(row.vendedor_nome);
+        if (row.familia_produto && row.familia_produto !== 'Outros') familias.add(row.familia_produto);
+        if (row.marca && row.marca !== 'Sem Marca') marcas.add(row.marca);
+      }
+
+      const unidades = new Set<string>();
+      if (controlePj) {
+        for (const cp of controlePj) {
+          if (cp.unidade) unidades.add(cp.unidade);
+        }
+      }
+
+      return {
+        vendedores: [...vendedores].sort(),
+        familias: [...familias].sort(),
+        marcas: [...marcas].sort(),
+        unidades: [...unidades].sort(),
+      };
     },
     staleTime: 2 * 60 * 1000,
+    enabled: !!controlePj,
   });
 
-  // RPC: Paginated table
-  const { data: vendasData, isLoading: loadVendas } = useQuery({
-    queryKey: ['gerencial-vendas', rpcFilters, tabelaPagina, searchDebounced],
+  // Fetch paginated vendas
+  const { data: vendasResult, isLoading: loadVendas } = useQuery({
+    queryKey: ['gerencial-vendas', periodoAno, periodoMes, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, searchDebounced, tabelaPagina],
     queryFn: async () => {
-      const { data, error } = await (supabase.rpc as any)('rpc_gerencial_vendas', {
-        ...rpcFilters,
-        p_search: searchDebounced || null,
-        p_offset: (tabelaPagina - 1) * TABLE_PAGE_SIZE,
-        p_limit: TABLE_PAGE_SIZE,
-      });
+      const offset = (tabelaPagina - 1) * TABLE_PAGE_SIZE;
+
+      let query = supabase
+        .from('vendas')
+        .select('id, data_emissao, vendedor_nome, descricao_produto, familia_produto, marca, nota_fiscal, total_com_desconto, lucros_reais, margem_percentual', { count: 'exact' })
+        .gte('data_emissao', startDate)
+        .lte('data_emissao', endDate)
+        .order('data_emissao', { ascending: false })
+        .order('id', { ascending: false })
+        .range(offset, offset + TABLE_PAGE_SIZE - 1);
+
+      // Apply filters
+      if (filtroVendedor !== 'all') {
+        query = query.eq('vendedor_nome', filtroVendedor);
+      }
+      if (filtroFamilia !== 'all') {
+        query = query.eq('familia_produto', filtroFamilia);
+      }
+      if (filtroMarca !== 'all') {
+        query = query.eq('marca', filtroMarca);
+      }
+
+      // Unidade filter: filter by vendedor names that belong to that unidade
+      if (vendedoresUnidade && vendedoresUnidade.length > 0) {
+        // We need to match case-insensitively. Since vendedor_nome in vendas may differ in case,
+        // we'll use the original names from controle_pj
+        const namesForFilter = controlePj
+          ?.filter(cp => cp.unidade === filtroUnidade)
+          .map(cp => cp.nome_vendas ?? cp.nome) ?? [];
+        if (namesForFilter.length > 0) {
+          query = query.in('vendedor_nome', namesForFilter);
+        }
+      }
+
+      // Text search
+      if (searchDebounced) {
+        const term = `%${searchDebounced}%`;
+        query = query.or(
+          `vendedor_nome.ilike.${term},descricao_produto.ilike.${term},familia_produto.ilike.${term},marca.ilike.${term},nota_fiscal.ilike.${term}`
+        );
+      }
+
+      const { data, error, count } = await query;
       if (error) throw error;
-      return data as any;
+      return { rows: data ?? [], totalCount: count ?? 0 };
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: 60 * 1000,
+    enabled: !!controlePj,
   });
 
-  const isLoading = loadResumo;
+  const vendasRows = vendasResult?.rows ?? [];
+  const vendasTotalCount = vendasResult?.totalCount ?? 0;
 
-  // Extract data from RPC responses
-  const kpis = resumo?.kpis ?? { faturamento: 0, lucro_total: 0, qtd_vendas: 0, qtd_vendedores: 0, margem_media: 0 };
-  const chartDiario = (resumo?.chart_diario ?? []).map((d: any) => {
-    const parts = d.data?.split('-');
-    const label = parts?.length >= 3 ? `${parts[2]}/${parts[1]}` : d.data;
-    return {
-      data: label,
-      faturamentoDia: Number(d.faturamento_dia),
-      lucroDia: Number(d.lucro_dia),
-      acumulado: Number(d.acumulado),
-    };
-  });
-  const chartFamilias = (resumo?.top_familias ?? []).map((f: any) => ({ name: f.name, total: Number(f.total) }));
-  const chartMarcas = (resumo?.top_marcas ?? []).map((m: any) => ({ name: m.name, total: Number(m.total) }));
-  const filtros = resumo?.filtros ?? { vendedores: [], unidades: [], familias: [], marcas: [] };
-  const totalPeriodo = resumo?.total_periodo ?? 0;
+  // Map rows to include unidade and parsed values
+  const mappedRows = useMemo(() => {
+    return vendasRows.map(row => {
+      const vendedorKey = (row.vendedor_nome ?? '').toUpperCase().trim();
+      return {
+        ...row,
+        unidade_nome: vendedorUnidadeMap.get(vendedorKey) ?? 'Sem Unidade',
+        total_parsed: parseMoneyBR(row.total_com_desconto),
+        lucro_parsed: parseMoneyBR(row.lucros_reais),
+        margem_parsed: parsePctBR(row.margem_percentual),
+      };
+    });
+  }, [vendasRows, vendedorUnidadeMap]);
 
-  const vendasRows = vendasData?.rows ?? [];
-  const vendasTotalCount = vendasData?.total_count ?? 0;
-
-  // Reset page when filters change
   const handleFilterChange = (setter: (v: string) => void) => (v: string) => {
     setter(v);
     setTabelaPagina(1);
   };
 
-  // Active filters for chips
   const activeFilters = [
     ...(filtroUnidade !== 'all' ? [{ label: `Unidade: ${filtroUnidade}`, clear: () => { setFiltroUnidade('all'); setTabelaPagina(1); } }] : []),
     ...(filtroVendedor !== 'all' ? [{ label: `Vendedor: ${filtroVendedor}`, clear: () => { setFiltroVendedor('all'); setTabelaPagina(1); } }] : []),
@@ -120,7 +226,6 @@ export default function Gerencial() {
     setTabelaPagina(1);
   };
 
-  // Detail table columns
   const detailColumns = [
     { key: 'data_emissao' as const, label: 'Data', render: (v: string) => v ? v.split('-').reverse().join('/') : '—' },
     { key: 'vendedor_nome' as const, label: 'Vendedor' },
@@ -128,39 +233,22 @@ export default function Gerencial() {
     { key: 'descricao_produto' as const, label: 'Produto' },
     { key: 'familia_produto' as const, label: 'Família' },
     { key: 'marca' as const, label: 'Marca' },
-    { key: 'total_com_desconto' as const, label: 'Valor', align: 'right' as const, render: (v: number) => fmt(v) },
-    { key: 'lucros_reais' as const, label: 'Lucro', align: 'right' as const, render: (v: number) => fmt(v) },
-    { key: 'margem_percentual' as const, label: 'Margem', align: 'right' as const, render: (v: number) => fmtPct(v) },
+    { key: 'total_parsed' as const, label: 'Valor', align: 'right' as const, render: (v: number) => fmt(v) },
+    { key: 'lucro_parsed' as const, label: 'Lucro', align: 'right' as const, render: (v: number) => fmt(v) },
+    { key: 'margem_parsed' as const, label: 'Margem', align: 'right' as const, render: (v: number) => fmtPct(v) },
   ];
 
-  if (isLoading) {
-    return (
-      <AppShell title="Gerencial">
-        <div className="flex items-center justify-center min-h-[50vh]">
-          <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
-        </div>
-      </AppShell>
-    );
-  }
+  const filtros = filterOptions ?? { vendedores: [], unidades: [], familias: [], marcas: [] };
 
   return (
     <AppShell title="Gerencial">
-      <div className="space-y-6">
-        {/* KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-          <KPICard icon={DollarSign} label="Faturamento" value={fmt(kpis.faturamento)} />
-          <KPICard icon={TrendingUp} label="Lucro Total" value={fmt(kpis.lucro_total)} />
-          <KPICard icon={Percent} label="Margem Média" value={fmtPct(kpis.margem_media)} />
-          <KPICard icon={Users} label="Vendedores" value={String(kpis.qtd_vendedores)} />
-          <KPICard icon={Package} label="Qtd Vendas" value={String(kpis.qtd_vendas)} />
-        </div>
-
-        {/* Filters inline */}
+      <div className="space-y-4">
+        {/* Filters */}
         <div className="flex flex-wrap items-center gap-3">
-          <FilterSelect label="Unidade" value={filtroUnidade} onChange={handleFilterChange(setFiltroUnidade)} options={(filtros.unidades ?? []).map((u: string) => ({ value: u, label: u }))} allLabel="Todas as Unidades" />
-          <FilterSelect label="Vendedor" value={filtroVendedor} onChange={handleFilterChange(setFiltroVendedor)} options={(filtros.vendedores ?? []).map((v: string) => ({ value: v, label: v }))} allLabel="Todos os Vendedores" />
-          <FilterSelect label="Família" value={filtroFamilia} onChange={handleFilterChange(setFiltroFamilia)} options={(filtros.familias ?? []).map((f: string) => ({ value: f, label: f }))} allLabel="Todas as Famílias" />
-          <FilterSelect label="Marca" value={filtroMarca} onChange={handleFilterChange(setFiltroMarca)} options={(filtros.marcas ?? []).map((m: string) => ({ value: m, label: m }))} allLabel="Todas as Marcas" />
+          <FilterSelect label="Unidade" value={filtroUnidade} onChange={handleFilterChange(setFiltroUnidade)} options={filtros.unidades.map(u => ({ value: u, label: u }))} allLabel="Todas as Unidades" />
+          <FilterSelect label="Vendedor" value={filtroVendedor} onChange={handleFilterChange(setFiltroVendedor)} options={filtros.vendedores.map(v => ({ value: v, label: v }))} allLabel="Todos os Vendedores" />
+          <FilterSelect label="Família" value={filtroFamilia} onChange={handleFilterChange(setFiltroFamilia)} options={filtros.familias.map(f => ({ value: f, label: f }))} allLabel="Todas as Famílias" />
+          <FilterSelect label="Marca" value={filtroMarca} onChange={handleFilterChange(setFiltroMarca)} options={filtros.marcas.map(m => ({ value: m, label: m }))} allLabel="Todas as Marcas" />
           {activeFilters.length > 0 && (
             <button onClick={clearAllFilters} className="text-xs text-muted-foreground hover:text-foreground transition-colors underline">
               Limpar filtros
@@ -180,82 +268,7 @@ export default function Gerencial() {
           </div>
         )}
 
-        {/* Area Chart - Progresso Diário + Acumulado */}
-        {chartDiario.length > 0 && (
-          <div className="bg-card border border-border rounded-lg p-6 shadow-card">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-secondary-foreground">Progresso de Faturamento</h3>
-              <span className="text-xs text-muted-foreground">{kpis.qtd_vendas} vendas filtradas de {totalPeriodo} no período</span>
-            </div>
-            <ResponsiveContainer width="100%" height={320}>
-              <AreaChart data={chartDiario} margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
-                <defs>
-                  <linearGradient id="gradFat" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="gradAcum" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(142 71% 45%)" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="hsl(142 71% 45%)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="data" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} interval="preserveStartEnd" />
-                <YAxis yAxisId="dia" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} />
-                <YAxis yAxisId="acum" orientation="right" tick={{ fill: 'hsl(142 71% 45%)', fontSize: 11 }} tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip
-                  contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }}
-                  labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}
-                  formatter={(v: number, name: string) => [
-                    fmt(v),
-                    name === 'faturamentoDia' ? 'Fat. Dia' : name === 'acumulado' ? 'Acumulado' : 'Lucro Dia',
-                  ]}
-                />
-                <Area yAxisId="dia" type="monotone" dataKey="faturamentoDia" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#gradFat)" dot={false} activeDot={{ r: 4, fill: 'hsl(var(--primary))' }} />
-                <Line yAxisId="acum" type="monotone" dataKey="acumulado" stroke="hsl(142 71% 45%)" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-
-        {/* Top Famílias & Top Marcas */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {chartFamilias.length > 0 && (
-            <div className="bg-card border border-border rounded-lg p-6 shadow-card">
-              <h3 className="text-sm font-semibold text-secondary-foreground mb-4">Top 10 Famílias de Produto</h3>
-              <ResponsiveContainer width="100%" height={Math.max(250, chartFamilias.length * 40)}>
-                <BarChart data={chartFamilias} layout="vertical" margin={{ left: 20, right: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-                  <XAxis type="number" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} />
-                  <YAxis type="category" dataKey="name" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} width={150} />
-                  <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} labelStyle={{ color: 'hsl(var(--foreground))' }} formatter={(v: number) => [fmt(v), 'Total']} />
-                  <Bar dataKey="total" radius={[0, 4, 4, 0]}>
-                    {chartFamilias.map((_: any, i: number) => <Cell key={i} fill="hsl(210 80% 55%)" />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-
-          {chartMarcas.length > 0 && (
-            <div className="bg-card border border-border rounded-lg p-6 shadow-card">
-              <h3 className="text-sm font-semibold text-secondary-foreground mb-4">Top 10 Marcas</h3>
-              <ResponsiveContainer width="100%" height={Math.max(250, chartMarcas.length * 40)}>
-                <BarChart data={chartMarcas} layout="vertical" margin={{ left: 20, right: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-                  <XAxis type="number" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} />
-                  <YAxis type="category" dataKey="name" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} width={150} />
-                  <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} labelStyle={{ color: 'hsl(var(--foreground))' }} formatter={(v: number) => [fmt(v), 'Total']} />
-                  <Bar dataKey="total" radius={[0, 4, 4, 0]}>
-                    {chartMarcas.map((_: any, i: number) => <Cell key={i} fill="hsl(280 70% 55%)" />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </div>
-
-        {/* Detailed Sales Table */}
+        {/* Sales Table */}
         <div>
           <div className="flex items-center justify-between mb-3 gap-3">
             <h3 className="text-sm font-semibold text-secondary-foreground whitespace-nowrap">
@@ -274,7 +287,7 @@ export default function Gerencial() {
           </div>
           <DataTable
             columns={detailColumns}
-            data={vendasRows}
+            data={mappedRows}
             pageSize={TABLE_PAGE_SIZE}
             serverPagination={{
               totalCount: vendasTotalCount,

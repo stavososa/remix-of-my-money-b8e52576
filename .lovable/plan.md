@@ -1,47 +1,39 @@
 
 
-## Plano: Simplificar Gerencial para Multifiltro
+## Gerencial com dados da tabela `vendas` + filtro por Unidade + graficos
 
-### Problema
-As funções RPC (`parse_brl`, `rpc_gerencial_resumo`, `rpc_gerencial_vendas`) estão retornando números absurdos porque o parsing de valores BR no PostgreSQL está incorreto. O usuário quer apenas pesquisa com multifiltro, sem KPIs nem gráficos.
+A tabela `vendas` tem 468 registros (Jan/2026) com valores em formato string brasileiro (ex: "R$ 15,40", "49,30%"). O campo `vendedor_nome` liga aos vendedores/unidades via `vendedores.nome_omie`. Sera necessario fazer JOIN client-side ou via query para associar unidade a cada venda.
 
 ### Abordagem
-Remover as RPCs completamente e consultar a tabela `vendas` diretamente via Supabase client com filtros server-side. Parsing de valores BR fica no frontend (já funciona em MeuPainel).
 
----
+Buscar dados da tabela `vendas` filtrados por periodo (`data_emissao`), e cruzar com `vendedores` + `unidades` para obter a unidade de cada venda. Parsear valores monetarios/percentuais no frontend (padrão ja existente no projeto).
 
-### 1. SQL para limpar (executar no Supabase SQL Editor)
+### Alteracoes em `src/pages/Gerencial.tsx`
 
-```sql
-DROP FUNCTION IF EXISTS rpc_gerencial_resumo(int, int, text, text, text, text);
-DROP FUNCTION IF EXISTS rpc_gerencial_vendas(int, int, text, text, text, text, text, int, int);
-DROP FUNCTION IF EXISTS parse_brl(text);
-```
+1. **Nova query: buscar `vendas`** filtradas pelo periodo atual (mes/ano do `data_emissao`), com limite adequado
 
-### 2. Reescrever `src/pages/Gerencial.tsx`
+2. **Nova query: buscar `vendedores` com `unidades`** para mapear `nome_omie` -> `unidade_nome`
 
-- Remover KPIs, gráficos (AreaChart, BarChart), imports de recharts
-- Manter apenas: filtros (Unidade, Vendedor, Família, Marca) + busca textual + tabela paginada
-- Consultar `vendas` direto com `supabase.from('vendas').select(...)`:
-  - Filtros `.eq('vendedor_nome', ...)`, `.eq('familia_produto', ...)`, `.eq('marca', ...)` aplicados no servidor
-  - Período via `.gte('data_emissao', startDate).lte('data_emissao', endDate)`
-  - Busca textual via `.or(...)` com `ilike`
-  - Paginação server-side via `.range(offset, offset + limit)`
-  - `.order('data_emissao', { ascending: false })`
-- Para filtro de **Unidade**: buscar `controle_pj` separadamente, montar mapa vendedor→unidade, e quando unidade selecionada, filtrar por `vendedor_nome.in(vendedores_da_unidade)` no servidor
-- Para listas de filtros: buscar valores distintos de `vendedor_nome`, `familia_produto`, `marca` do período, e unidades do `controle_pj`
-- Parsing de valores (total_com_desconto, lucros_reais, margem_percentual) feito no frontend com `parseMoneyBR` / `parsePctBR` (mesmo padrão do MeuPainel)
+3. **Processar dados client-side**:
+   - Parsear `total_com_desconto`, `lucros_reais`, `margem_percentual` de string BR para number
+   - Associar cada venda a sua unidade via mapa vendedor->unidade
+   - Agregar por unidade: total vendido, lucro, margem media, qtd vendas
 
-### 3. Manter `src/components/DataTable.tsx` como está
-O suporte a `serverPagination` já existe e será reutilizado.
+4. **Filtro por Unidade**: O select de unidades ja existe. Ao selecionar uma unidade, filtrar as vendas processadas e recalcular todos os KPIs e graficos.
 
-### Arquivos alterados
-- `src/pages/Gerencial.tsx` — reescrita (sem KPIs/gráficos, consulta direta)
-- SQL de limpeza — executar manualmente
+5. **Novos graficos usando dados de `vendas`**:
+   - **Faturamento por Unidade** (BarChart horizontal - ja existe, alimentar com dados de vendas)
+   - **Margem Media por Unidade** (novo BarChart horizontal, cor verde)
+   - **Top Familias de Produto** (BarChart mostrando as familias mais vendidas, reagindo ao filtro de unidade)
 
-### Resultado
-- Números corretos (parsing no JS, já testado no MeuPainel)
-- Filtros server-side performáticos
-- Tabela paginada com busca
-- Sem dependência de funções RPC
+6. **Cards PJ vs CLT**: Recalcular a partir do cruzamento vendas + vendedores (que tem campo `regime`), ao inves de depender exclusivamente da view `v_resumo_regime`
+
+7. **Layout**: Organizar graficos em grid 2 colunas no desktop
+
+### Detalhes tecnicos
+
+- Funcoes de parsing ja existem no projeto (regex para "R$ X,XX" e "XX,XX%")
+- A tabela `vendas` tem 468 linhas para Jan/2026, dentro do limite de 1000 do Supabase
+- Vendedores sem unidade (ex: "CHECK OUT", "COMPRA VENDEDOR") serao agrupados como "Sem Unidade" ou ignorados conforme filtro
+- Manter as queries existentes (`v_ranking`, `v_resumo_unidade`, `v_resumo_regime`) para dados de comissao que nao existem na tabela `vendas`
 
