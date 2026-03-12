@@ -340,8 +340,7 @@ export default function Gerencial() {
     { key: 'lucro_parsed' as const, label: 'Lucro', align: 'right' as const, render: (v: number) => fmt(v) },
     { key: 'margem_parsed' as const, label: 'Margem', align: 'right' as const, render: (v: number) => fmtPct(v) },
   ];
-
-  const filtros = filterOptions ?? { vendedores: [], unidades: [], familias: [], marcas: [] };
+  const filtros = filterOptions;
 
   return (
     <AppShell title="Gerencial">
