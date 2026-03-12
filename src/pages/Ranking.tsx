@@ -194,17 +194,18 @@ export default function Ranking() {
 
   // Agrupar famílias
   const familiaRanking: RankedItem[] = useMemo(() => {
-    const map = new Map<string, { total: number; qtd: number }>();
+    const map = new Map<string, { total: number; qtd: number; lucro: number }>();
     for (const v of vendasRaw) {
       const fam = v.familia_produto ?? 'Outros';
       const existing = map.get(fam);
       const total = parseBRL(v.total_com_desconto);
       const qtd = parseBRL(v.quantidade);
-      if (existing) { existing.total += total; existing.qtd += qtd; }
-      else map.set(fam, { total, qtd });
+      const lucro = parseBRL(v.lucros_reais);
+      if (existing) { existing.total += total; existing.qtd += qtd; existing.lucro += lucro; }
+      else map.set(fam, { total, qtd, lucro });
     }
     return [...map.entries()]
-      .map(([name, d]) => ({ name, total_vendido: d.total, quantidade: d.qtd, posicao: 0 }))
+      .map(([name, d]) => ({ name, total_vendido: d.total, quantidade: d.qtd, lucro: d.lucro, posicao: 0 }))
       .sort((a, b) => b.total_vendido - a.total_vendido)
       .map((item, i) => ({ ...item, posicao: i + 1 }));
   }, [vendasRaw]);
