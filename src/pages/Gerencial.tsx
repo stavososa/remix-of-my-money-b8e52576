@@ -39,6 +39,15 @@ const fmtCompact = (v: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 }).format(v);
 const fmtPct = (v: number) => `${v.toFixed(1)}%`;
 
+const normalize = (s: string) =>
+  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+
+const PIE_COLORS = [
+  'hsl(38 90% 55%)', 'hsl(200 80% 50%)', 'hsl(142 71% 45%)', 'hsl(280 60% 55%)',
+  'hsl(350 75% 55%)', 'hsl(170 65% 45%)', 'hsl(45 85% 50%)', 'hsl(220 70% 55%)',
+  'hsl(310 60% 50%)', 'hsl(90 60% 45%)',
+];
+
 const TABLE_PAGE_SIZE = 30;
 
 const CustomTooltip = ({ active, payload, label }: any) => {
