@@ -369,7 +369,7 @@ export default function MeuPainel() {
       const current = map.get(nome) ?? { count: 0, qty: 0, total: 0, marca: v.marca ?? '—' };
       map.set(nome, {
         count: current.count + 1,
-        qty: current.qty + parseFloat((v.quantidade ?? '0').replace(',', '.') || '0'),
+        qty: current.qty + parseFloat(String(v.quantidade ?? '0').replace(',', '.') || '0'),
         total: current.total + parseMoneyBR(v.total_com_desconto),
         marca: current.marca,
       });
