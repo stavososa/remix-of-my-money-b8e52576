@@ -309,10 +309,20 @@ export default function Gerencial() {
         if (row.marca && row.marca !== 'Sem Marca') marcas.add(row.marca);
       }
       const unidades = new Set<string>();
-      if (controlePj) {
-        for (const cp of controlePj) {
-          if (cp.unidade) unidades.add(cp.unidade);
+      for (const row of data ?? []) {
+        if (row.vendedor_nome) {
+          vendedores.add(row.vendedor_nome);
+          if (controlePj) {
+            const nk = normalize(row.vendedor_nome);
+            for (const cp of controlePj) {
+              if (normalize(cp.nome_vendas ?? cp.nome) === nk && cp.unidade) {
+                unidades.add(cp.unidade);
+              }
+            }
+          }
         }
+        if (row.familia_produto && row.familia_produto !== 'Outros') familias.add(row.familia_produto);
+        if (row.marca && row.marca !== 'Sem Marca') marcas.add(row.marca);
       }
       return {
         vendedores: [...vendedores].sort(),
