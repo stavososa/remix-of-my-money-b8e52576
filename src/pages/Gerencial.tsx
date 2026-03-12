@@ -115,7 +115,7 @@ export default function Gerencial() {
   }, [controlePj]);
 
   const getUnidade = useCallback((vendedorNome: string): string => {
-    if (!vendedorNome) return 'Sem Unidade';
+    if (!vendedorNome) return 'Sem Filial';
     const norm = normalize(vendedorNome);
     if (vendedorUnidadeMap.has(norm)) return vendedorUnidadeMap.get(norm)!;
     for (const [key, uni] of vendedorUnidadeMap.entries()) {
