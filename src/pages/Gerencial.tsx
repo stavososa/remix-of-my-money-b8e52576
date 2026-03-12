@@ -252,6 +252,42 @@ export default function Gerencial() {
       .map(([name, value]) => ({ name, value }));
   }, [filteredAll]);
 
+  // ===== Chart: Faturamento por Unidade (Pie) =====
+  const chartFatUnidade = useMemo(() => {
+    if (!allVendas) return [];
+    const map = new Map<string, number>();
+    for (const row of allVendas) {
+      const uni = getUnidade(row.vendedor_nome ?? '');
+      map.set(uni, (map.get(uni) ?? 0) + parseMoneyBR(row.total_com_desconto));
+    }
+    const sorted = [...map.entries()].sort((a, b) => b[1] - a[1]);
+    if (sorted.length <= 8) return sorted.map(([name, value]) => ({ name, value }));
+    const top = sorted.slice(0, 7);
+    const others = sorted.slice(7).reduce((s, [, v]) => s + v, 0);
+    return [...top.map(([name, value]) => ({ name, value })), { name: 'Outras', value: others }];
+  }, [allVendas, getUnidade]);
+
+  // ===== Chart: Margem Média por Unidade (Donut) =====
+  const chartMargemUnidade = useMemo(() => {
+    if (!allVendas) return [];
+    const map = new Map<string, { somaMargemPond: number; somaFat: number }>();
+    for (const row of allVendas) {
+      const uni = getUnidade(row.vendedor_nome ?? '');
+      const fat = parseMoneyBR(row.total_com_desconto);
+      const margem = parsePctBR(row.margem_percentual);
+      const cur = map.get(uni) ?? { somaMargemPond: 0, somaFat: 0 };
+      cur.somaMargemPond += margem * fat;
+      cur.somaFat += fat;
+      map.set(uni, cur);
+    }
+    return [...map.entries()]
+      .map(([name, { somaMargemPond, somaFat }]) => ({
+        name,
+        value: somaFat > 0 ? Math.round((somaMargemPond / somaFat) * 10) / 10 : 0,
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [allVendas, getUnidade]);
+
   // Fetch filter options
   const { data: filterOptions } = useQuery({
     queryKey: ['gerencial-filters', periodoAno, periodoMes],
