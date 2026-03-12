@@ -5,7 +5,8 @@ import { DataTable } from '@/components/DataTable';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { usePeriod } from '@/contexts/PeriodContext';
-import { DollarSign, Users, Percent, TrendingUp, Package, X } from 'lucide-react';
+import { DollarSign, Users, Percent, TrendingUp, Package, X, Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell,
   AreaChart, Area, Line,
@@ -83,6 +84,7 @@ export default function Gerencial() {
   const [filtroVendedor, setFiltroVendedor] = useState<string>('all');
   const [filtroFamilia, setFiltroFamilia] = useState<string>('all');
   const [filtroMarca, setFiltroMarca] = useState<string>('all');
+  const [buscaTabela, setBuscaTabela] = useState('');
 
   // Fetch vendas filtered by period server-side
   const { data: vendasRaw = [], isLoading: loadV } = useQuery({
@@ -188,6 +190,21 @@ export default function Gerencial() {
       return true;
     });
   }, [vendasProcessadas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca]);
+
+  // Search filter for table
+  const vendasParaTabela = useMemo(() => {
+    if (!buscaTabela.trim()) return vendasFiltradas;
+    const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const termo = normalize(buscaTabela);
+    return vendasFiltradas.filter(v =>
+      normalize(v.vendedor_nome).includes(termo) ||
+      normalize(v.unidade_nome).includes(termo) ||
+      normalize(v.descricao_produto).includes(termo) ||
+      normalize(v.familia_produto).includes(termo) ||
+      normalize(v.marca).includes(termo) ||
+      normalize(v.nota_fiscal).includes(termo)
+    );
+  }, [vendasFiltradas, buscaTabela]);
 
   // KPIs
   const kpis = useMemo(() => {
@@ -404,12 +421,19 @@ export default function Gerencial() {
 
         {/* Detailed Sales Table */}
         <div>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-secondary-foreground">Vendas Detalhadas ({vendasFiltradas.length} registros)</h3>
+          <div className="flex items-center justify-between mb-3 gap-3">
+            <h3 className="text-sm font-semibold text-secondary-foreground whitespace-nowrap">Vendas Detalhadas ({vendasParaTabela.length} registros)</h3>
+            <div className="relative max-w-xs w-full">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Buscar vendedor, produto, marca..."
+                value={buscaTabela}
+                onChange={e => setBuscaTabela(e.target.value)}
+                className="pl-8 h-8 text-xs"
+              />
+            </div>
           </div>
-          <div className="max-h-[500px] overflow-y-auto rounded-lg border border-border">
-            <DataTable columns={detailColumns} data={vendasFiltradas} />
-          </div>
+          <DataTable columns={detailColumns} data={vendasParaTabela} pageSize={30} />
         </div>
       </div>
     </AppShell>

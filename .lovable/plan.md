@@ -1,34 +1,39 @@
 
 
-## Plano: Paginação + Busca na Tabela e Índices no Supabase
+## Gerencial com dados da tabela `vendas` + filtro por Unidade + graficos
 
-### Problema atual
-1. A tabela "Vendas Detalhadas" renderiza **todas as linhas de uma vez** (potencialmente milhares), causando lentidão no scroll.
-2. Não existe campo de busca para localizar vendas específicas.
-3. Não há índices no banco para otimizar as queries com filtro por `data_emissao`.
+A tabela `vendas` tem 468 registros (Jan/2026) com valores em formato string brasileiro (ex: "R$ 15,40", "49,30%"). O campo `vendedor_nome` liga aos vendedores/unidades via `vendedores.nome_omie`. Sera necessario fazer JOIN client-side ou via query para associar unidade a cada venda.
 
-### O que será feito
+### Abordagem
 
-**1. Paginação de 30 linhas na DataTable** (`src/components/DataTable.tsx`)
-- Adicionar prop opcional `pageSize` (default ilimitado, mas Gerencial passará 30).
-- Controlar `currentPage` via estado interno.
-- Renderizar apenas o slice da página atual (`sorted.slice(start, end)`).
-- Adicionar controles de paginação no rodapé: Anterior / Página X de Y / Próximo.
+Buscar dados da tabela `vendas` filtrados por periodo (`data_emissao`), e cruzar com `vendedores` + `unidades` para obter a unidade de cada venda. Parsear valores monetarios/percentuais no frontend (padrão ja existente no projeto).
 
-**2. Campo de busca ao lado do título** (`src/pages/Gerencial.tsx`)
-- Adicionar um input com ícone de lupa ao lado de "Vendas Detalhadas".
-- Filtrar `vendasFiltradas` comparando o termo digitado contra todas as colunas visíveis (vendedor, unidade, produto, família, marca, nota fiscal).
-- Busca case-insensitive e sem acentos.
+### Alteracoes em `src/pages/Gerencial.tsx`
 
-**3. Índices no Supabase** (nova migration)
-- Criar índices para acelerar as queries principais:
-  - `idx_vendas_data_emissao` em `vendas(data_emissao)` — usado no filtro server-side `.gte/.lte`
-  - `idx_vendas_vendedor_nome` em `vendas(vendedor_nome)` — usado nos filtros
-  - `idx_vendas_familia_produto` em `vendas(familia_produto)`
-  - `idx_vendas_marca` em `vendas(marca)`
+1. **Nova query: buscar `vendas`** filtradas pelo periodo atual (mes/ano do `data_emissao`), com limite adequado
 
-### Arquivos alterados
-- `src/components/DataTable.tsx` — paginação interna
-- `src/pages/Gerencial.tsx` — input de busca + passar `pageSize={30}`
-- Nova migration SQL — criação dos índices
+2. **Nova query: buscar `vendedores` com `unidades`** para mapear `nome_omie` -> `unidade_nome`
+
+3. **Processar dados client-side**:
+   - Parsear `total_com_desconto`, `lucros_reais`, `margem_percentual` de string BR para number
+   - Associar cada venda a sua unidade via mapa vendedor->unidade
+   - Agregar por unidade: total vendido, lucro, margem media, qtd vendas
+
+4. **Filtro por Unidade**: O select de unidades ja existe. Ao selecionar uma unidade, filtrar as vendas processadas e recalcular todos os KPIs e graficos.
+
+5. **Novos graficos usando dados de `vendas`**:
+   - **Faturamento por Unidade** (BarChart horizontal - ja existe, alimentar com dados de vendas)
+   - **Margem Media por Unidade** (novo BarChart horizontal, cor verde)
+   - **Top Familias de Produto** (BarChart mostrando as familias mais vendidas, reagindo ao filtro de unidade)
+
+6. **Cards PJ vs CLT**: Recalcular a partir do cruzamento vendas + vendedores (que tem campo `regime`), ao inves de depender exclusivamente da view `v_resumo_regime`
+
+7. **Layout**: Organizar graficos em grid 2 colunas no desktop
+
+### Detalhes tecnicos
+
+- Funcoes de parsing ja existem no projeto (regex para "R$ X,XX" e "XX,XX%")
+- A tabela `vendas` tem 468 linhas para Jan/2026, dentro do limite de 1000 do Supabase
+- Vendedores sem unidade (ex: "CHECK OUT", "COMPRA VENDEDOR") serao agrupados como "Sem Unidade" ou ignorados conforme filtro
+- Manter as queries existentes (`v_ranking`, `v_resumo_unidade`, `v_resumo_regime`) para dados de comissao que nao existem na tabela `vendas`
 
