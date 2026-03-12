@@ -77,7 +77,8 @@ function RankingTable({ data, nameLabel }: { data: RankedItem[]; nameLabel: stri
   const columns = [
     { key: 'posicao' as const, label: '#', render: (v: number) => <span className={v <= 3 ? 'text-lg' : ''}>{medalha(v)}</span> },
     { key: 'name' as const, label: nameLabel },
-    { key: 'total_vendido' as const, label: 'Total Vendido', align: 'right' as const, render: (v: number) => formatBRL(v) },
+    { key: 'total_vendido' as const, label: 'Faturamento', align: 'right' as const, render: (v: number) => fmtCompact(v) },
+    { key: 'lucro' as const, label: 'Lucro Real', align: 'right' as const, render: (v: number) => fmtCompact(v) },
     { key: 'quantidade' as const, label: 'Quantidade', align: 'right' as const, render: (v: number) => Math.round(v).toLocaleString('pt-BR') },
   ];
 
@@ -93,8 +94,9 @@ function RankingTable({ data, nameLabel }: { data: RankedItem[]; nameLabel: stri
               <span className="text-lg">{medalha(item.posicao)}</span>
               <span className="font-bold text-foreground text-sm">{item.name}</span>
             </div>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div><span className="text-muted-foreground">Vendido: </span><span className="font-semibold text-foreground">{formatBRL(item.total_vendido)}</span></div>
+            <div className="grid grid-cols-3 gap-2 text-sm">
+              <div><span className="text-muted-foreground">Faturamento: </span><span className="font-semibold text-foreground">{fmtCompact(item.total_vendido)}</span></div>
+              <div><span className="text-muted-foreground">Lucro: </span><span className="font-semibold text-foreground">{fmtCompact(item.lucro)}</span></div>
               <div><span className="text-muted-foreground">Qtd: </span><span className="text-foreground">{Math.round(item.quantidade).toLocaleString('pt-BR')}</span></div>
             </div>
           </div>
