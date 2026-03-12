@@ -153,21 +153,23 @@ export default function Ranking() {
 
   // Agrupar produtos
   const productRanking: ProductRank[] = useMemo(() => {
-    const map = new Map<string, { total: number; qtd: number; familia: string; marca: string }>();
+    const map = new Map<string, { total: number; qtd: number; lucro: number; familia: string; marca: string }>();
     for (const v of vendasRaw) {
       const nome = v.descricao_produto ?? 'Sem Nome';
       const existing = map.get(nome);
       const total = parseBRL(v.total_com_desconto);
       const qtd = parseBRL(v.quantidade);
+      const lucro = parseBRL(v.lucros_reais);
       if (existing) {
         existing.total += total;
         existing.qtd += qtd;
+        existing.lucro += lucro;
       } else {
-        map.set(nome, { total, qtd, familia: v.familia_produto ?? 'Outros', marca: v.marca ?? 'Sem Marca' });
+        map.set(nome, { total, qtd, lucro, familia: v.familia_produto ?? 'Outros', marca: v.marca ?? 'Sem Marca' });
       }
     }
     return [...map.entries()]
-      .map(([nome, d]) => ({ descricao_produto: nome, familia_produto: d.familia, marca: d.marca, total_vendido: d.total, quantidade: d.qtd, posicao: 0 }))
+      .map(([nome, d]) => ({ descricao_produto: nome, familia_produto: d.familia, marca: d.marca, total_vendido: d.total, quantidade: d.qtd, lucro: d.lucro, posicao: 0 }))
       .sort((a, b) => b.total_vendido - a.total_vendido)
       .map((item, i) => ({ ...item, posicao: i + 1 }));
   }, [vendasRaw]);
