@@ -32,13 +32,11 @@ SET search_path = public
 AS $$
 DECLARE
   result json;
-  start_date text;
-  end_date text;
-  last_day int;
+  start_date date;
+  end_date date;
 BEGIN
-  start_date := p_ano || '-' || LPAD(p_mes::text, 2, '0') || '-01';
-  last_day := EXTRACT(DAY FROM (DATE_TRUNC('month', (start_date || ' 00:00:00')::timestamp) + INTERVAL '1 month - 1 day'));
-  end_date := p_ano || '-' || LPAD(p_mes::text, 2, '0') || '-' || LPAD(last_day::text, 2, '0');
+  start_date := make_date(p_ano, p_mes, 1);
+  end_date := (start_date + INTERVAL '1 month - 1 day')::date;
 
   WITH filtered AS (
     SELECT
@@ -169,13 +167,11 @@ SET search_path = public
 AS $$
 DECLARE
   result json;
-  start_date text;
-  end_date text;
-  last_day int;
+  start_date date;
+  end_date date;
 BEGIN
-  start_date := p_ano || '-' || LPAD(p_mes::text, 2, '0') || '-01';
-  last_day := EXTRACT(DAY FROM (DATE_TRUNC('month', (start_date || ' 00:00:00')::timestamp) + INTERVAL '1 month - 1 day'));
-  end_date := p_ano || '-' || LPAD(p_mes::text, 2, '0') || '-' || LPAD(last_day::text, 2, '0');
+  start_date := make_date(p_ano, p_mes, 1);
+  end_date := (start_date + INTERVAL '1 month - 1 day')::date;
 
   WITH filtered AS (
     SELECT
