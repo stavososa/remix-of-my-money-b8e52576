@@ -65,6 +65,17 @@ export default function Gerencial() {
   const [searchDebounced, setSearchDebounced] = useState('');
   const [tabelaPagina, setTabelaPagina] = useState(1);
 
+  // Reset filters and page when period changes
+  useEffect(() => {
+    setFiltroUnidade('all');
+    setFiltroVendedor('all');
+    setFiltroFamilia('all');
+    setFiltroMarca('all');
+    setBuscaTabela('');
+    setSearchDebounced('');
+    setTabelaPagina(1);
+  }, [periodoAno, periodoMes]);
+
   const searchTimer = useCallback((val: string) => {
     setBuscaTabela(val);
     const id = setTimeout(() => {
