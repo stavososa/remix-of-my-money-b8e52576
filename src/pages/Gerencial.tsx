@@ -278,11 +278,13 @@ export default function Gerencial() {
       if (filtroFamilia !== 'all') query = query.eq('familia_produto', filtroFamilia);
       if (filtroMarca !== 'all') query = query.eq('marca', filtroMarca);
 
-      if (vendedoresUnidade && vendedoresUnidade.length > 0) {
-        const namesForFilter = controlePj
-          ?.filter(cp => cp.unidade === filtroUnidade)
-          .map(cp => cp.nome_vendas ?? cp.nome) ?? [];
-        if (namesForFilter.length > 0) query = query.in('vendedor_nome', namesForFilter);
+      if (filtroUnidade !== 'all') {
+        if (vendedoresUnidade && vendedoresUnidade.length > 0) {
+          query = query.in('vendedor_nome', vendedoresUnidade);
+        } else {
+          // Unit selected but no vendors mapped → force empty result
+          query = query.eq('vendedor_nome', '__NONEXISTENT__');
+        }
       }
 
       if (searchDebounced) {
