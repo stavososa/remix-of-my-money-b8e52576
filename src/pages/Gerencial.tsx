@@ -242,52 +242,26 @@ export default function Gerencial() {
       .sort((a, b) => b.value - a.value);
   }, [allVendas]);
 
-  // Fetch filter options
-  const { data: filterOptions } = useQuery({
-    queryKey: ['gerencial-filters', periodoAno, periodoMes],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('vendas')
-        .select('vendedor_nome, familia_produto, marca')
-        .gte('data_emissao', startDate)
-        .lte('data_emissao', endDate)
-        .limit(10000);
-      if (error) throw error;
-
-      const vendedores = new Set<string>();
-      const familias = new Set<string>();
-      const marcas = new Set<string>();
-      for (const row of data ?? []) {
-        if (row.vendedor_nome) vendedores.add(row.vendedor_nome);
-        if (row.familia_produto && row.familia_produto !== 'Outros') familias.add(row.familia_produto);
-        if (row.marca && row.marca !== 'Sem Marca') marcas.add(row.marca);
-      }
-      const unidades = new Set<string>();
-      for (const row of data ?? []) {
-        if (row.vendedor_nome) {
-          vendedores.add(row.vendedor_nome);
-          if (controlePj) {
-            const nk = normalize(row.vendedor_nome);
-            for (const cp of controlePj) {
-              if (normalize(cp.nome_vendas ?? cp.nome) === nk && cp.unidade) {
-                unidades.add(cp.unidade);
-              }
-            }
-          }
-        }
-        if (row.familia_produto && row.familia_produto !== 'Outros') familias.add(row.familia_produto);
-        if (row.marca && row.marca !== 'Sem Marca') marcas.add(row.marca);
-      }
-      return {
-        vendedores: [...vendedores].sort(),
-        familias: [...familias].sort(),
-        marcas: [...marcas].sort(),
-        unidades: [...unidades].sort(),
-      };
-    },
-    staleTime: 2 * 60 * 1000,
-    enabled: !!controlePj,
-  });
+  // Fetch filter options from allVendas
+  const filterOptions = useMemo(() => {
+    if (!allVendas) return { vendedores: [], unidades: [], familias: [], marcas: [] };
+    const vendedores = new Set<string>();
+    const familias = new Set<string>();
+    const marcas = new Set<string>();
+    const unidades = new Set<string>();
+    for (const row of allVendas) {
+      if (row.vendedor_nome) vendedores.add(row.vendedor_nome);
+      if (row.familia_produto && row.familia_produto !== 'Outros') familias.add(row.familia_produto);
+      if (row.marca && row.marca !== 'Sem Marca') marcas.add(row.marca);
+      if (row.local_estoque) unidades.add(row.local_estoque);
+    }
+    return {
+      vendedores: [...vendedores].sort(),
+      familias: [...familias].sort(),
+      marcas: [...marcas].sort(),
+      unidades: [...unidades].sort(),
+    };
+  }, [allVendas]);
 
   // Fetch paginated vendas for table
   const { data: vendasResult, isLoading: loadVendas } = useQuery({
