@@ -1,39 +1,36 @@
 
 
-## Gerencial com dados da tabela `vendas` + filtro por Unidade + graficos
+## Plano: Filtro de Unidade usando `local_estoque` da tabela `vendas`
 
-A tabela `vendas` tem 468 registros (Jan/2026) com valores em formato string brasileiro (ex: "R$ 15,40", "49,30%"). O campo `vendedor_nome` liga aos vendedores/unidades via `vendedores.nome_omie`. Sera necessario fazer JOIN client-side ou via query para associar unidade a cada venda.
+### Problema
+O filtro de Unidade depende da tabela `controle_pj` para mapear vendedores a unidades. Esse mapeamento falha em muitos casos (vendedores não cadastrados, nomes divergentes). O usuário quer usar exclusivamente a tabela `vendas`.
 
-### Abordagem
+### Solução
+A tabela `vendas` possui o campo `local_estoque` que contém o local/unidade de cada venda. Vamos usar esse campo diretamente como filtro de unidade, eliminando a dependência do `controle_pj` para esse propósito.
 
-Buscar dados da tabela `vendas` filtrados por periodo (`data_emissao`), e cruzar com `vendedores` + `unidades` para obter a unidade de cada venda. Parsear valores monetarios/percentuais no frontend (padrão ja existente no projeto).
+### Alterações em `src/pages/Gerencial.tsx`
 
-### Alteracoes em `src/pages/Gerencial.tsx`
+1. **Incluir `local_estoque` em todas as queries de vendas** (allVendas, filterOptions, tabela paginada)
 
-1. **Nova query: buscar `vendas`** filtradas pelo periodo atual (mes/ano do `data_emissao`), com limite adequado
+2. **Substituir lógica de mapeamento vendedor→unidade** pelo uso direto de `local_estoque`:
+   - Remover `vendedorUnidadeMap`, `getUnidade`, `vendedoresUnidade` (mapeamento via `controle_pj`)
+   - O filtro de unidade agora filtra por `local_estoque` diretamente
+   - Na query paginada (tabela), usar `.eq('local_estoque', filtroUnidade)` ao invés de `.in('vendedor_nome', ...)`
 
-2. **Nova query: buscar `vendedores` com `unidades`** para mapear `nome_omie` -> `unidade_nome`
+3. **Gerar opções de unidades** a partir dos valores distintos de `local_estoque` no período
 
-3. **Processar dados client-side**:
-   - Parsear `total_com_desconto`, `lucros_reais`, `margem_percentual` de string BR para number
-   - Associar cada venda a sua unidade via mapa vendedor->unidade
-   - Agregar por unidade: total vendido, lucro, margem media, qtd vendas
+4. **Manter `controle_pj`** apenas se ainda for usado em outro lugar (ex: coluna "Unidade" na tabela de detalhes). Se não, remover a query.
 
-4. **Filtro por Unidade**: O select de unidades ja existe. Ao selecionar uma unidade, filtrar as vendas processadas e recalcular todos os KPIs e graficos.
+5. **Nos gráficos Pie/Donut "por Unidade"**, agrupar por `local_estoque` ao invés do mapeamento
 
-5. **Novos graficos usando dados de `vendas`**:
-   - **Faturamento por Unidade** (BarChart horizontal - ja existe, alimentar com dados de vendas)
-   - **Margem Media por Unidade** (novo BarChart horizontal, cor verde)
-   - **Top Familias de Produto** (BarChart mostrando as familias mais vendidas, reagindo ao filtro de unidade)
+6. **Filtro client-side (`filteredAll`)**: comparar `row.local_estoque` com `filtroUnidade`
 
-6. **Cards PJ vs CLT**: Recalcular a partir do cruzamento vendas + vendedores (que tem campo `regime`), ao inves de depender exclusivamente da view `v_resumo_regime`
+### Resultado esperado
+- Select de Unidade aparece com todas as unidades presentes no período
+- Filtrar por unidade atualiza KPIs, gráficos e tabela corretamente
+- Multifiltro (Unidade + Vendedor + Família + Marca) funciona em conjunto
+- Sem dependência de `controle_pj` para o filtro de unidade
 
-7. **Layout**: Organizar graficos em grid 2 colunas no desktop
-
-### Detalhes tecnicos
-
-- Funcoes de parsing ja existem no projeto (regex para "R$ X,XX" e "XX,XX%")
-- A tabela `vendas` tem 468 linhas para Jan/2026, dentro do limite de 1000 do Supabase
-- Vendedores sem unidade (ex: "CHECK OUT", "COMPRA VENDEDOR") serao agrupados como "Sem Unidade" ou ignorados conforme filtro
-- Manter as queries existentes (`v_ranking`, `v_resumo_unidade`, `v_resumo_regime`) para dados de comissao que nao existem na tabela `vendas`
+### Arquivos alterados
+- `src/pages/Gerencial.tsx`
 
