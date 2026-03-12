@@ -1,39 +1,44 @@
 
 
-## Gerencial com dados da tabela `vendas` + filtro por Unidade + graficos
+## Problema
 
-A tabela `vendas` tem 468 registros (Jan/2026) com valores em formato string brasileiro (ex: "R$ 15,40", "49,30%"). O campo `vendedor_nome` liga aos vendedores/unidades via `vendedores.nome_omie`. Sera necessario fazer JOIN client-side ou via query para associar unidade a cada venda.
+O período selecionado é **Março/2026**, mas a view `v_ranking` e a tabela `vendas` não têm dados para esse mês. Por isso todas as abas mostram "Nenhum dado encontrado" e KPIs zerados.
 
-### Abordagem
+## Solução: Autoajustar período para o último mês com dados
 
-Buscar dados da tabela `vendas` filtrados por periodo (`data_emissao`), e cruzar com `vendedores` + `unidades` para obter a unidade de cada venda. Parsear valores monetarios/percentuais no frontend (padrão ja existente no projeto).
+### Alteração 1: `src/contexts/PeriodContext.tsx`
 
-### Alteracoes em `src/pages/Gerencial.tsx`
+- Ao inicializar, consultar a tabela `vendas` para descobrir o `MAX(data_emissao)` existente
+- Extrair mês/ano dessa data e usá-la como período inicial (ao invés de `new Date()`)
+- Enquanto a consulta carrega, manter um estado `loading` para evitar queries com período incorreto
 
-1. **Nova query: buscar `vendas`** filtradas pelo periodo atual (mes/ano do `data_emissao`), com limite adequado
+### Alteração 2: `src/components/PeriodFilter.tsx`
 
-2. **Nova query: buscar `vendedores` com `unidades`** para mapear `nome_omie` -> `unidade_nome`
+- Nenhuma alteração estrutural necessária — o componente já reflete o estado do contexto
 
-3. **Processar dados client-side**:
-   - Parsear `total_com_desconto`, `lucros_reais`, `margem_percentual` de string BR para number
-   - Associar cada venda a sua unidade via mapa vendedor->unidade
-   - Agregar por unidade: total vendido, lucro, margem media, qtd vendas
+### Alteração 3: `src/pages/Ranking.tsx` (e outras páginas)
 
-4. **Filtro por Unidade**: O select de unidades ja existe. Ao selecionar uma unidade, filtrar as vendas processadas e recalcular todos os KPIs e graficos.
+- Nenhuma alteração necessária — as queries já usam `periodoAno`/`periodoMes` do contexto
 
-5. **Novos graficos usando dados de `vendas`**:
-   - **Faturamento por Unidade** (BarChart horizontal - ja existe, alimentar com dados de vendas)
-   - **Margem Media por Unidade** (novo BarChart horizontal, cor verde)
-   - **Top Familias de Produto** (BarChart mostrando as familias mais vendidas, reagindo ao filtro de unidade)
+### Detalhes técnicos
 
-6. **Cards PJ vs CLT**: Recalcular a partir do cruzamento vendas + vendedores (que tem campo `regime`), ao inves de depender exclusivamente da view `v_resumo_regime`
+```typescript
+// PeriodContext.tsx — nova lógica de inicialização
+useEffect(() => {
+  supabase
+    .from('vendas')
+    .select('data_emissao')
+    .order('data_emissao', { ascending: false })
+    .limit(1)
+    .then(({ data }) => {
+      if (data?.[0]?.data_emissao) {
+        const d = new Date(data[0].data_emissao);
+        setAno(d.getFullYear());
+        setMes(d.getMonth() + 1);
+      }
+    });
+}, []);
+```
 
-7. **Layout**: Organizar graficos em grid 2 colunas no desktop
-
-### Detalhes tecnicos
-
-- Funcoes de parsing ja existem no projeto (regex para "R$ X,XX" e "XX,XX%")
-- A tabela `vendas` tem 468 linhas para Jan/2026, dentro do limite de 1000 do Supabase
-- Vendedores sem unidade (ex: "CHECK OUT", "COMPRA VENDEDOR") serao agrupados como "Sem Unidade" ou ignorados conforme filtro
-- Manter as queries existentes (`v_ranking`, `v_resumo_unidade`, `v_resumo_regime`) para dados de comissao que nao existem na tabela `vendas`
+Isso garante que, ao abrir o app, o período já aponta para o mês mais recente com vendas registradas, eliminando a tela vazia.
 
