@@ -277,7 +277,8 @@ export default function Ranking() {
     { key: 'descricao_produto' as const, label: 'Produto' },
     { key: 'familia_produto' as const, label: 'Família' },
     { key: 'marca' as const, label: 'Marca' },
-    { key: 'total_vendido' as const, label: 'Total Vendido', align: 'right' as const, render: (v: number) => formatBRL(v) },
+    { key: 'total_vendido' as const, label: 'Faturamento', align: 'right' as const, render: (v: number) => fmtCompact(v) },
+    { key: 'lucro' as const, label: 'Lucro Real', align: 'right' as const, render: (v: number) => fmtCompact(v) },
     { key: 'quantidade' as const, label: 'Quantidade', align: 'right' as const, render: (v: number) => Math.round(v).toLocaleString('pt-BR') },
   ];
 
