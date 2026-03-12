@@ -1,11 +1,18 @@
 import { useState, useCallback, useMemo } from 'react';
 import { AppShell } from '@/components/AppShell';
+import { KPICard } from '@/components/KPICard';
 import { DataTable } from '@/components/DataTable';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { usePeriod } from '@/contexts/PeriodContext';
-import { X, Search } from 'lucide-react';
+import { X, Search, DollarSign, TrendingUp, Percent, ShoppingCart } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { motion } from 'framer-motion';
+import {
+  ResponsiveContainer, AreaChart, Area, BarChart, Bar,
+  XAxis, YAxis, Tooltip, CartesianGrid,
+} from 'recharts';
 
 const parseMoneyBR = (str: unknown): number => {
   if (str == null) return 0;
@@ -27,9 +34,26 @@ const parsePctBR = (str: unknown): number => {
 
 const fmt = (v: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+const fmtCompact = (v: number) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 }).format(v);
 const fmtPct = (v: number) => `${v.toFixed(1)}%`;
 
 const TABLE_PAGE_SIZE = 30;
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-card border border-border rounded-lg p-3 shadow-lg text-xs">
+      <p className="font-medium text-foreground mb-1">{label}</p>
+      {payload.map((p: any, i: number) => (
+        <p key={i} style={{ color: p.color }} className="flex justify-between gap-4">
+          <span>{p.name}:</span>
+          <span className="font-semibold">{typeof p.value === 'number' && p.value > 100 ? fmt(p.value) : p.name === 'Margem' ? fmtPct(p.value) : fmt(p.value)}</span>
+        </p>
+      ))}
+    </div>
+  );
+};
 
 export default function Gerencial() {
   const { periodoAno, periodoMes } = usePeriod();
@@ -50,7 +74,6 @@ export default function Gerencial() {
     return () => clearTimeout(id);
   }, []);
 
-  // Date range for the period
   const startDate = `${periodoAno}-${String(periodoMes).padStart(2, '0')}-01`;
   const endDay = new Date(periodoAno, periodoMes, 0).getDate();
   const endDate = `${periodoAno}-${String(periodoMes).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
@@ -68,7 +91,6 @@ export default function Gerencial() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Build vendedor→unidade map
   const vendedorUnidadeMap = useMemo(() => {
     const map = new Map<string, string>();
     if (!controlePj) return map;
@@ -79,7 +101,6 @@ export default function Gerencial() {
     return map;
   }, [controlePj]);
 
-  // Get vendedores for selected unidade
   const vendedoresUnidade = useMemo(() => {
     if (filtroUnidade === 'all') return null;
     const names: string[] = [];
@@ -92,38 +113,152 @@ export default function Gerencial() {
     return names;
   }, [filtroUnidade, controlePj]);
 
-  // Fetch filter options (distinct values for the period)
+  // ===== FULL PERIOD DATA (for KPIs & charts) =====
+  const { data: allVendas, isLoading: loadAll } = useQuery({
+    queryKey: ['gerencial-all-vendas', periodoAno, periodoMes],
+    queryFn: async () => {
+      const allData: any[] = [];
+      let from = 0;
+      const step = 1000;
+      while (true) {
+        const { data, error } = await supabase
+          .from('vendas')
+          .select('data_emissao, vendedor_nome, total_com_desconto, lucros_reais, margem_percentual, familia_produto, marca')
+          .gte('data_emissao', startDate)
+          .lte('data_emissao', endDate)
+          .range(from, from + step - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        allData.push(...data);
+        if (data.length < step) break;
+        from += step;
+      }
+      return allData;
+    },
+    staleTime: 2 * 60 * 1000,
+    enabled: !!controlePj,
+  });
+
+  // Apply client-side filters to full dataset
+  const filteredAll = useMemo(() => {
+    if (!allVendas) return [];
+    return allVendas.filter(row => {
+      const vendKey = (row.vendedor_nome ?? '').toUpperCase().trim();
+      if (filtroUnidade !== 'all') {
+        const unidade = vendedorUnidadeMap.get(vendKey);
+        if (unidade !== filtroUnidade) return false;
+      }
+      if (filtroVendedor !== 'all' && row.vendedor_nome !== filtroVendedor) return false;
+      if (filtroFamilia !== 'all' && row.familia_produto !== filtroFamilia) return false;
+      if (filtroMarca !== 'all' && row.marca !== filtroMarca) return false;
+      return true;
+    });
+  }, [allVendas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, vendedorUnidadeMap]);
+
+  // ===== KPIs =====
+  const kpis = useMemo(() => {
+    let totalFat = 0, totalLucro = 0, somaMargemPond = 0, count = 0;
+    for (const row of filteredAll) {
+      const fat = parseMoneyBR(row.total_com_desconto);
+      const lucro = parseMoneyBR(row.lucros_reais);
+      const margem = parsePctBR(row.margem_percentual);
+      totalFat += fat;
+      totalLucro += lucro;
+      somaMargemPond += margem * fat;
+      count++;
+    }
+    const margemMedia = totalFat > 0 ? somaMargemPond / totalFat : 0;
+    return { totalFat, totalLucro, margemMedia, count };
+  }, [filteredAll]);
+
+  // ===== Chart: Faturamento por Dia =====
+  const chartDiario = useMemo(() => {
+    const dayMap = new Map<string, number>();
+    for (const row of filteredAll) {
+      const day = row.data_emissao ?? '';
+      dayMap.set(day, (dayMap.get(day) ?? 0) + parseMoneyBR(row.total_com_desconto));
+    }
+    const sorted = [...dayMap.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    let acum = 0;
+    return sorted.map(([day, val]) => {
+      acum += val;
+      return { dia: day.substring(8), faturamento: val, acumulado: acum };
+    });
+  }, [filteredAll]);
+
+  // ===== Chart: Faturamento por Unidade =====
+  const chartUnidade = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of filteredAll) {
+      const vendKey = (row.vendedor_nome ?? '').toUpperCase().trim();
+      const unidade = vendedorUnidadeMap.get(vendKey) ?? 'Sem Unidade';
+      map.set(unidade, (map.get(unidade) ?? 0) + parseMoneyBR(row.total_com_desconto));
+    }
+    return [...map.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, value]) => ({ name, value }));
+  }, [filteredAll, vendedorUnidadeMap]);
+
+  // ===== Chart: Top 10 Famílias =====
+  const chartFamilias = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of filteredAll) {
+      const fam = row.familia_produto ?? 'Outros';
+      map.set(fam, (map.get(fam) ?? 0) + parseMoneyBR(row.total_com_desconto));
+    }
+    return [...map.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([name, value]) => ({ name, value }));
+  }, [filteredAll]);
+
+  // ===== Chart: Margem por Unidade =====
+  const chartMargemUnidade = useMemo(() => {
+    const map = new Map<string, { somaMargemPond: number; somaFat: number }>();
+    for (const row of filteredAll) {
+      const vendKey = (row.vendedor_nome ?? '').toUpperCase().trim();
+      const unidade = vendedorUnidadeMap.get(vendKey) ?? 'Sem Unidade';
+      const fat = parseMoneyBR(row.total_com_desconto);
+      const margem = parsePctBR(row.margem_percentual);
+      const cur = map.get(unidade) ?? { somaMargemPond: 0, somaFat: 0 };
+      cur.somaMargemPond += margem * fat;
+      cur.somaFat += fat;
+      map.set(unidade, cur);
+    }
+    return [...map.entries()]
+      .map(([name, { somaMargemPond, somaFat }]) => ({
+        name,
+        margem: somaFat > 0 ? somaMargemPond / somaFat : 0,
+      }))
+      .sort((a, b) => b.margem - a.margem);
+  }, [filteredAll, vendedorUnidadeMap]);
+
+  // Fetch filter options
   const { data: filterOptions } = useQuery({
     queryKey: ['gerencial-filters', periodoAno, periodoMes],
     queryFn: async () => {
-      // Fetch all vendedor_nome, familia_produto, marca for the period
-      let query = supabase
+      const { data, error } = await supabase
         .from('vendas')
         .select('vendedor_nome, familia_produto, marca')
         .gte('data_emissao', startDate)
-        .lte('data_emissao', endDate);
-
-      // Fetch up to 10000 rows for distinct values
-      const { data, error } = await query.limit(10000);
+        .lte('data_emissao', endDate)
+        .limit(10000);
       if (error) throw error;
 
       const vendedores = new Set<string>();
       const familias = new Set<string>();
       const marcas = new Set<string>();
-
       for (const row of data ?? []) {
         if (row.vendedor_nome) vendedores.add(row.vendedor_nome);
         if (row.familia_produto && row.familia_produto !== 'Outros') familias.add(row.familia_produto);
         if (row.marca && row.marca !== 'Sem Marca') marcas.add(row.marca);
       }
-
       const unidades = new Set<string>();
       if (controlePj) {
         for (const cp of controlePj) {
           if (cp.unidade) unidades.add(cp.unidade);
         }
       }
-
       return {
         vendedores: [...vendedores].sort(),
         familias: [...familias].sort(),
@@ -135,12 +270,11 @@ export default function Gerencial() {
     enabled: !!controlePj,
   });
 
-  // Fetch paginated vendas
+  // Fetch paginated vendas for table
   const { data: vendasResult, isLoading: loadVendas } = useQuery({
     queryKey: ['gerencial-vendas', periodoAno, periodoMes, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, searchDebounced, tabelaPagina],
     queryFn: async () => {
       const offset = (tabelaPagina - 1) * TABLE_PAGE_SIZE;
-
       let query = supabase
         .from('vendas')
         .select('id, data_emissao, vendedor_nome, descricao_produto, familia_produto, marca, nota_fiscal, total_com_desconto, lucros_reais, margem_percentual', { count: 'exact' })
@@ -150,30 +284,17 @@ export default function Gerencial() {
         .order('id', { ascending: false })
         .range(offset, offset + TABLE_PAGE_SIZE - 1);
 
-      // Apply filters
-      if (filtroVendedor !== 'all') {
-        query = query.eq('vendedor_nome', filtroVendedor);
-      }
-      if (filtroFamilia !== 'all') {
-        query = query.eq('familia_produto', filtroFamilia);
-      }
-      if (filtroMarca !== 'all') {
-        query = query.eq('marca', filtroMarca);
-      }
+      if (filtroVendedor !== 'all') query = query.eq('vendedor_nome', filtroVendedor);
+      if (filtroFamilia !== 'all') query = query.eq('familia_produto', filtroFamilia);
+      if (filtroMarca !== 'all') query = query.eq('marca', filtroMarca);
 
-      // Unidade filter: filter by vendedor names that belong to that unidade
       if (vendedoresUnidade && vendedoresUnidade.length > 0) {
-        // We need to match case-insensitively. Since vendedor_nome in vendas may differ in case,
-        // we'll use the original names from controle_pj
         const namesForFilter = controlePj
           ?.filter(cp => cp.unidade === filtroUnidade)
           .map(cp => cp.nome_vendas ?? cp.nome) ?? [];
-        if (namesForFilter.length > 0) {
-          query = query.in('vendedor_nome', namesForFilter);
-        }
+        if (namesForFilter.length > 0) query = query.in('vendedor_nome', namesForFilter);
       }
 
-      // Text search
       if (searchDebounced) {
         const term = `%${searchDebounced}%`;
         query = query.or(
@@ -192,7 +313,6 @@ export default function Gerencial() {
   const vendasRows = vendasResult?.rows ?? [];
   const vendasTotalCount = vendasResult?.totalCount ?? 0;
 
-  // Map rows to include unidade and parsed values
   const mappedRows = useMemo(() => {
     return vendasRows.map(row => {
       const vendedorKey = (row.vendedor_nome ?? '').toUpperCase().trim();
@@ -242,7 +362,7 @@ export default function Gerencial() {
 
   return (
     <AppShell title="Gerencial">
-      <div className="space-y-4">
+      <div className="space-y-6">
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-3">
           <FilterSelect label="Unidade" value={filtroUnidade} onChange={handleFilterChange(setFiltroUnidade)} options={filtros.unidades.map(u => ({ value: u, label: u }))} allLabel="Todas as Unidades" />
@@ -256,7 +376,6 @@ export default function Gerencial() {
           )}
         </div>
 
-        {/* Active filter chips */}
         {activeFilters.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {activeFilters.map(f => (
@@ -268,12 +387,114 @@ export default function Gerencial() {
           </div>
         )}
 
+        {/* KPIs */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <KPICard icon={DollarSign} label="Faturamento" value={fmt(kpis.totalFat)} accentColor="hsl(38 90% 55%)" />
+          <KPICard icon={TrendingUp} label="Lucro" value={fmt(kpis.totalLucro)} accentColor="hsl(142 71% 45%)" />
+          <KPICard icon={Percent} label="Margem Média" value={fmtPct(kpis.margemMedia)} accentColor="hsl(200 80% 50%)" />
+          <KPICard icon={ShoppingCart} label="Vendas" value={kpis.count.toLocaleString('pt-BR')} accentColor="hsl(280 60% 55%)" />
+        </div>
+
+        {/* Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Faturamento por Dia */}
+          <Card className="border-border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold text-foreground">Faturamento por Dia</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[260px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartDiario}>
+                    <defs>
+                      <linearGradient id="gradFat" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(38 90% 55%)" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="hsl(38 90% 55%)" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="gradAcum" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(200 80% 50%)" stopOpacity={0.2} />
+                        <stop offset="95%" stopColor="hsl(200 80% 50%)" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 20% 20%)" />
+                    <XAxis dataKey="dia" tick={{ fontSize: 11, fill: 'hsl(215 15% 55%)' }} />
+                    <YAxis tickFormatter={v => fmtCompact(v)} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} width={65} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Area type="monotone" dataKey="faturamento" name="Diário" stroke="hsl(38 90% 55%)" fill="url(#gradFat)" strokeWidth={2} />
+                    <Area type="monotone" dataKey="acumulado" name="Acumulado" stroke="hsl(200 80% 50%)" fill="url(#gradAcum)" strokeWidth={2} strokeDasharray="4 2" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Faturamento por Unidade */}
+          <Card className="border-border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold text-foreground">Faturamento por Unidade</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[260px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartUnidade} layout="vertical" margin={{ left: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 20% 20%)" />
+                    <XAxis type="number" tickFormatter={v => fmtCompact(v)} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
+                    <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 11, fill: 'hsl(215 15% 55%)' }} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="value" name="Faturamento" fill="hsl(38 90% 55%)" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Top 10 Famílias */}
+          <Card className="border-border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold text-foreground">Top 10 Famílias</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[260px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartFamilias} layout="vertical" margin={{ left: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 20% 20%)" />
+                    <XAxis type="number" tickFormatter={v => fmtCompact(v)} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
+                    <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="value" name="Faturamento" fill="hsl(200 80% 50%)" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Margem por Unidade */}
+          <Card className="border-border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold text-foreground">Margem Média por Unidade</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[260px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartMargemUnidade} layout="vertical" margin={{ left: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 20% 20%)" />
+                    <XAxis type="number" tickFormatter={v => fmtPct(v)} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
+                    <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 11, fill: 'hsl(215 15% 55%)' }} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="margem" name="Margem" fill="hsl(142 71% 45%)" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Sales Table */}
         <div>
           <div className="flex items-center justify-between mb-3 gap-3">
             <h3 className="text-sm font-semibold text-secondary-foreground whitespace-nowrap">
               Vendas Detalhadas ({vendasTotalCount} registros)
-              {loadVendas && <span className="ml-2 text-xs text-muted-foreground">(carregando...)</span>}
+              {(loadVendas || loadAll) && <span className="ml-2 text-xs text-muted-foreground">(carregando...)</span>}
             </h3>
             <div className="relative max-w-xs w-full">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -301,7 +522,6 @@ export default function Gerencial() {
   );
 }
 
-// --- Filter Select Sub-component ---
 function FilterSelect({ label, value, onChange, options, allLabel }: {
   label: string;
   value: string;

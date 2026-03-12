@@ -1,42 +1,39 @@
 
 
-## Plano: Restaurar KPIs e Gráficos no Gerencial
+## Gerencial com dados da tabela `vendas` + filtro por Unidade + graficos
 
-O Gerencial atual tem apenas filtros + tabela. Vamos adicionar de volta KPIs e gráficos, alimentados pelos dados da tabela `vendas` com parsing no frontend (sem RPCs).
+A tabela `vendas` tem 468 registros (Jan/2026) com valores em formato string brasileiro (ex: "R$ 15,40", "49,30%"). O campo `vendedor_nome` liga aos vendedores/unidades via `vendedores.nome_omie`. Sera necessario fazer JOIN client-side ou via query para associar unidade a cada venda.
 
 ### Abordagem
 
-Buscar **todos** os registros de `vendas` do período (com busca paginada recursiva para superar o limite de 1000 do Supabase), aplicar filtros client-side para KPIs e gráficos, e manter a tabela paginada server-side como está.
+Buscar dados da tabela `vendas` filtrados por periodo (`data_emissao`), e cruzar com `vendedores` + `unidades` para obter a unidade de cada venda. Parsear valores monetarios/percentuais no frontend (padrão ja existente no projeto).
 
-### Alterações em `src/pages/Gerencial.tsx`
+### Alteracoes em `src/pages/Gerencial.tsx`
 
-**1. Nova query: buscar todas as vendas do período (para KPIs/gráficos)**
-- Busca recursiva (1000 em 1000) para garantir 100% dos registros
-- Campos: `data_emissao`, `vendedor_nome`, `total_com_desconto`, `lucros_reais`, `margem_percentual`, `familia_produto`, `marca`
-- Filtros de período server-side; filtros de unidade/vendedor/família/marca aplicados client-side sobre esse dataset completo
+1. **Nova query: buscar `vendas`** filtradas pelo periodo atual (mes/ano do `data_emissao`), com limite adequado
 
-**2. KPIs (4 cards acima dos gráficos)**
-- Faturamento Total (soma `total_com_desconto`)
-- Lucro Total (soma `lucros_reais`)
-- Margem Média (média ponderada `margem_percentual`)
-- Qtd Vendas (contagem de registros)
-- Usando o componente `KPICard` já existente
-- Reagindo aos filtros ativos
+2. **Nova query: buscar `vendedores` com `unidades`** para mapear `nome_omie` -> `unidade_nome`
 
-**3. Gráficos (grid 2 colunas no desktop)**
+3. **Processar dados client-side**:
+   - Parsear `total_com_desconto`, `lucros_reais`, `margem_percentual` de string BR para number
+   - Associar cada venda a sua unidade via mapa vendedor->unidade
+   - Agregar por unidade: total vendido, lucro, margem media, qtd vendas
 
-- **Faturamento por Dia** (AreaChart): soma de `total_com_desconto` agrupada por `data_emissao`, com linha de acumulado
-- **Faturamento por Unidade** (BarChart horizontal): soma agrupada pela unidade mapeada via `controle_pj`
-- **Top 10 Famílias** (BarChart): famílias com maior faturamento
-- **Margem Média por Unidade** (BarChart horizontal): média de margem por unidade
+4. **Filtro por Unidade**: O select de unidades ja existe. Ao selecionar uma unidade, filtrar as vendas processadas e recalcular todos os KPIs e graficos.
 
-Todos os gráficos usam `recharts` (ResponsiveContainer, AreaChart, BarChart) com o mesmo estilo visual do MeuPainel (cores, tooltips, grid).
+5. **Novos graficos usando dados de `vendas`**:
+   - **Faturamento por Unidade** (BarChart horizontal - ja existe, alimentar com dados de vendas)
+   - **Margem Media por Unidade** (novo BarChart horizontal, cor verde)
+   - **Top Familias de Produto** (BarChart mostrando as familias mais vendidas, reagindo ao filtro de unidade)
 
-**4. Manter tudo que já existe**
-- Filtros (Unidade, Vendedor, Família, Marca) + busca textual + chips de filtro ativo
-- Tabela paginada server-side com DataTable
-- Parsing de valores BR no frontend
+6. **Cards PJ vs CLT**: Recalcular a partir do cruzamento vendas + vendedores (que tem campo `regime`), ao inves de depender exclusivamente da view `v_resumo_regime`
 
-### Arquivos alterados
-- `src/pages/Gerencial.tsx` — adicionar KPIs, gráficos e query completa
+7. **Layout**: Organizar graficos em grid 2 colunas no desktop
+
+### Detalhes tecnicos
+
+- Funcoes de parsing ja existem no projeto (regex para "R$ X,XX" e "XX,XX%")
+- A tabela `vendas` tem 468 linhas para Jan/2026, dentro do limite de 1000 do Supabase
+- Vendedores sem unidade (ex: "CHECK OUT", "COMPRA VENDEDOR") serao agrupados como "Sem Unidade" ou ignorados conforme filtro
+- Manter as queries existentes (`v_ranking`, `v_resumo_unidade`, `v_resumo_regime`) para dados de comissao que nao existem na tabela `vendas`
 
