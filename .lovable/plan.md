@@ -1,28 +1,39 @@
 
 
-## Plano: Reestruturar Gerencial e Ranking + Corrigir erro `local_estoque`
+## Gerencial com dados da tabela `vendas` + filtro por Unidade + graficos
 
-### Problema principal
-A coluna `local_estoque` **não existe** na tabela `vendas` do banco de dados (apesar de constar no types.ts). Todas as queries estão falhando com erro 400. Isso quebrou o filtro de mês e todo o dashboard.
+A tabela `vendas` tem 468 registros (Jan/2026) com valores em formato string brasileiro (ex: "R$ 15,40", "49,30%"). O campo `vendedor_nome` liga aos vendedores/unidades via `vendedores.nome_omie`. Sera necessario fazer JOIN client-side ou via query para associar unidade a cada venda.
 
-### Alterações
+### Abordagem
 
-**1. Gerencial (`src/pages/Gerencial.tsx`)**
-- Remover `local_estoque` de todas as queries (causa do erro)
-- Remover gráficos: Faturamento por Unidade (Pie), Margem Média por Unidade (Donut)
-- Remover gráficos: Top 10 Vendedores, Top 10 Famílias, Top 10 Marcas (vão para Ranking)
-- Remover useMemos desses gráficos (`chartFatUnidade`, `chartMargemUnidade`, `chartVendedores`, `chartFamilias`, `chartMarcas`)
-- Manter apenas: gráfico "Faturamento por Dia" (largura total)
-- Adicionar KPI "Notas Fiscais": contar valores distintos de `nota_fiscal` no `filteredAll`
-- Filtro de Unidade: voltar ao mapeamento via `controle_pj` (query separada) ou remover temporariamente. Como o usuário quer filtro de unidade mas a coluna não existe, usaremos `controle_pj` para mapear vendedor→unidade
-- Na query paginada da tabela, remover `.eq('local_estoque', ...)` e usar `.in('vendedor_nome', [...])` para filtrar por unidade
+Buscar dados da tabela `vendas` filtrados por periodo (`data_emissao`), e cruzar com `vendedores` + `unidades` para obter a unidade de cada venda. Parsear valores monetarios/percentuais no frontend (padrão ja existente no projeto).
 
-**2. Ranking (`src/pages/Ranking.tsx`)**
-- Adicionar nova aba "Top Famílias / Marcas / Vendedores" com os 3 gráficos BarChart (movidos do Gerencial)
-- Reutilizar a query de vendas já existente (`vendasRaw`) para gerar os dados dos gráficos
-- Importar recharts (BarChart, Bar, etc.)
+### Alteracoes em `src/pages/Gerencial.tsx`
 
-### Arquivos alterados
-- `src/pages/Gerencial.tsx`
-- `src/pages/Ranking.tsx`
+1. **Nova query: buscar `vendas`** filtradas pelo periodo atual (mes/ano do `data_emissao`), com limite adequado
+
+2. **Nova query: buscar `vendedores` com `unidades`** para mapear `nome_omie` -> `unidade_nome`
+
+3. **Processar dados client-side**:
+   - Parsear `total_com_desconto`, `lucros_reais`, `margem_percentual` de string BR para number
+   - Associar cada venda a sua unidade via mapa vendedor->unidade
+   - Agregar por unidade: total vendido, lucro, margem media, qtd vendas
+
+4. **Filtro por Unidade**: O select de unidades ja existe. Ao selecionar uma unidade, filtrar as vendas processadas e recalcular todos os KPIs e graficos.
+
+5. **Novos graficos usando dados de `vendas`**:
+   - **Faturamento por Unidade** (BarChart horizontal - ja existe, alimentar com dados de vendas)
+   - **Margem Media por Unidade** (novo BarChart horizontal, cor verde)
+   - **Top Familias de Produto** (BarChart mostrando as familias mais vendidas, reagindo ao filtro de unidade)
+
+6. **Cards PJ vs CLT**: Recalcular a partir do cruzamento vendas + vendedores (que tem campo `regime`), ao inves de depender exclusivamente da view `v_resumo_regime`
+
+7. **Layout**: Organizar graficos em grid 2 colunas no desktop
+
+### Detalhes tecnicos
+
+- Funcoes de parsing ja existem no projeto (regex para "R$ X,XX" e "XX,XX%")
+- A tabela `vendas` tem 468 linhas para Jan/2026, dentro do limite de 1000 do Supabase
+- Vendedores sem unidade (ex: "CHECK OUT", "COMPRA VENDEDOR") serao agrupados como "Sem Unidade" ou ignorados conforme filtro
+- Manter as queries existentes (`v_ranking`, `v_resumo_unidade`, `v_resumo_regime`) para dados de comissao que nao existem na tabela `vendas`
 

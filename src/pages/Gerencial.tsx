@@ -5,14 +5,12 @@ import { DataTable } from '@/components/DataTable';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { usePeriod } from '@/contexts/PeriodContext';
-import { X, Search, DollarSign, TrendingUp, Percent, ShoppingCart } from 'lucide-react';
+import { X, Search, DollarSign, TrendingUp, Percent, ShoppingCart, FileText } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { motion } from 'framer-motion';
 import {
-  ResponsiveContainer, AreaChart, Area, BarChart, Bar,
-  PieChart, Pie, Cell,
-  XAxis, YAxis, Tooltip, CartesianGrid, Legend,
+  ResponsiveContainer, AreaChart, Area,
+  XAxis, YAxis, Tooltip, CartesianGrid,
 } from 'recharts';
 
 const parseMoneyBR = (str: unknown): number => {
@@ -42,12 +40,6 @@ const fmtPct = (v: number) => `${v.toFixed(1)}%`;
 const normalize = (s: string) =>
   s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
 
-const PIE_COLORS = [
-  'hsl(38 90% 55%)', 'hsl(200 80% 50%)', 'hsl(142 71% 45%)', 'hsl(280 60% 55%)',
-  'hsl(350 75% 55%)', 'hsl(170 65% 45%)', 'hsl(45 85% 50%)', 'hsl(220 70% 55%)',
-  'hsl(310 60% 50%)', 'hsl(90 60% 45%)',
-];
-
 const TABLE_PAGE_SIZE = 30;
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -75,7 +67,6 @@ export default function Gerencial() {
   const [searchDebounced, setSearchDebounced] = useState('');
   const [tabelaPagina, setTabelaPagina] = useState(1);
 
-  // Reset filters and page when period changes
   useEffect(() => {
     setFiltroUnidade('all');
     setFiltroVendedor('all');
@@ -99,6 +90,40 @@ export default function Gerencial() {
   const endDay = new Date(periodoAno, periodoMes, 0).getDate();
   const endDate = `${periodoAno}-${String(periodoMes).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
 
+  // ===== controle_pj for vendedor→unidade mapping =====
+  const { data: controlePj } = useQuery({
+    queryKey: ['controle-pj-unidades'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('controle_pj')
+        .select('nome_vendas, unidade');
+      if (error) throw error;
+      return data ?? [];
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const vendedorUnidadeMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!controlePj) return map;
+    for (const row of controlePj) {
+      if (row.nome_vendas && row.unidade) {
+        map.set(normalize(row.nome_vendas), row.unidade);
+      }
+    }
+    return map;
+  }, [controlePj]);
+
+  const getUnidade = useCallback((vendedorNome: string): string => {
+    if (!vendedorNome) return 'Sem Unidade';
+    const norm = normalize(vendedorNome);
+    if (vendedorUnidadeMap.has(norm)) return vendedorUnidadeMap.get(norm)!;
+    for (const [key, uni] of vendedorUnidadeMap.entries()) {
+      if (norm.includes(key) || key.includes(norm)) return uni;
+    }
+    return 'Sem Unidade';
+  }, [vendedorUnidadeMap]);
+
   // ===== FULL PERIOD DATA (for KPIs & charts) =====
   const { data: allVendas, isLoading: loadAll } = useQuery({
     queryKey: ['gerencial-all-vendas', periodoAno, periodoMes],
@@ -109,7 +134,7 @@ export default function Gerencial() {
       while (true) {
         const { data, error } = await supabase
           .from('vendas')
-          .select('data_emissao, vendedor_nome, total_com_desconto, lucros_reais, margem_percentual, familia_produto, marca, local_estoque')
+          .select('data_emissao, vendedor_nome, total_com_desconto, lucros_reais, margem_percentual, familia_produto, marca, nota_fiscal')
           .gte('data_emissao', startDate)
           .lte('data_emissao', endDate)
           .range(from, from + step - 1);
@@ -124,17 +149,17 @@ export default function Gerencial() {
     staleTime: 2 * 60 * 1000,
   });
 
-  // Apply client-side filters to full dataset
+  // Apply client-side filters
   const filteredAll = useMemo(() => {
     if (!allVendas) return [];
     return allVendas.filter(row => {
-      if (filtroUnidade !== 'all' && (row.local_estoque ?? '') !== filtroUnidade) return false;
+      if (filtroUnidade !== 'all' && getUnidade(row.vendedor_nome) !== filtroUnidade) return false;
       if (filtroVendedor !== 'all' && row.vendedor_nome !== filtroVendedor) return false;
       if (filtroFamilia !== 'all' && row.familia_produto !== filtroFamilia) return false;
       if (filtroMarca !== 'all' && row.marca !== filtroMarca) return false;
       return true;
     });
-  }, [allVendas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca]);
+  }, [allVendas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, getUnidade]);
 
   // ===== KPIs =====
   const kpis = useMemo(() => {
@@ -152,6 +177,15 @@ export default function Gerencial() {
     return { totalFat, totalLucro, margemMedia, count };
   }, [filteredAll]);
 
+  // ===== KPI: Notas Fiscais (distinct nota_fiscal) =====
+  const totalNotas = useMemo(() => {
+    const set = new Set<string>();
+    for (const row of filteredAll) {
+      if (row.nota_fiscal) set.add(row.nota_fiscal);
+    }
+    return set.size;
+  }, [filteredAll]);
+
   // ===== Chart: Faturamento por Dia =====
   const chartDiario = useMemo(() => {
     const dayMap = new Map<string, number>();
@@ -167,82 +201,7 @@ export default function Gerencial() {
     });
   }, [filteredAll]);
 
-  // ===== Chart: Top 10 Vendedores =====
-  const chartVendedores = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const row of filteredAll) {
-      const vend = row.vendedor_nome ?? 'Desconhecido';
-      map.set(vend, (map.get(vend) ?? 0) + parseMoneyBR(row.total_com_desconto));
-    }
-    return [...map.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(([name, value]) => ({ name, value }));
-  }, [filteredAll]);
-
-  // ===== Chart: Top 10 Marcas =====
-  const chartMarcas = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const row of filteredAll) {
-      const marca = row.marca ?? 'Sem Marca';
-      map.set(marca, (map.get(marca) ?? 0) + parseMoneyBR(row.total_com_desconto));
-    }
-    return [...map.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(([name, value]) => ({ name, value }));
-  }, [filteredAll]);
-
-  // ===== Chart: Top 10 Famílias =====
-  const chartFamilias = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const row of filteredAll) {
-      const fam = row.familia_produto ?? 'Outros';
-      map.set(fam, (map.get(fam) ?? 0) + parseMoneyBR(row.total_com_desconto));
-    }
-    return [...map.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(([name, value]) => ({ name, value }));
-  }, [filteredAll]);
-
-  // ===== Chart: Faturamento por Unidade (Pie) =====
-  const chartFatUnidade = useMemo(() => {
-    if (!allVendas) return [];
-    const map = new Map<string, number>();
-    for (const row of allVendas) {
-      const uni = row.local_estoque ?? 'Sem Unidade';
-      map.set(uni, (map.get(uni) ?? 0) + parseMoneyBR(row.total_com_desconto));
-    }
-    const sorted = [...map.entries()].sort((a, b) => b[1] - a[1]);
-    if (sorted.length <= 8) return sorted.map(([name, value]) => ({ name, value }));
-    const top = sorted.slice(0, 7);
-    const others = sorted.slice(7).reduce((s, [, v]) => s + v, 0);
-    return [...top.map(([name, value]) => ({ name, value })), { name: 'Outras', value: others }];
-  }, [allVendas]);
-
-  // ===== Chart: Margem Média por Unidade (Donut) =====
-  const chartMargemUnidade = useMemo(() => {
-    if (!allVendas) return [];
-    const map = new Map<string, { somaMargemPond: number; somaFat: number }>();
-    for (const row of allVendas) {
-      const uni = row.local_estoque ?? 'Sem Unidade';
-      const fat = parseMoneyBR(row.total_com_desconto);
-      const margem = parsePctBR(row.margem_percentual);
-      const cur = map.get(uni) ?? { somaMargemPond: 0, somaFat: 0 };
-      cur.somaMargemPond += margem * fat;
-      cur.somaFat += fat;
-      map.set(uni, cur);
-    }
-    return [...map.entries()]
-      .map(([name, { somaMargemPond, somaFat }]) => ({
-        name,
-        value: somaFat > 0 ? Math.round((somaMargemPond / somaFat) * 10) / 10 : 0,
-      }))
-      .sort((a, b) => b.value - a.value);
-  }, [allVendas]);
-
-  // Fetch filter options from allVendas
+  // Filter options from allVendas
   const filterOptions = useMemo(() => {
     if (!allVendas) return { vendedores: [], unidades: [], familias: [], marcas: [] };
     const vendedores = new Set<string>();
@@ -253,7 +212,8 @@ export default function Gerencial() {
       if (row.vendedor_nome) vendedores.add(row.vendedor_nome);
       if (row.familia_produto && row.familia_produto !== 'Outros') familias.add(row.familia_produto);
       if (row.marca && row.marca !== 'Sem Marca') marcas.add(row.marca);
-      if (row.local_estoque) unidades.add(row.local_estoque);
+      const uni = getUnidade(row.vendedor_nome);
+      if (uni !== 'Sem Unidade') unidades.add(uni);
     }
     return {
       vendedores: [...vendedores].sort(),
@@ -261,7 +221,19 @@ export default function Gerencial() {
       marcas: [...marcas].sort(),
       unidades: [...unidades].sort(),
     };
-  }, [allVendas]);
+  }, [allVendas, getUnidade]);
+
+  // Get vendedores for a given unidade (for server-side filtering)
+  const getVendedoresByUnidade = useCallback((unidade: string): string[] => {
+    if (!allVendas) return [];
+    const set = new Set<string>();
+    for (const row of allVendas) {
+      if (row.vendedor_nome && getUnidade(row.vendedor_nome) === unidade) {
+        set.add(row.vendedor_nome);
+      }
+    }
+    return [...set];
+  }, [allVendas, getUnidade]);
 
   // Fetch paginated vendas for table
   const { data: vendasResult, isLoading: loadVendas } = useQuery({
@@ -270,14 +242,21 @@ export default function Gerencial() {
       const offset = (tabelaPagina - 1) * TABLE_PAGE_SIZE;
       let query = supabase
         .from('vendas')
-        .select('id, data_emissao, vendedor_nome, descricao_produto, familia_produto, marca, nota_fiscal, total_com_desconto, lucros_reais, margem_percentual, local_estoque', { count: 'exact' })
+        .select('id, data_emissao, vendedor_nome, descricao_produto, familia_produto, marca, nota_fiscal, total_com_desconto, lucros_reais, margem_percentual', { count: 'exact' })
         .gte('data_emissao', startDate)
         .lte('data_emissao', endDate)
         .order('data_emissao', { ascending: false })
         .order('id', { ascending: false })
         .range(offset, offset + TABLE_PAGE_SIZE - 1);
 
-      if (filtroUnidade !== 'all') query = query.eq('local_estoque', filtroUnidade);
+      if (filtroUnidade !== 'all') {
+        const vendedoresDaUnidade = getVendedoresByUnidade(filtroUnidade);
+        if (vendedoresDaUnidade.length > 0) {
+          query = query.in('vendedor_nome', vendedoresDaUnidade);
+        } else {
+          return { rows: [], totalCount: 0 };
+        }
+      }
       if (filtroVendedor !== 'all') query = query.eq('vendedor_nome', filtroVendedor);
       if (filtroFamilia !== 'all') query = query.eq('familia_produto', filtroFamilia);
       if (filtroMarca !== 'all') query = query.eq('marca', filtroMarca);
@@ -302,12 +281,12 @@ export default function Gerencial() {
   const mappedRows = useMemo(() => {
     return vendasRows.map(row => ({
       ...row,
-      unidade_nome: row.local_estoque ?? 'Sem Unidade',
+      unidade_nome: getUnidade(row.vendedor_nome),
       total_parsed: parseMoneyBR(row.total_com_desconto),
       lucro_parsed: parseMoneyBR(row.lucros_reais),
       margem_parsed: parsePctBR(row.margem_percentual),
     }));
-  }, [vendasRows]);
+  }, [vendasRows, getUnidade]);
 
   const handleFilterChange = (setter: (v: string) => void) => (v: string) => {
     setter(v);
@@ -336,6 +315,7 @@ export default function Gerencial() {
     { key: 'descricao_produto' as const, label: 'Produto' },
     { key: 'familia_produto' as const, label: 'Família' },
     { key: 'marca' as const, label: 'Marca' },
+    { key: 'nota_fiscal' as const, label: 'NF' },
     { key: 'total_parsed' as const, label: 'Valor', align: 'right' as const, render: (v: number) => fmt(v) },
     { key: 'lucro_parsed' as const, label: 'Lucro', align: 'right' as const, render: (v: number) => fmt(v) },
     { key: 'margem_parsed' as const, label: 'Margem', align: 'right' as const, render: (v: number) => fmtPct(v) },
@@ -370,146 +350,44 @@ export default function Gerencial() {
         )}
 
         {/* KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <KPICard icon={DollarSign} label="Faturamento" value={fmt(kpis.totalFat)} accentColor="hsl(38 90% 55%)" />
           <KPICard icon={TrendingUp} label="Lucro" value={fmt(kpis.totalLucro)} accentColor="hsl(142 71% 45%)" />
           <KPICard icon={Percent} label="Margem Média" value={fmtPct(kpis.margemMedia)} accentColor="hsl(200 80% 50%)" />
           <KPICard icon={ShoppingCart} label="Vendas" value={kpis.count.toLocaleString('pt-BR')} accentColor="hsl(280 60% 55%)" />
+          <KPICard icon={FileText} label="Notas Fiscais" value={totalNotas.toLocaleString('pt-BR')} accentColor="hsl(350 75% 55%)" />
         </div>
 
-        {/* Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Faturamento por Dia */}
-          <Card className="border-border">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-foreground">Faturamento por Dia</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[260px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartDiario}>
-                    <defs>
-                      <linearGradient id="gradFat" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(38 90% 55%)" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="hsl(38 90% 55%)" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="gradAcum" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(200 80% 50%)" stopOpacity={0.2} />
-                        <stop offset="95%" stopColor="hsl(200 80% 50%)" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 20% 20%)" />
-                    <XAxis dataKey="dia" tick={{ fontSize: 11, fill: 'hsl(215 15% 55%)' }} />
-                    <YAxis tickFormatter={v => fmtCompact(v)} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} width={65} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Area type="monotone" dataKey="faturamento" name="Diário" stroke="hsl(38 90% 55%)" fill="url(#gradFat)" strokeWidth={2} />
-                    <Area type="monotone" dataKey="acumulado" name="Acumulado" stroke="hsl(200 80% 50%)" fill="url(#gradAcum)" strokeWidth={2} strokeDasharray="4 2" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Top 10 Vendedores */}
-          <Card className="border-border">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-foreground">Top 10 Vendedores</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[260px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartVendedores} layout="vertical" margin={{ left: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 20% 20%)" />
-                    <XAxis type="number" tickFormatter={v => fmtCompact(v)} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
-                    <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="value" name="Faturamento" fill="hsl(38 90% 55%)" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Faturamento por Unidade - Pie */}
-          <Card className="border-border">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-foreground">Faturamento por Unidade</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[260px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={chartFatUnidade} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={95} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false} fontSize={10}>
-                      {chartFatUnidade.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                    </Pie>
-                    <Tooltip formatter={(v: number) => fmt(v)} />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Margem Média por Unidade - Donut */}
-          <Card className="border-border">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-foreground">Margem Média por Unidade</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[260px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={chartMargemUnidade} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={95} label={({ name, value }) => `${name} ${fmtPct(value)}`} labelLine={false} fontSize={10}>
-                      {chartMargemUnidade.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                    </Pie>
-                    <Tooltip formatter={(v: number) => fmtPct(v)} />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Top 10 Famílias */}
-          <Card className="border-border">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-foreground">Top 10 Famílias</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[260px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartFamilias} layout="vertical" margin={{ left: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 20% 20%)" />
-                    <XAxis type="number" tickFormatter={v => fmtCompact(v)} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
-                    <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="value" name="Faturamento" fill="hsl(200 80% 50%)" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Top 10 Marcas */}
-          <Card className="border-border">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-foreground">Top 10 Marcas</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[260px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartMarcas} layout="vertical" margin={{ left: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 20% 20%)" />
-                    <XAxis type="number" tickFormatter={v => fmtCompact(v)} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
-                    <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="value" name="Faturamento" fill="hsl(280 60% 55%)" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        {/* Chart: Faturamento por Dia (full width) */}
+        <Card className="border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-foreground">Faturamento por Dia</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartDiario}>
+                  <defs>
+                    <linearGradient id="gradFat" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(38 90% 55%)" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(38 90% 55%)" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="gradAcum" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(200 80% 50%)" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="hsl(200 80% 50%)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 20% 20%)" />
+                  <XAxis dataKey="dia" tick={{ fontSize: 11, fill: 'hsl(215 15% 55%)' }} />
+                  <YAxis tickFormatter={v => fmtCompact(v)} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} width={65} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Area type="monotone" dataKey="faturamento" name="Diário" stroke="hsl(38 90% 55%)" fill="url(#gradFat)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="acumulado" name="Acumulado" stroke="hsl(200 80% 50%)" fill="url(#gradAcum)" strokeWidth={2} strokeDasharray="4 2" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Sales Table */}
         <div>

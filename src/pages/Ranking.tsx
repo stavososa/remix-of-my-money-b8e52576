@@ -5,14 +5,21 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { usePeriod } from '@/contexts/PeriodContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { Trophy, DollarSign, Users, Receipt, Crown, Package, ShoppingCart } from 'lucide-react';
+import { Trophy, DollarSign, Users, Receipt, Crown, Package, ShoppingCart, BarChart3 } from 'lucide-react';
 import { DataTable } from '@/components/DataTable';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  ResponsiveContainer, BarChart, Bar,
+  XAxis, YAxis, Tooltip, CartesianGrid,
+} from 'recharts';
 
 const MESES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
 const formatBRL = (v: number | null) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v ?? 0);
+const fmtCompact = (v: number) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 }).format(v);
 
 const formatPct = (v: number | null) =>
   v != null ? `${v.toFixed(1)}%` : '—';
@@ -42,10 +49,24 @@ interface ProductRank {
   quantidade: number;
 }
 
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-card border border-border rounded-lg p-3 shadow-lg text-xs">
+      <p className="font-medium text-foreground mb-1">{label}</p>
+      {payload.map((p: any, i: number) => (
+        <p key={i} style={{ color: p.color }} className="flex justify-between gap-4">
+          <span>{p.name}:</span>
+          <span className="font-semibold">{formatBRL(p.value)}</span>
+        </p>
+      ))}
+    </div>
+  );
+};
+
 export default function Ranking() {
   const { periodoAno, periodoMes } = usePeriod();
 
-  // Ranking de vendedores (view existente)
   const { data: ranking = [], isLoading: loadRanking } = useQuery({
     queryKey: ['ranking', periodoAno, periodoMes],
     queryFn: async () => {
@@ -60,7 +81,6 @@ export default function Ranking() {
     },
   });
 
-  // Ranking de produtos (tabela vendas)
   const mesStr = String(periodoMes).padStart(2, '0');
   const inicioMes = `${periodoAno}-${mesStr}-01`;
   const fimMes = `${periodoAno}-${mesStr}-31`;
@@ -74,7 +94,7 @@ export default function Ranking() {
       while (true) {
         const { data } = await supabase
           .from('vendas')
-          .select('descricao_produto, familia_produto, marca, total_com_desconto, quantidade')
+          .select('descricao_produto, familia_produto, marca, total_com_desconto, quantidade, vendedor_nome')
           .gte('data_emissao', inicioMes)
           .lte('data_emissao', fimMes)
           .range(from, from + PAGE - 1);
@@ -110,6 +130,34 @@ export default function Ranking() {
       .map((item, i) => ({ ...item, posicao: i + 1 }));
   }, [vendasRaw]);
 
+  // Top 10 charts
+  const chartVendedores = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of vendasRaw) {
+      const vend = row.vendedor_nome ?? 'Desconhecido';
+      map.set(vend, (map.get(vend) ?? 0) + parseBRL(row.total_com_desconto));
+    }
+    return [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, value]) => ({ name, value }));
+  }, [vendasRaw]);
+
+  const chartFamilias = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of vendasRaw) {
+      const fam = row.familia_produto ?? 'Outros';
+      map.set(fam, (map.get(fam) ?? 0) + parseBRL(row.total_com_desconto));
+    }
+    return [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, value]) => ({ name, value }));
+  }, [vendasRaw]);
+
+  const chartMarcas = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of vendasRaw) {
+      const marca = row.marca ?? 'Sem Marca';
+      map.set(marca, (map.get(marca) ?? 0) + parseBRL(row.total_com_desconto));
+    }
+    return [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, value]) => ({ name, value }));
+  }, [vendasRaw]);
+
   const top1 = ranking[0] ?? null;
 
   const kpis = useMemo(() => {
@@ -127,68 +175,23 @@ export default function Ranking() {
   }, [productRanking]);
 
   const vendedorColumns = [
-    {
-      key: 'posicao' as const,
-      label: '#',
-      render: (v: number | null) => (
-        <span className={v != null && v <= 3 ? 'text-lg' : ''}>{medalha(v)}</span>
-      ),
-    },
+    { key: 'posicao' as const, label: '#', render: (v: number | null) => <span className={v != null && v <= 3 ? 'text-lg' : ''}>{medalha(v)}</span> },
     { key: 'vendedor_nome' as const, label: 'Vendedor' },
     { key: 'unidade_nome' as const, label: 'Unidade' },
-    {
-      key: 'regime' as const,
-      label: 'Regime',
-      render: (v: string | null) => v ? <StatusBadge status={v} /> : '—',
-    },
-    {
-      key: 'total_vendido' as const,
-      label: 'Total Vendido',
-      align: 'right' as const,
-      render: (v: number | null) => formatBRL(v),
-    },
-    {
-      key: 'total_comissao' as const,
-      label: 'Comissão',
-      align: 'right' as const,
-      render: (v: number | null) => formatBRL(v),
-    },
-    {
-      key: 'percentual_aplicado' as const,
-      label: '% Comissão',
-      align: 'right' as const,
-      render: (v: number | null) => formatPct(v),
-    },
-    {
-      key: 'qtd_notas' as const,
-      label: 'Notas',
-      align: 'right' as const,
-    },
+    { key: 'regime' as const, label: 'Regime', render: (v: string | null) => v ? <StatusBadge status={v} /> : '—' },
+    { key: 'total_vendido' as const, label: 'Total Vendido', align: 'right' as const, render: (v: number | null) => formatBRL(v) },
+    { key: 'total_comissao' as const, label: 'Comissão', align: 'right' as const, render: (v: number | null) => formatBRL(v) },
+    { key: 'percentual_aplicado' as const, label: '% Comissão', align: 'right' as const, render: (v: number | null) => formatPct(v) },
+    { key: 'qtd_notas' as const, label: 'Notas', align: 'right' as const },
   ];
 
   const produtoColumns = [
-    {
-      key: 'posicao' as const,
-      label: '#',
-      render: (v: number) => (
-        <span className={v <= 3 ? 'text-lg' : ''}>{medalha(v)}</span>
-      ),
-    },
+    { key: 'posicao' as const, label: '#', render: (v: number) => <span className={v <= 3 ? 'text-lg' : ''}>{medalha(v)}</span> },
     { key: 'descricao_produto' as const, label: 'Produto' },
     { key: 'familia_produto' as const, label: 'Família' },
     { key: 'marca' as const, label: 'Marca' },
-    {
-      key: 'total_vendido' as const,
-      label: 'Total Vendido',
-      align: 'right' as const,
-      render: (v: number) => formatBRL(v),
-    },
-    {
-      key: 'quantidade' as const,
-      label: 'Quantidade',
-      align: 'right' as const,
-      render: (v: number) => Math.round(v).toLocaleString('pt-BR'),
-    },
+    { key: 'total_vendido' as const, label: 'Total Vendido', align: 'right' as const, render: (v: number) => formatBRL(v) },
+    { key: 'quantidade' as const, label: 'Quantidade', align: 'right' as const, render: (v: number) => Math.round(v).toLocaleString('pt-BR') },
   ];
 
   return (
@@ -227,7 +230,11 @@ export default function Ranking() {
               </TabsTrigger>
               <TabsTrigger value="produtos" className="flex-1 sm:flex-none gap-2">
                 <Package className="h-4 w-4" />
-                Produtos Mais Vendidos
+                Produtos
+              </TabsTrigger>
+              <TabsTrigger value="tops" className="flex-1 sm:flex-none gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Top Rankings
               </TabsTrigger>
             </TabsList>
 
@@ -256,22 +263,10 @@ export default function Ranking() {
                     </div>
                     <p className="text-xs text-secondary-foreground mb-2">{r.unidade_nome}</p>
                     <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Vendido: </span>
-                        <span className="font-semibold text-foreground">{formatBRL(r.total_vendido)}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Comissão: </span>
-                        <span className="font-semibold text-foreground">{formatBRL(r.total_comissao)}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">%: </span>
-                        <span className="text-foreground">{formatPct(r.percentual_aplicado)}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Notas: </span>
-                        <span className="text-foreground">{r.qtd_notas ?? 0}</span>
-                      </div>
+                      <div><span className="text-muted-foreground">Vendido: </span><span className="font-semibold text-foreground">{formatBRL(r.total_vendido)}</span></div>
+                      <div><span className="text-muted-foreground">Comissão: </span><span className="font-semibold text-foreground">{formatBRL(r.total_comissao)}</span></div>
+                      <div><span className="text-muted-foreground">%: </span><span className="text-foreground">{formatPct(r.percentual_aplicado)}</span></div>
+                      <div><span className="text-muted-foreground">Notas: </span><span className="text-foreground">{r.qtd_notas ?? 0}</span></div>
                     </div>
                   </div>
                 ))}
@@ -299,17 +294,76 @@ export default function Ranking() {
                     </div>
                     <p className="text-xs text-secondary-foreground mb-2">{p.familia_produto} · {p.marca}</p>
                     <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Vendido: </span>
-                        <span className="font-semibold text-foreground">{formatBRL(p.total_vendido)}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Qtd: </span>
-                        <span className="text-foreground">{Math.round(p.quantidade).toLocaleString('pt-BR')}</span>
-                      </div>
+                      <div><span className="text-muted-foreground">Vendido: </span><span className="font-semibold text-foreground">{formatBRL(p.total_vendido)}</span></div>
+                      <div><span className="text-muted-foreground">Qtd: </span><span className="text-foreground">{Math.round(p.quantidade).toLocaleString('pt-BR')}</span></div>
                     </div>
                   </div>
                 ))}
+              </div>
+            </TabsContent>
+
+            {/* Tab Top Rankings */}
+            <TabsContent value="tops" className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Top 10 Vendedores */}
+                <Card className="border-border lg:col-span-2">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-semibold text-foreground">Top 10 Vendedores por Faturamento</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartVendedores} layout="vertical" margin={{ left: 10 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 20% 20%)" />
+                          <XAxis type="number" tickFormatter={v => fmtCompact(v)} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
+                          <YAxis dataKey="name" type="category" width={140} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
+                          <Tooltip content={<CustomTooltip />} />
+                          <Bar dataKey="value" name="Faturamento" fill="hsl(38 90% 55%)" radius={[0, 4, 4, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Top 10 Famílias */}
+                <Card className="border-border">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-semibold text-foreground">Top 10 Famílias</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartFamilias} layout="vertical" margin={{ left: 10 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 20% 20%)" />
+                          <XAxis type="number" tickFormatter={v => fmtCompact(v)} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
+                          <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
+                          <Tooltip content={<CustomTooltip />} />
+                          <Bar dataKey="value" name="Faturamento" fill="hsl(200 80% 50%)" radius={[0, 4, 4, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Top 10 Marcas */}
+                <Card className="border-border">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-semibold text-foreground">Top 10 Marcas</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartMarcas} layout="vertical" margin={{ left: 10 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 20% 20%)" />
+                          <XAxis type="number" tickFormatter={v => fmtCompact(v)} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
+                          <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
+                          <Tooltip content={<CustomTooltip />} />
+                          <Bar dataKey="value" name="Faturamento" fill="hsl(280 60% 55%)" radius={[0, 4, 4, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </TabsContent>
           </Tabs>
