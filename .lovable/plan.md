@@ -1,39 +1,15 @@
 
 
-## Gerencial com dados da tabela `vendas` + filtro por Unidade + graficos
+## Plano: Simplificar aba Vendedores — só ranking, sem gráficos
 
-A tabela `vendas` tem 468 registros (Jan/2026) com valores em formato string brasileiro (ex: "R$ 15,40", "49,30%"). O campo `vendedor_nome` liga aos vendedores/unidades via `vendedores.nome_omie`. Sera necessario fazer JOIN client-side ou via query para associar unidade a cada venda.
+A aba Vendedores atualmente tem a tabela de ranking **mais** 4 gráficos Top 10 (Vendedores, Produtos, Marcas, Famílias). O pedido é claro: deixar **somente o ranking de vendedores**, igual às abas Produtos/Marcas/Famílias.
 
-### Abordagem
+### Alterações em `src/pages/Ranking.tsx`
 
-Buscar dados da tabela `vendas` filtrados por periodo (`data_emissao`), e cruzar com `vendedores` + `unidades` para obter a unidade de cada venda. Parsear valores monetarios/percentuais no frontend (padrão ja existente no projeto).
+1. **Remover os 4 gráficos Top 10** da aba Vendedores (linhas 388-394)
+2. **Remover os useMemos** dos charts: `chartVendedores`, `chartProdutos`, `chartFamilias`, `chartMarcas` (linhas 214-233)
+3. **Remover a função `renderChart`** e o `CustomTooltip` (linhas 61-304) — já não são usados em lugar nenhum
+4. **Remover imports do recharts** (`ResponsiveContainer`, `BarChart`, `Bar`, `XAxis`, `YAxis`, `Tooltip`, `CartesianGrid`)
 
-### Alteracoes em `src/pages/Gerencial.tsx`
-
-1. **Nova query: buscar `vendas`** filtradas pelo periodo atual (mes/ano do `data_emissao`), com limite adequado
-
-2. **Nova query: buscar `vendedores` com `unidades`** para mapear `nome_omie` -> `unidade_nome`
-
-3. **Processar dados client-side**:
-   - Parsear `total_com_desconto`, `lucros_reais`, `margem_percentual` de string BR para number
-   - Associar cada venda a sua unidade via mapa vendedor->unidade
-   - Agregar por unidade: total vendido, lucro, margem media, qtd vendas
-
-4. **Filtro por Unidade**: O select de unidades ja existe. Ao selecionar uma unidade, filtrar as vendas processadas e recalcular todos os KPIs e graficos.
-
-5. **Novos graficos usando dados de `vendas`**:
-   - **Faturamento por Unidade** (BarChart horizontal - ja existe, alimentar com dados de vendas)
-   - **Margem Media por Unidade** (novo BarChart horizontal, cor verde)
-   - **Top Familias de Produto** (BarChart mostrando as familias mais vendidas, reagindo ao filtro de unidade)
-
-6. **Cards PJ vs CLT**: Recalcular a partir do cruzamento vendas + vendedores (que tem campo `regime`), ao inves de depender exclusivamente da view `v_resumo_regime`
-
-7. **Layout**: Organizar graficos em grid 2 colunas no desktop
-
-### Detalhes tecnicos
-
-- Funcoes de parsing ja existem no projeto (regex para "R$ X,XX" e "XX,XX%")
-- A tabela `vendas` tem 468 linhas para Jan/2026, dentro do limite de 1000 do Supabase
-- Vendedores sem unidade (ex: "CHECK OUT", "COMPRA VENDEDOR") serao agrupados como "Sem Unidade" ou ignorados conforme filtro
-- Manter as queries existentes (`v_ranking`, `v_resumo_unidade`, `v_resumo_regime`) para dados de comissao que nao existem na tabela `vendas`
+A aba Vendedores ficará com: KPIs + tabela ranking + cards mobile — mesma estrutura das outras abas.
 
