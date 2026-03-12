@@ -45,6 +45,7 @@ interface RankedItem {
   name: string;
   total_vendido: number;
   quantidade: number;
+  lucro: number;
 }
 
 interface ProductRank {
@@ -54,6 +55,7 @@ interface ProductRank {
   marca: string;
   total_vendido: number;
   quantidade: number;
+  lucro: number;
 }
 
 const CustomTooltip = ({ active, payload, label }: any) => {
