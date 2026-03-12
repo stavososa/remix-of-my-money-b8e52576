@@ -414,8 +414,9 @@ export default function Ranking() {
                       <span className="font-bold text-foreground text-sm">{p.descricao_produto}</span>
                     </div>
                     <p className="text-xs text-secondary-foreground mb-2">{p.familia_produto} · {p.marca}</p>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div><span className="text-muted-foreground">Vendido: </span><span className="font-semibold text-foreground">{formatBRL(p.total_vendido)}</span></div>
+                    <div className="grid grid-cols-3 gap-2 text-sm">
+                      <div><span className="text-muted-foreground">Faturamento: </span><span className="font-semibold text-foreground">{fmtCompact(p.total_vendido)}</span></div>
+                      <div><span className="text-muted-foreground">Lucro: </span><span className="font-semibold text-foreground">{fmtCompact(p.lucro)}</span></div>
                       <div><span className="text-muted-foreground">Qtd: </span><span className="text-foreground">{Math.round(p.quantidade).toLocaleString('pt-BR')}</span></div>
                     </div>
                   </div>
