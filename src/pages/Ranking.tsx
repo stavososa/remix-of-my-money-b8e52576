@@ -8,11 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Trophy, DollarSign, Users, Receipt, Crown, Package, ShoppingCart, Tag, Layers } from 'lucide-react';
 import { DataTable } from '@/components/DataTable';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  ResponsiveContainer, BarChart, Bar,
-  XAxis, YAxis, Tooltip, CartesianGrid,
-} from 'recharts';
+
 
 const MESES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
@@ -58,20 +54,6 @@ interface ProductRank {
   lucro: number;
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-card border border-border rounded-lg p-3 shadow-lg text-xs">
-      <p className="font-medium text-foreground mb-1">{label}</p>
-      {payload.map((p: any, i: number) => (
-        <p key={i} style={{ color: p.color }} className="flex justify-between gap-4">
-          <span>{p.name}:</span>
-          <span className="font-semibold">{formatBRL(p.value)}</span>
-        </p>
-      ))}
-    </div>
-  );
-};
 
 function RankingTable({ data, nameLabel }: { data: RankedItem[]; nameLabel: string }) {
   const columns = [
@@ -210,27 +192,6 @@ export default function Ranking() {
       .map((item, i) => ({ ...item, posicao: i + 1 }));
   }, [vendasRaw]);
 
-  // Top 10 charts for Vendedores tab
-  const chartVendedores = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const row of vendasRaw) {
-      const vend = row.vendedor_nome ?? 'Desconhecido';
-      map.set(vend, (map.get(vend) ?? 0) + parseBRL(row.total_com_desconto));
-    }
-    return [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, value]) => ({ name, value }));
-  }, [vendasRaw]);
-
-  const chartProdutos = useMemo(() => {
-    return productRanking.slice(0, 10).map(p => ({ name: p.descricao_produto, value: p.total_vendido }));
-  }, [productRanking]);
-
-  const chartFamilias = useMemo(() => {
-    return familiaRanking.slice(0, 10).map(f => ({ name: f.name, value: f.total_vendido }));
-  }, [familiaRanking]);
-
-  const chartMarcas = useMemo(() => {
-    return marcaRanking.slice(0, 10).map(m => ({ name: m.name, value: m.total_vendido }));
-  }, [marcaRanking]);
 
   const top1 = ranking[0] ?? null;
 
@@ -282,26 +243,6 @@ export default function Ranking() {
     { key: 'quantidade' as const, label: 'Quantidade', align: 'right' as const, render: (v: number) => Math.round(v).toLocaleString('pt-BR') },
   ];
 
-  const renderChart = (data: { name: string; value: number }[], title: string, color: string, fullWidth?: boolean) => (
-    <Card className={`border-border ${fullWidth ? 'lg:col-span-2' : ''}`}>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-semibold text-foreground">{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} layout="vertical" margin={{ left: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 20% 20%)" />
-              <XAxis type="number" tickFormatter={v => fmtCompact(v)} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
-              <YAxis dataKey="name" type="category" width={140} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
-              <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="value" name="Faturamento" fill={color} radius={[0, 4, 4, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </CardContent>
-    </Card>
-  );
 
   return (
     <AppShell title="Ranking">
@@ -385,13 +326,6 @@ export default function Ranking() {
                 ))}
               </div>
 
-              {/* Top 10 Charts */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {renderChart(chartVendedores, 'Top 10 Vendedores por Faturamento', 'hsl(38 90% 55%)', true)}
-                {renderChart(chartProdutos, 'Top 10 Produtos por Faturamento', 'hsl(150 60% 45%)')}
-                {renderChart(chartFamilias, 'Top 10 Famílias por Faturamento', 'hsl(200 80% 50%)')}
-                {renderChart(chartMarcas, 'Top 10 Marcas por Faturamento', 'hsl(280 60% 55%)')}
-              </div>
             </TabsContent>
 
             {/* Tab Produtos */}
