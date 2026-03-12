@@ -420,18 +420,18 @@ export default function Gerencial() {
             </CardContent>
           </Card>
 
-          {/* Faturamento por Unidade */}
+          {/* Top 10 Vendedores */}
           <Card className="border-border">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-foreground">Faturamento por Unidade</CardTitle>
+              <CardTitle className="text-sm font-semibold text-foreground">Top 10 Vendedores</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-[260px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartUnidade} layout="vertical" margin={{ left: 10 }}>
+                  <BarChart data={chartVendedores} layout="vertical" margin={{ left: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 20% 20%)" />
                     <XAxis type="number" tickFormatter={v => fmtCompact(v)} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
-                    <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 11, fill: 'hsl(215 15% 55%)' }} />
+                    <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
                     <Tooltip content={<CustomTooltip />} />
                     <Bar dataKey="value" name="Faturamento" fill="hsl(38 90% 55%)" radius={[0, 4, 4, 0]} />
                   </BarChart>
@@ -460,20 +460,20 @@ export default function Gerencial() {
             </CardContent>
           </Card>
 
-          {/* Margem por Unidade */}
+          {/* Top 10 Marcas */}
           <Card className="border-border">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-foreground">Margem Média por Unidade</CardTitle>
+              <CardTitle className="text-sm font-semibold text-foreground">Top 10 Marcas</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-[260px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartMargemUnidade} layout="vertical" margin={{ left: 10 }}>
+                  <BarChart data={chartMarcas} layout="vertical" margin={{ left: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 20% 20%)" />
-                    <XAxis type="number" tickFormatter={v => fmtPct(v)} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
-                    <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 11, fill: 'hsl(215 15% 55%)' }} />
+                    <XAxis type="number" tickFormatter={v => fmtCompact(v)} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
+                    <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 10, fill: 'hsl(215 15% 55%)' }} />
                     <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="margem" name="Margem" fill="hsl(142 71% 45%)" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="value" name="Faturamento" fill="hsl(280 60% 55%)" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
