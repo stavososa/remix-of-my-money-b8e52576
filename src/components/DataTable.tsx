@@ -13,9 +13,15 @@ interface DataTableProps<T> {
   data: T[];
   rowClassName?: (row: T) => string;
   pageSize?: number;
+  // Server-side pagination props
+  serverPagination?: {
+    totalCount: number;
+    currentPage: number;
+    onPageChange: (page: number) => void;
+  };
 }
 
-export function DataTable<T extends Record<string, any>>({ columns, data, rowClassName, pageSize }: DataTableProps<T>) {
+export function DataTable<T extends Record<string, any>>({ columns, data, rowClassName, pageSize, serverPagination }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<keyof T | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -29,7 +35,10 @@ export function DataTable<T extends Record<string, any>>({ columns, data, rowCla
     }
   };
 
-  const sorted = [...data].sort((a, b) => {
+  const isServerPaginated = !!serverPagination;
+
+  // For server pagination, don't sort client-side
+  const sorted = isServerPaginated ? data : [...data].sort((a, b) => {
     if (!sortKey) return 0;
     const va = a[sortKey], vb = b[sortKey];
     if (va == null) return 1;
@@ -38,17 +47,37 @@ export function DataTable<T extends Record<string, any>>({ columns, data, rowCla
     return sortDir === 'asc' ? cmp : -cmp;
   });
 
-  // Reset page when data changes
-  const totalPages = pageSize ? Math.max(1, Math.ceil(sorted.length / pageSize)) : 1;
-  const safePage = Math.min(currentPage, totalPages);
-  const displayData = pageSize
-    ? sorted.slice((safePage - 1) * pageSize, safePage * pageSize)
-    : sorted;
+  // Pagination logic
+  const effectivePageSize = serverPagination ? Math.ceil(serverPagination.totalCount / Math.max(1, Math.ceil(serverPagination.totalCount / (pageSize || 30)))) : pageSize;
+  
+  let totalPages: number;
+  let safePage: number;
+  let displayData: T[];
 
-  // Reset to page 1 when data length changes significantly
+  if (isServerPaginated) {
+    const ps = pageSize || 30;
+    totalPages = Math.max(1, Math.ceil(serverPagination.totalCount / ps));
+    safePage = Math.min(serverPagination.currentPage, totalPages);
+    displayData = sorted; // already paginated from server
+  } else {
+    totalPages = pageSize ? Math.max(1, Math.ceil(sorted.length / pageSize)) : 1;
+    safePage = Math.min(currentPage, totalPages);
+    displayData = pageSize
+      ? sorted.slice((safePage - 1) * pageSize, safePage * pageSize)
+      : sorted;
+  }
+
   const handlePageChange = (page: number) => {
-    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+    const newPage = Math.max(1, Math.min(page, totalPages));
+    if (isServerPaginated) {
+      serverPagination.onPageChange(newPage);
+    } else {
+      setCurrentPage(newPage);
+    }
   };
+
+  const totalItems = isServerPaginated ? serverPagination.totalCount : sorted.length;
+  const ps = pageSize || 30;
 
   return (
     <div>
@@ -59,12 +88,12 @@ export function DataTable<T extends Record<string, any>>({ columns, data, rowCla
               {columns.map((col) => (
                 <th
                   key={String(col.key)}
-                  onClick={() => handleSort(col.key)}
-                  className={`px-4 py-3 font-medium text-secondary-foreground cursor-pointer hover:text-foreground select-none ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}
+                  onClick={() => !isServerPaginated && handleSort(col.key)}
+                  className={`px-4 py-3 font-medium text-secondary-foreground ${!isServerPaginated ? 'cursor-pointer hover:text-foreground' : ''} select-none ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}
                 >
                   <span className="inline-flex items-center gap-1">
                     {col.label}
-                    <ArrowUpDown className="h-3 w-3" />
+                    {!isServerPaginated && <ArrowUpDown className="h-3 w-3" />}
                   </span>
                 </th>
               ))}
@@ -91,10 +120,10 @@ export function DataTable<T extends Record<string, any>>({ columns, data, rowCla
       </div>
 
       {/* Pagination controls */}
-      {pageSize && totalPages > 1 && (
+      {totalPages > 1 && (
         <div className="flex items-center justify-between px-2 py-3">
           <span className="text-xs text-muted-foreground">
-            {((safePage - 1) * pageSize) + 1}–{Math.min(safePage * pageSize, sorted.length)} de {sorted.length}
+            {((safePage - 1) * ps) + 1}–{Math.min(safePage * ps, totalItems)} de {totalItems}
           </span>
           <div className="flex items-center gap-1">
             <button

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState, useCallback } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { KPICard } from '@/components/KPICard';
 import { DataTable } from '@/components/DataTable';
@@ -17,66 +17,7 @@ const fmt = (v: number | null | undefined) =>
 const fmtPct = (v: number | null | undefined) =>
   v != null ? `${Number(v).toFixed(1)}%` : '—';
 
-function parseBRL(val: unknown): number {
-  if (val == null) return 0;
-  if (typeof val === 'number') return val;
-  const s = String(val);
-  const cleaned = s.replace(/R\$\s?/g, '').replace(/\./g, '').replace(',', '.').trim();
-  const n = parseFloat(cleaned);
-  return isNaN(n) ? 0 : n;
-}
-
-function parsePct(val: unknown): number {
-  if (val == null) return 0;
-  if (typeof val === 'number') return val;
-  const s = String(val);
-  const cleaned = s.replace('%', '').replace(',', '.').trim();
-  const n = parseFloat(cleaned);
-  return isNaN(n) ? 0 : n;
-}
-
-const PAGE_SIZE = 1000;
-
-async function fetchVendasByPeriod(ano: number, mes: number) {
-  const startDate = `${ano}-${String(mes).padStart(2, '0')}-01`;
-  const lastDay = new Date(ano, mes, 0).getDate();
-  const endDate = `${ano}-${String(mes).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-
-  const allRows: any[] = [];
-  let offset = 0;
-  while (true) {
-    const { data, error } = await supabase
-      .from('vendas')
-      .select('*')
-      .gte('data_emissao', startDate)
-      .lte('data_emissao', endDate)
-      .order('data_emissao', { ascending: true })
-      .range(offset, offset + PAGE_SIZE - 1);
-    if (error) throw error;
-    if (!data || data.length === 0) break;
-    allRows.push(...data);
-    if (data.length < PAGE_SIZE) break;
-    offset += PAGE_SIZE;
-  }
-  return allRows;
-}
-
-interface ProcessedVenda {
-  id: number;
-  data_emissao: string;
-  mesAno: string;
-  dia: number;
-  vendedor_nome: string;
-  unidade_nome: string;
-  familia_produto: string;
-  descricao_produto: string;
-  marca: string;
-  total_com_desconto: number;
-  lucros_reais: number;
-  margem_percentual: number;
-  quantidade: number;
-  nota_fiscal: string;
-}
+const TABLE_PAGE_SIZE = 30;
 
 export default function Gerencial() {
   const { periodoAno, periodoMes } = usePeriod();
@@ -85,196 +26,90 @@ export default function Gerencial() {
   const [filtroFamilia, setFiltroFamilia] = useState<string>('all');
   const [filtroMarca, setFiltroMarca] = useState<string>('all');
   const [buscaTabela, setBuscaTabela] = useState('');
+  const [tabelaPagina, setTabelaPagina] = useState(1);
 
-  // Fetch vendas filtered by period server-side
-  const { data: vendasRaw = [], isLoading: loadV } = useQuery({
-    queryKey: ['vendas-period', periodoAno, periodoMes],
-    queryFn: () => fetchVendasByPeriod(periodoAno, periodoMes),
-    staleTime: 5 * 60 * 1000,
-  });
+  // Debounced search state
+  const [searchDebounced, setSearchDebounced] = useState('');
+  const searchTimer = useCallback((val: string) => {
+    setBuscaTabela(val);
+    // Simple debounce via setTimeout
+    const id = setTimeout(() => {
+      setSearchDebounced(val);
+      setTabelaPagina(1);
+    }, 400);
+    return () => clearTimeout(id);
+  }, []);
 
-  // Fetch controle_pj for vendor->unit mapping
-  const { data: controlePj = [], isLoading: loadC } = useQuery({
-    queryKey: ['controle_pj'],
-    queryFn: async () => {
-      const { data } = await supabase.from('controle_pj').select('*');
-      return (data ?? []) as any[];
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const isLoading = loadV || loadC;
-
-  const unidadesConhecidas = useMemo(() => {
-    return [...new Set(controlePj.map(cp => cp.unidade).filter(Boolean))] as string[];
-  }, [controlePj]);
-
-  const vendedorUnidadeMap = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const cp of controlePj) {
-      const unidade = cp.unidade ?? 'Sem Unidade';
-      if ((cp as any).nome_vendas) map.set(((cp as any).nome_vendas as string).toUpperCase().trim(), unidade);
-      if (cp.nome) map.set(cp.nome.toUpperCase().trim(), unidade);
-    }
-    return map;
-  }, [controlePj]);
-
-  const resolveUnidade = (vendedorNome: string): string => {
-    const upper = vendedorNome.toUpperCase().trim();
-    if (vendedorUnidadeMap.has(upper)) return vendedorUnidadeMap.get(upper)!;
-    const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
-    const normalizedInput = normalize(vendedorNome);
-    for (const [key, val] of vendedorUnidadeMap.entries()) {
-      if (normalize(key) === normalizedInput) return val;
-    }
-    for (const [key, val] of vendedorUnidadeMap.entries()) {
-      const normKey = normalize(key);
-      if (normalizedInput.includes(normKey) || normKey.includes(normalizedInput)) return val;
-    }
-    for (const unidade of unidadesConhecidas) {
-      if (normalizedInput.includes(normalize(unidade))) return unidade;
-    }
-    return 'Sem Unidade';
+  const rpcFilters = {
+    p_ano: periodoAno,
+    p_mes: periodoMes,
+    p_unidade: filtroUnidade !== 'all' ? filtroUnidade : null,
+    p_vendedor: filtroVendedor !== 'all' ? filtroVendedor : null,
+    p_familia: filtroFamilia !== 'all' ? filtroFamilia : null,
+    p_marca: filtroMarca !== 'all' ? filtroMarca : null,
   };
 
-  // Process vendas (already filtered by period from server)
-  const vendasProcessadas: ProcessedVenda[] = useMemo(() => {
-    return vendasRaw.map((v: any) => {
-      const vendNome = v.vendedor_nome ?? '';
-      const unidade = resolveUnidade(vendNome);
-      const dataStr = v.data_emissao ?? '';
-      let dia = 0;
-      if (dataStr) {
-        const parts = dataStr.split('-');
-        if (parts.length >= 3) {
-          dia = parseInt(parts[2], 10);
-        }
-      }
-      return {
-        id: v.id,
-        data_emissao: dataStr,
-        mesAno: '',
-        dia,
-        vendedor_nome: vendNome,
-        unidade_nome: unidade,
-        familia_produto: v.familia_produto ?? 'Outros',
-        descricao_produto: v.descricao_produto ?? '',
-        marca: v.marca ?? 'Sem Marca',
-        total_com_desconto: parseBRL(v.total_com_desconto),
-        lucros_reais: parseBRL(v.lucros_reais),
-        margem_percentual: parsePct(v.margem_percentual),
-        quantidade: parseBRL(v.quantidade),
-        nota_fiscal: v.nota_fiscal ?? '',
-      };
-    });
-  }, [vendasRaw, vendedorUnidadeMap, unidadesConhecidas]);
+  // RPC: Summary (KPIs, charts, filter options)
+  const { data: resumo, isLoading: loadResumo } = useQuery({
+    queryKey: ['gerencial-resumo', rpcFilters],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('rpc_gerencial_resumo', rpcFilters as any);
+      if (error) throw error;
+      return data as any;
+    },
+    staleTime: 2 * 60 * 1000,
+  });
 
-  // No client-side period filter needed — server already filtered
+  // RPC: Paginated table
+  const { data: vendasData, isLoading: loadVendas } = useQuery({
+    queryKey: ['gerencial-vendas', rpcFilters, tabelaPagina, searchDebounced],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('rpc_gerencial_vendas', {
+        ...rpcFilters,
+        p_search: searchDebounced || null,
+        p_offset: (tabelaPagina - 1) * TABLE_PAGE_SIZE,
+        p_limit: TABLE_PAGE_SIZE,
+      } as any);
+      if (error) throw error;
+      return data as any;
+    },
+    staleTime: 2 * 60 * 1000,
+  });
 
-  // Filter options from period data
-  const filterOptions = useMemo(() => {
-    const vendedores = [...new Set(vendasProcessadas.map(v => v.vendedor_nome))].filter(Boolean).sort();
-    const unidades = [...new Set(vendasProcessadas.map(v => v.unidade_nome))].filter((n): n is string => n !== 'Sem Unidade').sort();
-    const familias = [...new Set(vendasProcessadas.map(v => v.familia_produto))].filter((f): f is string => f !== 'Outros').sort();
-    const marcas = [...new Set(vendasProcessadas.map(v => v.marca))].filter((m): m is string => m !== 'Sem Marca').sort();
-    return { vendedores, unidades, familias, marcas };
-  }, [vendasProcessadas]);
+  const isLoading = loadResumo;
 
-  // Apply filters
-  const vendasFiltradas = useMemo(() => {
-    return vendasProcessadas.filter(v => {
-      if (filtroUnidade !== 'all' && v.unidade_nome !== filtroUnidade) return false;
-      if (filtroVendedor !== 'all' && v.vendedor_nome !== filtroVendedor) return false;
-      if (filtroFamilia !== 'all' && v.familia_produto !== filtroFamilia) return false;
-      if (filtroMarca !== 'all' && v.marca !== filtroMarca) return false;
-      return true;
-    });
-  }, [vendasProcessadas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca]);
+  // Extract data from RPC responses
+  const kpis = resumo?.kpis ?? { faturamento: 0, lucro_total: 0, qtd_vendas: 0, qtd_vendedores: 0, margem_media: 0 };
+  const chartDiario = (resumo?.chart_diario ?? []).map((d: any) => {
+    const parts = d.data?.split('-');
+    const label = parts?.length >= 3 ? `${parts[2]}/${parts[1]}` : d.data;
+    return {
+      data: label,
+      faturamentoDia: Number(d.faturamento_dia),
+      lucroDia: Number(d.lucro_dia),
+      acumulado: Number(d.acumulado),
+    };
+  });
+  const chartFamilias = (resumo?.top_familias ?? []).map((f: any) => ({ name: f.name, total: Number(f.total) }));
+  const chartMarcas = (resumo?.top_marcas ?? []).map((m: any) => ({ name: m.name, total: Number(m.total) }));
+  const filtros = resumo?.filtros ?? { vendedores: [], unidades: [], familias: [], marcas: [] };
+  const totalPeriodo = resumo?.total_periodo ?? 0;
 
-  // Search filter for table
-  const vendasParaTabela = useMemo(() => {
-    if (!buscaTabela.trim()) return vendasFiltradas;
-    const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-    const termo = normalize(buscaTabela);
-    return vendasFiltradas.filter(v =>
-      normalize(v.vendedor_nome).includes(termo) ||
-      normalize(v.unidade_nome).includes(termo) ||
-      normalize(v.descricao_produto).includes(termo) ||
-      normalize(v.familia_produto).includes(termo) ||
-      normalize(v.marca).includes(termo) ||
-      normalize(v.nota_fiscal).includes(termo)
-    );
-  }, [vendasFiltradas, buscaTabela]);
+  const vendasRows = vendasData?.rows ?? [];
+  const vendasTotalCount = vendasData?.total_count ?? 0;
 
-  // KPIs
-  const kpis = useMemo(() => {
-    const faturamento = vendasFiltradas.reduce((s, v) => s + v.total_com_desconto, 0);
-    const lucroTotal = vendasFiltradas.reduce((s, v) => s + v.lucros_reais, 0);
-    const qtdVendas = vendasFiltradas.length;
-    const totalPeso = vendasFiltradas.reduce((s, v) => s + v.total_com_desconto, 0);
-    const totalMargemPonderada = vendasFiltradas.reduce((s, v) => s + v.margem_percentual * v.total_com_desconto, 0);
-    const margemMedia = totalPeso > 0 ? totalMargemPonderada / totalPeso : 0;
-    const vendedoresUnicos = new Set(vendasFiltradas.map(v => v.vendedor_nome)).size;
-    return { faturamento, lucroTotal, qtdVendas, margemMedia, vendedoresUnicos };
-  }, [vendasFiltradas]);
-
-  // Chart: daily + cumulative revenue
-  const chartProgresso = useMemo(() => {
-    const map = new Map<string, { fat: number; lucro: number }>();
-    for (const v of vendasFiltradas) {
-      if (!v.data_emissao) continue;
-      const existing = map.get(v.data_emissao) ?? { fat: 0, lucro: 0 };
-      existing.fat += v.total_com_desconto;
-      existing.lucro += v.lucros_reais;
-      map.set(v.data_emissao, existing);
-    }
-    const sorted = [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-    let acumulado = 0;
-    return sorted.map(([data, vals]) => {
-      acumulado += vals.fat;
-      const parts = data.split('-');
-      const label = parts.length >= 3 ? `${parts[2]}/${parts[1]}` : data;
-      return {
-        data: label,
-        faturamentoDia: vals.fat,
-        lucroDia: vals.lucro,
-        acumulado,
-      };
-    });
-  }, [vendasFiltradas]);
-
-  // Chart: Top Famílias
-  const chartFamilias = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const v of vendasFiltradas) {
-      if (!v.familia_produto || v.familia_produto === 'Outros') continue;
-      map.set(v.familia_produto, (map.get(v.familia_produto) ?? 0) + v.total_com_desconto);
-    }
-    return [...map.entries()]
-      .map(([name, total]) => ({ name, total }))
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 10);
-  }, [vendasFiltradas]);
-
-  // Chart: Top Marcas
-  const chartMarcas = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const v of vendasFiltradas) {
-      if (!v.marca || v.marca === 'Sem Marca') continue;
-      map.set(v.marca, (map.get(v.marca) ?? 0) + v.total_com_desconto);
-    }
-    return [...map.entries()]
-      .map(([name, total]) => ({ name, total }))
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 10);
-  }, [vendasFiltradas]);
+  // Reset page when filters change
+  const handleFilterChange = (setter: (v: string) => void) => (v: string) => {
+    setter(v);
+    setTabelaPagina(1);
+  };
 
   // Active filters for chips
   const activeFilters = [
-    ...(filtroUnidade !== 'all' ? [{ label: `Unidade: ${filtroUnidade}`, clear: () => setFiltroUnidade('all') }] : []),
-    ...(filtroVendedor !== 'all' ? [{ label: `Vendedor: ${filtroVendedor}`, clear: () => setFiltroVendedor('all') }] : []),
-    ...(filtroFamilia !== 'all' ? [{ label: `Família: ${filtroFamilia}`, clear: () => setFiltroFamilia('all') }] : []),
-    ...(filtroMarca !== 'all' ? [{ label: `Marca: ${filtroMarca}`, clear: () => setFiltroMarca('all') }] : []),
+    ...(filtroUnidade !== 'all' ? [{ label: `Unidade: ${filtroUnidade}`, clear: () => { setFiltroUnidade('all'); setTabelaPagina(1); } }] : []),
+    ...(filtroVendedor !== 'all' ? [{ label: `Vendedor: ${filtroVendedor}`, clear: () => { setFiltroVendedor('all'); setTabelaPagina(1); } }] : []),
+    ...(filtroFamilia !== 'all' ? [{ label: `Família: ${filtroFamilia}`, clear: () => { setFiltroFamilia('all'); setTabelaPagina(1); } }] : []),
+    ...(filtroMarca !== 'all' ? [{ label: `Marca: ${filtroMarca}`, clear: () => { setFiltroMarca('all'); setTabelaPagina(1); } }] : []),
   ];
 
   const clearAllFilters = () => {
@@ -282,6 +117,7 @@ export default function Gerencial() {
     setFiltroVendedor('all');
     setFiltroFamilia('all');
     setFiltroMarca('all');
+    setTabelaPagina(1);
   };
 
   // Detail table columns
@@ -313,18 +149,18 @@ export default function Gerencial() {
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <KPICard icon={DollarSign} label="Faturamento" value={fmt(kpis.faturamento)} />
-          <KPICard icon={TrendingUp} label="Lucro Total" value={fmt(kpis.lucroTotal)} />
-          <KPICard icon={Percent} label="Margem Média" value={fmtPct(kpis.margemMedia)} />
-          <KPICard icon={Users} label="Vendedores" value={String(kpis.vendedoresUnicos)} />
-          <KPICard icon={Package} label="Qtd Vendas" value={String(kpis.qtdVendas)} />
+          <KPICard icon={TrendingUp} label="Lucro Total" value={fmt(kpis.lucro_total)} />
+          <KPICard icon={Percent} label="Margem Média" value={fmtPct(kpis.margem_media)} />
+          <KPICard icon={Users} label="Vendedores" value={String(kpis.qtd_vendedores)} />
+          <KPICard icon={Package} label="Qtd Vendas" value={String(kpis.qtd_vendas)} />
         </div>
 
         {/* Filters inline */}
         <div className="flex flex-wrap items-center gap-3">
-          <FilterSelect label="Unidade" value={filtroUnidade} onChange={setFiltroUnidade} options={filterOptions.unidades.map(u => ({ value: u, label: u }))} allLabel="Todas as Unidades" />
-          <FilterSelect label="Vendedor" value={filtroVendedor} onChange={setFiltroVendedor} options={filterOptions.vendedores.map(v => ({ value: v, label: v }))} allLabel="Todos os Vendedores" />
-          <FilterSelect label="Família" value={filtroFamilia} onChange={setFiltroFamilia} options={filterOptions.familias.map(f => ({ value: f, label: f }))} allLabel="Todas as Famílias" />
-          <FilterSelect label="Marca" value={filtroMarca} onChange={setFiltroMarca} options={filterOptions.marcas.map(m => ({ value: m, label: m }))} allLabel="Todas as Marcas" />
+          <FilterSelect label="Unidade" value={filtroUnidade} onChange={handleFilterChange(setFiltroUnidade)} options={(filtros.unidades ?? []).map((u: string) => ({ value: u, label: u }))} allLabel="Todas as Unidades" />
+          <FilterSelect label="Vendedor" value={filtroVendedor} onChange={handleFilterChange(setFiltroVendedor)} options={(filtros.vendedores ?? []).map((v: string) => ({ value: v, label: v }))} allLabel="Todos os Vendedores" />
+          <FilterSelect label="Família" value={filtroFamilia} onChange={handleFilterChange(setFiltroFamilia)} options={(filtros.familias ?? []).map((f: string) => ({ value: f, label: f }))} allLabel="Todas as Famílias" />
+          <FilterSelect label="Marca" value={filtroMarca} onChange={handleFilterChange(setFiltroMarca)} options={(filtros.marcas ?? []).map((m: string) => ({ value: m, label: m }))} allLabel="Todas as Marcas" />
           {activeFilters.length > 0 && (
             <button onClick={clearAllFilters} className="text-xs text-muted-foreground hover:text-foreground transition-colors underline">
               Limpar filtros
@@ -345,14 +181,14 @@ export default function Gerencial() {
         )}
 
         {/* Area Chart - Progresso Diário + Acumulado */}
-        {chartProgresso.length > 0 && (
+        {chartDiario.length > 0 && (
           <div className="bg-card border border-border rounded-lg p-6 shadow-card">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-secondary-foreground">Progresso de Faturamento</h3>
-              <span className="text-xs text-muted-foreground">{vendasFiltradas.length} de {vendasProcessadas.length} vendas</span>
+              <span className="text-xs text-muted-foreground">{kpis.qtd_vendas} vendas filtradas de {totalPeriodo} no período</span>
             </div>
             <ResponsiveContainer width="100%" height={320}>
-              <AreaChart data={chartProgresso} margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
+              <AreaChart data={chartDiario} margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
                 <defs>
                   <linearGradient id="gradFat" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
@@ -394,7 +230,7 @@ export default function Gerencial() {
                   <YAxis type="category" dataKey="name" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} width={150} />
                   <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} labelStyle={{ color: 'hsl(var(--foreground))' }} formatter={(v: number) => [fmt(v), 'Total']} />
                   <Bar dataKey="total" radius={[0, 4, 4, 0]}>
-                    {chartFamilias.map((_, i) => <Cell key={i} fill="hsl(210 80% 55%)" />)}
+                    {chartFamilias.map((_: any, i: number) => <Cell key={i} fill="hsl(210 80% 55%)" />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -411,7 +247,7 @@ export default function Gerencial() {
                   <YAxis type="category" dataKey="name" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} width={150} />
                   <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} labelStyle={{ color: 'hsl(var(--foreground))' }} formatter={(v: number) => [fmt(v), 'Total']} />
                   <Bar dataKey="total" radius={[0, 4, 4, 0]}>
-                    {chartMarcas.map((_, i) => <Cell key={i} fill="hsl(280 70% 55%)" />)}
+                    {chartMarcas.map((_: any, i: number) => <Cell key={i} fill="hsl(280 70% 55%)" />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -422,18 +258,30 @@ export default function Gerencial() {
         {/* Detailed Sales Table */}
         <div>
           <div className="flex items-center justify-between mb-3 gap-3">
-            <h3 className="text-sm font-semibold text-secondary-foreground whitespace-nowrap">Vendas Detalhadas ({vendasParaTabela.length} registros)</h3>
+            <h3 className="text-sm font-semibold text-secondary-foreground whitespace-nowrap">
+              Vendas Detalhadas ({vendasTotalCount} registros)
+              {loadVendas && <span className="ml-2 text-xs text-muted-foreground">(carregando...)</span>}
+            </h3>
             <div className="relative max-w-xs w-full">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <Input
                 placeholder="Buscar vendedor, produto, marca..."
                 value={buscaTabela}
-                onChange={e => setBuscaTabela(e.target.value)}
+                onChange={e => searchTimer(e.target.value)}
                 className="pl-8 h-8 text-xs"
               />
             </div>
           </div>
-          <DataTable columns={detailColumns} data={vendasParaTabela} pageSize={30} />
+          <DataTable
+            columns={detailColumns}
+            data={vendasRows}
+            pageSize={TABLE_PAGE_SIZE}
+            serverPagination={{
+              totalCount: vendasTotalCount,
+              currentPage: tabelaPagina,
+              onPageChange: setTabelaPagina,
+            }}
+          />
         </div>
       </div>
     </AppShell>
