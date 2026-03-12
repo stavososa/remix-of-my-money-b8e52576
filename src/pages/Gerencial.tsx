@@ -64,12 +64,12 @@ export default function Gerencial() {
   const { data: vendasData, isLoading: loadVendas } = useQuery({
     queryKey: ['gerencial-vendas', rpcFilters, tabelaPagina, searchDebounced],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('rpc_gerencial_vendas', {
+      const { data, error } = await (supabase.rpc as any)('rpc_gerencial_vendas', {
         ...rpcFilters,
         p_search: searchDebounced || null,
         p_offset: (tabelaPagina - 1) * TABLE_PAGE_SIZE,
         p_limit: TABLE_PAGE_SIZE,
-      } as any);
+      });
       if (error) throw error;
       return data as any;
     },
