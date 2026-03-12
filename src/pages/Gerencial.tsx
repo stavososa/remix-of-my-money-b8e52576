@@ -302,12 +302,12 @@ export default function Gerencial() {
   const mappedRows = useMemo(() => {
     return vendasRows.map(row => ({
       ...row,
-      unidade_nome: getUnidade(row.vendedor_nome ?? ''),
+      unidade_nome: row.local_estoque ?? 'Sem Unidade',
       total_parsed: parseMoneyBR(row.total_com_desconto),
       lucro_parsed: parseMoneyBR(row.lucros_reais),
       margem_parsed: parsePctBR(row.margem_percentual),
     }));
-  }, [vendasRows, getUnidade]);
+  }, [vendasRows]);
 
   const handleFilterChange = (setter: (v: string) => void) => (v: string) => {
     setter(v);
