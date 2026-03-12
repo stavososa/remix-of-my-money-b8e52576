@@ -1,67 +1,39 @@
 
 
-## Plano: Mover processamento para Supabase RPC
+## Gerencial com dados da tabela `vendas` + filtro por Unidade + graficos
 
-### Problema
-Hoje o Gerencial baixa **20.000+ registros** da tabela `vendas` para o navegador e faz todo o processamento (parsing de valores BR, mapeamento vendedor→unidade, agregação de KPIs, gráficos, filtragem) no cliente. Isso é lento e pesado.
+A tabela `vendas` tem 468 registros (Jan/2026) com valores em formato string brasileiro (ex: "R$ 15,40", "49,30%"). O campo `vendedor_nome` liga aos vendedores/unidades via `vendedores.nome_omie`. Sera necessario fazer JOIN client-side ou via query para associar unidade a cada venda.
 
-### Solução
-Criar **2 funções RPC no Supabase** que fazem toda a agregação no servidor e retornam apenas o necessário. O frontend passará os filtros como parâmetros.
+### Abordagem
 
----
+Buscar dados da tabela `vendas` filtrados por periodo (`data_emissao`), e cruzar com `vendedores` + `unidades` para obter a unidade de cada venda. Parsear valores monetarios/percentuais no frontend (padrão ja existente no projeto).
 
-### 1. Função auxiliar PostgreSQL: `parse_brl`
-Converte strings como `"R$ 15.432,40"` e `"49,30%"` para numeric diretamente no banco:
-```sql
-CREATE FUNCTION parse_brl(val text) RETURNS numeric AS $$
-  SELECT COALESCE(
-    NULLIF(regexp_replace(regexp_replace(val, '[R$\s%]', '', 'g'), '\.(?=\d{3})', '', 'g'), '')::numeric,
-    0
-  );
-$$ LANGUAGE sql IMMUTABLE;
-```
-(Troca pontos de milhar, vírgula decimal → ponto, remove R$, %, espaços)
+### Alteracoes em `src/pages/Gerencial.tsx`
 
-### 2. Função RPC: `rpc_gerencial_resumo`
-**Parâmetros**: `p_ano`, `p_mes`, `p_vendedor` (opcional), `p_familia` (opcional), `p_marca` (opcional), `p_unidade` (opcional)
+1. **Nova query: buscar `vendas`** filtradas pelo periodo atual (mes/ano do `data_emissao`), com limite adequado
 
-**Retorna JSON** com:
-- **KPIs**: faturamento, lucro, margem média ponderada, qtd vendas, qtd vendedores únicos
-- **Dados diários**: array `[{data, faturamento_dia, lucro_dia, acumulado}]` para o AreaChart
-- **Top 10 famílias**: `[{name, total}]`
-- **Top 10 marcas**: `[{name, total}]`
-- **Listas de filtros disponíveis**: vendedores, unidades, famílias, marcas únicos do período
+2. **Nova query: buscar `vendedores` com `unidades`** para mapear `nome_omie` -> `unidade_nome`
 
-A função faz JOIN com `controle_pj` para resolver vendedor→unidade internamente.
+3. **Processar dados client-side**:
+   - Parsear `total_com_desconto`, `lucros_reais`, `margem_percentual` de string BR para number
+   - Associar cada venda a sua unidade via mapa vendedor->unidade
+   - Agregar por unidade: total vendido, lucro, margem media, qtd vendas
 
-### 3. Função RPC: `rpc_gerencial_vendas`
-**Parâmetros**: mesmos filtros + `p_offset`, `p_limit` (30), `p_search` (texto de busca)
+4. **Filtro por Unidade**: O select de unidades ja existe. Ao selecionar uma unidade, filtrar as vendas processadas e recalcular todos os KPIs e graficos.
 
-**Retorna**: as linhas paginadas (30 por vez) + `total_count` para controle de paginação. A busca textual usa `ILIKE` no servidor.
+5. **Novos graficos usando dados de `vendas`**:
+   - **Faturamento por Unidade** (BarChart horizontal - ja existe, alimentar com dados de vendas)
+   - **Margem Media por Unidade** (novo BarChart horizontal, cor verde)
+   - **Top Familias de Produto** (BarChart mostrando as familias mais vendidas, reagindo ao filtro de unidade)
 
-### 4. Refatorar `src/pages/Gerencial.tsx`
-- Remover `fetchVendasByPeriod` (download de 20k+ linhas)
-- Remover todo processamento client-side (`vendasProcessadas`, `vendasFiltradas`, `kpis`, `chartProgresso`, `chartFamilias`, `chartMarcas`)
-- Substituir por 2 queries:
-  - `supabase.rpc('rpc_gerencial_resumo', {filtros...})` → alimenta KPIs + gráficos + listas de filtro
-  - `supabase.rpc('rpc_gerencial_vendas', {filtros..., offset, limit, search})` → alimenta tabela paginada
-- Filtros passam como parâmetros da RPC (server-side)
-- Paginação e busca da tabela são server-side
+6. **Cards PJ vs CLT**: Recalcular a partir do cruzamento vendas + vendedores (que tem campo `regime`), ao inves de depender exclusivamente da view `v_resumo_regime`
 
-### 5. Atualizar `src/components/DataTable.tsx`
-- Adicionar modo **server-side pagination**: props `totalCount`, `currentPage`, `onPageChange` como alternativa à paginação client-side atual
+7. **Layout**: Organizar graficos em grid 2 colunas no desktop
 
-### Resultado esperado
+### Detalhes tecnicos
 
-| Métrica | Antes | Depois |
-|---------|-------|--------|
-| Dados transferidos | 20.000+ linhas (~2MB) | 30 linhas + 2KB JSON |
-| Requests | 20+ paginadas | 2 RPCs |
-| Tempo de carregamento | ~10s | < 1s |
-| Mudança de filtro | Reprocessa 20k no JS | Nova RPC ~100ms |
-
-### Arquivos alterados
-- **Nova migration SQL**: `parse_brl`, `rpc_gerencial_resumo`, `rpc_gerencial_vendas`
-- **`src/pages/Gerencial.tsx`**: refatoração completa do data-fetching
-- **`src/components/DataTable.tsx`**: suporte a paginação server-side
+- Funcoes de parsing ja existem no projeto (regex para "R$ X,XX" e "XX,XX%")
+- A tabela `vendas` tem 468 linhas para Jan/2026, dentro do limite de 1000 do Supabase
+- Vendedores sem unidade (ex: "CHECK OUT", "COMPRA VENDEDOR") serao agrupados como "Sem Unidade" ou ignorados conforme filtro
+- Manter as queries existentes (`v_ranking`, `v_resumo_unidade`, `v_resumo_regime`) para dados de comissao que nao existem na tabela `vendas`
 
