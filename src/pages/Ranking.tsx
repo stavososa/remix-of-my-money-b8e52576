@@ -339,12 +339,12 @@ export default function Ranking() {
               </div>
 
               <div className="hidden md:block">
-                <DataTable columns={vendedorColumns} data={ranking} rowClassName={(row: any) => row.posicao != null && row.posicao <= 3 ? 'bg-primary/5' : ''} />
+                <DataTable columns={vendedorColumns} data={rankingData} rowClassName={(row: any) => row.posicao != null && row.posicao <= 3 ? 'bg-primary/5' : ''} />
               </div>
 
               <div className="md:hidden space-y-3">
-                {ranking.map((r) => (
-                  <div key={r.vendedor_id} className={`bg-card border border-border rounded-lg p-4 shadow-card ${r.posicao != null && r.posicao <= 3 ? 'border-primary/40' : ''}`}>
+                {rankingData.map((r) => (
+                  <div key={`${r.vendedor_id ?? r.vendedor_nome ?? 'vendedor'}-${r.posicao ?? 0}`} className={`bg-card border border-border rounded-lg p-4 shadow-card ${r.posicao != null && r.posicao <= 3 ? 'border-primary/40' : ''}`}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <span className="text-lg">{medalha(r.posicao)}</span>
