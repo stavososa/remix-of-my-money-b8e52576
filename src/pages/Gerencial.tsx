@@ -223,6 +223,19 @@ export default function Gerencial() {
       .map(([name, value]) => ({ name, value }));
   }, [filteredAll]);
 
+  // ===== Chart: Top 10 Famílias =====
+  const chartFamilias = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of filteredAll) {
+      const fam = row.familia_produto ?? 'Outros';
+      map.set(fam, (map.get(fam) ?? 0) + parseMoneyBR(row.total_com_desconto));
+    }
+    return [...map.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([name, value]) => ({ name, value }));
+  }, [filteredAll]);
+
   // Fetch filter options
   const { data: filterOptions } = useQuery({
     queryKey: ['gerencial-filters', periodoAno, periodoMes],
