@@ -89,10 +89,11 @@ function RankingTable({ data, nameLabel }: { data: RankedItem[]; nameLabel: stri
 }
 
 export default function Ranking() {
-  const { periodoAno, periodoMes } = usePeriod();
+  const { periodoAno, periodoMes, loading: loadingPeriodo } = usePeriod();
 
   const { data: ranking = [], isLoading: loadRanking } = useQuery({
     queryKey: ['ranking', periodoAno, periodoMes],
+    enabled: !loadingPeriodo,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('v_ranking')
@@ -111,6 +112,7 @@ export default function Ranking() {
 
   const { data: vendasRaw = [], isLoading: loadProd } = useQuery({
     queryKey: ['vendas-ranking-prod', periodoAno, periodoMes],
+    enabled: !loadingPeriodo,
     queryFn: async () => {
       let allData: any[] = [];
       let from = 0;
@@ -131,7 +133,7 @@ export default function Ranking() {
     },
   });
 
-  const isLoading = loadRanking || loadProd;
+  const isLoading = loadingPeriodo || loadRanking || loadProd;
 
   // Agrupar produtos
   const productRanking: ProductRank[] = useMemo(() => {
@@ -192,16 +194,51 @@ export default function Ranking() {
       .map((item, i) => ({ ...item, posicao: i + 1 }));
   }, [vendasRaw]);
 
+  const rankingData = useMemo(() => {
+    if (ranking.length > 0) return ranking;
 
-  const top1 = ranking[0] ?? null;
+    const map = new Map<string, { total: number; lucro: number; notas: number }>();
+    for (const v of vendasRaw) {
+      const vendedor = String(v.vendedor_nome ?? 'Sem vendedor').trim() || 'Sem vendedor';
+      const existing = map.get(vendedor);
+      const total = parseBRL(v.total_com_desconto);
+      const lucro = parseBRL(v.lucros_reais);
+
+      if (existing) {
+        existing.total += total;
+        existing.lucro += lucro;
+        existing.notas += 1;
+      } else {
+        map.set(vendedor, { total, lucro, notas: 1 });
+      }
+    }
+
+    return [...map.entries()]
+      .map(([vendedor_nome, d]) => ({
+        posicao: 0,
+        vendedor_id: null,
+        vendedor_nome,
+        unidade_nome: '—',
+        regime: null,
+        total_vendido: d.total,
+        lucro_total: d.lucro,
+        total_comissao: 0,
+        percentual_aplicado: null,
+        qtd_notas: d.notas,
+      }))
+      .sort((a, b) => (b.total_vendido ?? 0) - (a.total_vendido ?? 0))
+      .map((item, i) => ({ ...item, posicao: i + 1 }));
+  }, [ranking, vendasRaw]);
+
+  const top1 = rankingData[0] ?? null;
 
   const kpis = useMemo(() => {
-    const totalVendido = ranking.reduce((s, r) => s + (r.total_vendido ?? 0), 0);
-    const totalComissao = ranking.reduce((s, r) => s + (r.total_comissao ?? 0), 0);
-    const totalNotas = ranking.reduce((s, r) => s + (r.qtd_notas ?? 0), 0);
+    const totalVendido = rankingData.reduce((s, r) => s + (r.total_vendido ?? 0), 0);
+    const totalComissao = rankingData.reduce((s, r) => s + (r.total_comissao ?? 0), 0);
+    const totalNotas = rankingData.reduce((s, r) => s + (r.qtd_notas ?? 0), 0);
     const ticketMedio = totalNotas > 0 ? totalVendido / totalNotas : 0;
-    return { totalVendido, totalComissao, vendedores: ranking.length, ticketMedio };
-  }, [ranking]);
+    return { totalVendido, totalComissao, vendedores: rankingData.length, ticketMedio };
+  }, [rankingData]);
 
   const prodKpis = useMemo(() => {
     const totalVendido = productRanking.reduce((s, p) => s + p.total_vendido, 0);
@@ -302,12 +339,12 @@ export default function Ranking() {
               </div>
 
               <div className="hidden md:block">
-                <DataTable columns={vendedorColumns} data={ranking} rowClassName={(row: any) => row.posicao != null && row.posicao <= 3 ? 'bg-primary/5' : ''} />
+                <DataTable columns={vendedorColumns} data={rankingData} rowClassName={(row: any) => row.posicao != null && row.posicao <= 3 ? 'bg-primary/5' : ''} />
               </div>
 
               <div className="md:hidden space-y-3">
-                {ranking.map((r) => (
-                  <div key={r.vendedor_id} className={`bg-card border border-border rounded-lg p-4 shadow-card ${r.posicao != null && r.posicao <= 3 ? 'border-primary/40' : ''}`}>
+                {rankingData.map((r) => (
+                  <div key={`${r.vendedor_id ?? r.vendedor_nome ?? 'vendedor'}-${r.posicao ?? 0}`} className={`bg-card border border-border rounded-lg p-4 shadow-card ${r.posicao != null && r.posicao <= 3 ? 'border-primary/40' : ''}`}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <span className="text-lg">{medalha(r.posicao)}</span>
