@@ -406,12 +406,19 @@ export default function Gerencial() {
 
         {/* Detailed Sales Table */}
         <div>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-secondary-foreground">Vendas Detalhadas ({vendasFiltradas.length} registros)</h3>
+          <div className="flex items-center justify-between mb-3 gap-3">
+            <h3 className="text-sm font-semibold text-secondary-foreground whitespace-nowrap">Vendas Detalhadas ({vendasParaTabela.length} registros)</h3>
+            <div className="relative max-w-xs w-full">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Buscar vendedor, produto, marca..."
+                value={buscaTabela}
+                onChange={e => setBuscaTabela(e.target.value)}
+                className="pl-8 h-8 text-xs"
+              />
+            </div>
           </div>
-          <div className="max-h-[500px] overflow-y-auto rounded-lg border border-border">
-            <DataTable columns={detailColumns} data={vendasFiltradas} />
-          </div>
+          <DataTable columns={detailColumns} data={vendasParaTabela} pageSize={30} />
         </div>
       </div>
     </AppShell>
