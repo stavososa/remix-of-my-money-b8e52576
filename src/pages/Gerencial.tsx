@@ -614,6 +614,7 @@ export default function Gerencial() {
             columns={detailColumns}
             data={mappedRows}
             pageSize={TABLE_PAGE_SIZE}
+            maxHeight="500px"
             serverPagination={{
               totalCount: vendasTotalCount,
               currentPage: tabelaPagina,
