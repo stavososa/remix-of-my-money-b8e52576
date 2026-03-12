@@ -376,9 +376,9 @@ export default function Ranking() {
                     </div>
                     <p className="text-xs text-secondary-foreground mb-2">{r.unidade_nome}</p>
                     <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div><span className="text-muted-foreground">Vendido: </span><span className="font-semibold text-foreground">{formatBRL(r.total_vendido)}</span></div>
-                      <div><span className="text-muted-foreground">Comissão: </span><span className="font-semibold text-foreground">{formatBRL(r.total_comissao)}</span></div>
-                      <div><span className="text-muted-foreground">%: </span><span className="text-foreground">{formatPct(r.percentual_aplicado)}</span></div>
+                      <div><span className="text-muted-foreground">Faturamento: </span><span className="font-semibold text-foreground">{fmtCompact(r.total_vendido ?? 0)}</span></div>
+                      <div><span className="text-muted-foreground">Lucro: </span><span className="font-semibold text-foreground">{fmtCompact(r.lucro_total ?? 0)}</span></div>
+                      <div><span className="text-muted-foreground">Comissão: </span><span className="font-semibold text-foreground">{fmtCompact(r.total_comissao ?? 0)}</span></div>
                       <div><span className="text-muted-foreground">Notas: </span><span className="text-foreground">{r.qtd_notas ?? 0}</span></div>
                     </div>
                   </div>
