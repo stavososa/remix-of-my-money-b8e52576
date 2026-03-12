@@ -197,25 +197,12 @@ export default function Gerencial() {
     });
   }, [filteredAll]);
 
-  // ===== Chart: Faturamento por Unidade =====
-  const chartUnidade = useMemo(() => {
+  // ===== Chart: Top 10 Vendedores =====
+  const chartVendedores = useMemo(() => {
     const map = new Map<string, number>();
     for (const row of filteredAll) {
-      const vendKey = (row.vendedor_nome ?? '').toUpperCase().trim();
-      const unidade = vendedorUnidadeMap.get(vendKey) ?? 'Sem Unidade';
-      map.set(unidade, (map.get(unidade) ?? 0) + parseMoneyBR(row.total_com_desconto));
-    }
-    return [...map.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .map(([name, value]) => ({ name, value }));
-  }, [filteredAll, vendedorUnidadeMap]);
-
-  // ===== Chart: Top 10 Famílias =====
-  const chartFamilias = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const row of filteredAll) {
-      const fam = row.familia_produto ?? 'Outros';
-      map.set(fam, (map.get(fam) ?? 0) + parseMoneyBR(row.total_com_desconto));
+      const vend = row.vendedor_nome ?? 'Desconhecido';
+      map.set(vend, (map.get(vend) ?? 0) + parseMoneyBR(row.total_com_desconto));
     }
     return [...map.entries()]
       .sort((a, b) => b[1] - a[1])
@@ -223,26 +210,18 @@ export default function Gerencial() {
       .map(([name, value]) => ({ name, value }));
   }, [filteredAll]);
 
-  // ===== Chart: Margem por Unidade =====
-  const chartMargemUnidade = useMemo(() => {
-    const map = new Map<string, { somaMargemPond: number; somaFat: number }>();
+  // ===== Chart: Top 10 Marcas =====
+  const chartMarcas = useMemo(() => {
+    const map = new Map<string, number>();
     for (const row of filteredAll) {
-      const vendKey = (row.vendedor_nome ?? '').toUpperCase().trim();
-      const unidade = vendedorUnidadeMap.get(vendKey) ?? 'Sem Unidade';
-      const fat = parseMoneyBR(row.total_com_desconto);
-      const margem = parsePctBR(row.margem_percentual);
-      const cur = map.get(unidade) ?? { somaMargemPond: 0, somaFat: 0 };
-      cur.somaMargemPond += margem * fat;
-      cur.somaFat += fat;
-      map.set(unidade, cur);
+      const marca = row.marca ?? 'Sem Marca';
+      map.set(marca, (map.get(marca) ?? 0) + parseMoneyBR(row.total_com_desconto));
     }
     return [...map.entries()]
-      .map(([name, { somaMargemPond, somaFat }]) => ({
-        name,
-        margem: somaFat > 0 ? somaMargemPond / somaFat : 0,
-      }))
-      .sort((a, b) => b.margem - a.margem);
-  }, [filteredAll, vendedorUnidadeMap]);
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([name, value]) => ({ name, value }));
+  }, [filteredAll]);
 
   // Fetch filter options
   const { data: filterOptions } = useQuery({
