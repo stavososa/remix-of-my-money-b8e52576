@@ -1,39 +1,37 @@
 
 
-## Gerencial com dados da tabela `vendas` + filtro por Unidade + graficos
+## Plano: Substituir gráficos "por Unidade" + corrigir filtros
 
-A tabela `vendas` tem 468 registros (Jan/2026) com valores em formato string brasileiro (ex: "R$ 15,40", "49,30%"). O campo `vendedor_nome` liga aos vendedores/unidades via `vendedores.nome_omie`. Sera necessario fazer JOIN client-side ou via query para associar unidade a cada venda.
+### 1. Remover gráficos "por Unidade" e substituir por gráficos úteis
 
-### Abordagem
+**Remover:**
+- "Faturamento por Unidade" (BarChart, linhas 431-449)
+- "Margem Média por Unidade" (BarChart, linhas 471-489)
+- Seus respectivos `useMemo` (`chartUnidade`, `chartMargemUnidade`)
 
-Buscar dados da tabela `vendas` filtrados por periodo (`data_emissao`), e cruzar com `vendedores` + `unidades` para obter a unidade de cada venda. Parsear valores monetarios/percentuais no frontend (padrão ja existente no projeto).
+**Adicionar no lugar:**
+- **Top 10 Vendedores** (BarChart horizontal): ranking dos vendedores que mais faturaram no período, usando `vendedor_nome` agrupado
+- **Top 10 Marcas** (BarChart horizontal): ranking das marcas com maior faturamento, usando campo `marca`
 
-### Alteracoes em `src/pages/Gerencial.tsx`
+Esses gráficos são mais informativos e acionáveis que "por unidade" (que já está nos KPIs e filtros).
 
-1. **Nova query: buscar `vendas`** filtradas pelo periodo atual (mes/ano do `data_emissao`), com limite adequado
+### 2. Corrigir filtro de mês/período
 
-2. **Nova query: buscar `vendedores` com `unidades`** para mapear `nome_omie` -> `unidade_nome`
+O `PeriodFilter` no header já funciona e atualiza o `PeriodContext`. No entanto, quando o período muda, as queries do Gerencial usam `startDate`/`endDate` derivados de `periodoAno`/`periodoMes` — isso já está correto. O problema é que **ao mudar o período, a página da tabela não reseta para 1** e os filtros ativos podem não ter dados no novo período.
 
-3. **Processar dados client-side**:
-   - Parsear `total_com_desconto`, `lucros_reais`, `margem_percentual` de string BR para number
-   - Associar cada venda a sua unidade via mapa vendedor->unidade
-   - Agregar por unidade: total vendido, lucro, margem media, qtd vendas
+**Correção:**
+- Adicionar `useEffect` que reseta `tabelaPagina` para 1 e limpa todos os filtros quando `periodoAno` ou `periodoMes` mudam
+- Garantir que a query de `filterOptions` dependa corretamente do período (já depende, mas os filtros selecionados podem ficar "órfãos")
 
-4. **Filtro por Unidade**: O select de unidades ja existe. Ao selecionar uma unidade, filtrar as vendas processadas e recalcular todos os KPIs e graficos.
+### 3. Corrigir multifiltros
 
-5. **Novos graficos usando dados de `vendas`**:
-   - **Faturamento por Unidade** (BarChart horizontal - ja existe, alimentar com dados de vendas)
-   - **Margem Media por Unidade** (novo BarChart horizontal, cor verde)
-   - **Top Familias de Produto** (BarChart mostrando as familias mais vendidas, reagindo ao filtro de unidade)
+O filtro de **Unidade** na tabela paginada tem um bug: ele usa `controlePj?.filter(...)` para buscar nomes, mas o filtro `vendedoresUnidade` (já calculado) não é utilizado diretamente na query. Além disso, quando a unidade é selecionada mas não tem vendedores mapeados, a query não filtra nada.
 
-6. **Cards PJ vs CLT**: Recalcular a partir do cruzamento vendas + vendedores (que tem campo `regime`), ao inves de depender exclusivamente da view `v_resumo_regime`
+**Correção:**
+- Usar `vendedoresUnidade` diretamente na query da tabela (já calculado no `useMemo`)
+- Quando `vendedoresUnidade` é um array vazio (unidade sem vendedores), forçar resultado vazio
+- Garantir que todos os filtros combinam corretamente (AND entre eles)
 
-7. **Layout**: Organizar graficos em grid 2 colunas no desktop
-
-### Detalhes tecnicos
-
-- Funcoes de parsing ja existem no projeto (regex para "R$ X,XX" e "XX,XX%")
-- A tabela `vendas` tem 468 linhas para Jan/2026, dentro do limite de 1000 do Supabase
-- Vendedores sem unidade (ex: "CHECK OUT", "COMPRA VENDEDOR") serao agrupados como "Sem Unidade" ou ignorados conforme filtro
-- Manter as queries existentes (`v_ranking`, `v_resumo_unidade`, `v_resumo_regime`) para dados de comissao que nao existem na tabela `vendas`
+### Arquivos alterados
+- `src/pages/Gerencial.tsx` — substituir 2 gráficos, corrigir reset de período, corrigir filtro de unidade na tabela
 
