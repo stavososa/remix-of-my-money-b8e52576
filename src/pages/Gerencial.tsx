@@ -112,27 +112,35 @@ export default function Gerencial() {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Normalized map: normalized_name -> unidade
   const vendedorUnidadeMap = useMemo(() => {
     const map = new Map<string, string>();
     if (!controlePj) return map;
     for (const cp of controlePj) {
-      const key = (cp.nome_vendas ?? cp.nome).toUpperCase().trim();
+      const key = normalize(cp.nome_vendas ?? cp.nome);
       if (cp.unidade) map.set(key, cp.unidade);
     }
     return map;
   }, [controlePj]);
 
+  // Get unidade for a vendor name
+  const getUnidade = useCallback((vendedorNome: string) => {
+    return vendedorUnidadeMap.get(normalize(vendedorNome)) ?? 'Sem Unidade';
+  }, [vendedorUnidadeMap]);
+
+  // Real vendor names from allVendas that belong to selected unit
   const vendedoresUnidade = useMemo(() => {
     if (filtroUnidade === 'all') return null;
-    const names: string[] = [];
-    if (!controlePj) return names;
-    for (const cp of controlePj) {
-      if (cp.unidade === filtroUnidade) {
-        names.push((cp.nome_vendas ?? cp.nome).toUpperCase().trim());
+    if (!allVendas) return [];
+    const realNames = new Set<string>();
+    for (const row of allVendas) {
+      const vn = row.vendedor_nome ?? '';
+      if (getUnidade(vn) === filtroUnidade) {
+        realNames.add(vn);
       }
     }
-    return names;
-  }, [filtroUnidade, controlePj]);
+    return [...realNames];
+  }, [filtroUnidade, allVendas, getUnidade]);
 
   // ===== FULL PERIOD DATA (for KPIs & charts) =====
   const { data: allVendas, isLoading: loadAll } = useQuery({
