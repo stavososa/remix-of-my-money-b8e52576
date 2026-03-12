@@ -136,7 +136,7 @@ export default function Ranking() {
       while (true) {
         const { data } = await supabase
           .from('vendas')
-          .select('descricao_produto, familia_produto, marca, total_com_desconto, quantidade, vendedor_nome')
+          .select('descricao_produto, familia_produto, marca, total_com_desconto, quantidade, vendedor_nome, lucros_reais')
           .gte('data_emissao', inicioMes)
           .lte('data_emissao', fimMes)
           .range(from, from + PAGE - 1);
