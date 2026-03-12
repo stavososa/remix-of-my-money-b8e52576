@@ -54,20 +54,6 @@ interface ProductRank {
   lucro: number;
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-card border border-border rounded-lg p-3 shadow-lg text-xs">
-      <p className="font-medium text-foreground mb-1">{label}</p>
-      {payload.map((p: any, i: number) => (
-        <p key={i} style={{ color: p.color }} className="flex justify-between gap-4">
-          <span>{p.name}:</span>
-          <span className="font-semibold">{formatBRL(p.value)}</span>
-        </p>
-      ))}
-    </div>
-  );
-};
 
 function RankingTable({ data, nameLabel }: { data: RankedItem[]; nameLabel: string }) {
   const columns = [
