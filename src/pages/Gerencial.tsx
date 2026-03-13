@@ -341,6 +341,8 @@ export default function Gerencial() {
     setTabelaPagina(1);
   };
 
+  const [selectedVenda, setSelectedVenda] = useState<any>(null);
+
   const detailColumns = [
     { key: 'data_emissao' as const, label: 'Data', render: (v: string) => v ? v.split('-').reverse().join('/') : '—' },
     { key: 'vendedor_nome' as const, label: 'Vendedor' },
@@ -352,6 +354,12 @@ export default function Gerencial() {
     { key: 'total_parsed' as const, label: 'Valor', align: 'right' as const, render: (v: number) => fmt(v) },
     { key: 'lucro_parsed' as const, label: 'Lucro', align: 'right' as const, render: (v: number) => fmt(v) },
     { key: 'margem_parsed' as const, label: 'Margem', align: 'right' as const, render: (v: number) => fmtPct(v) },
+  ];
+
+  const detailColumnsMobile = [
+    { key: 'data_emissao' as const, label: 'Data', render: (v: string) => v ? v.split('-').reverse().join('/') : '—' },
+    { key: 'vendedor_nome' as const, label: 'Vendedor' },
+    { key: 'descricao_produto' as const, label: 'Produto' },
   ];
   const filtros = filterOptions;
 
