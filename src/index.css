@@ -37,7 +37,7 @@
     --input: 215 40% 24%;
     --ring: 38 90% 55%;
 
-    --radius: 0.75rem;
+    --radius: 0.25rem;
 
     --sidebar-background: 216 50% 5%;
     --sidebar-foreground: 210 20% 60%;
@@ -63,7 +63,7 @@
   body {
     @apply text-foreground;
     font-family: var(--font-body);
-    background: linear-gradient(135deg, #0A1628 0%, #0D1F3C 100%);
+    background: #0B192C;
     min-height: 100vh;
   }
 

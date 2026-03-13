@@ -352,6 +352,10 @@ export default function Gerencial() {
   return (
     <AppShell title="Gerencial">
       <div className="space-y-6">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-foreground">Painel Gerencial</h1>
+          <p className="text-sm text-muted-foreground mt-1">Filtre resultados específicos por loja, vendedor e identifique tendências reais.</p>
+        </div>
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 overflow-x-auto">
           <FilterSelect label="Filial" value={filtroUnidade} onChange={handleFilterChange(setFiltroUnidade)} options={filtros.unidades.map(u => ({ value: u, label: u }))} allLabel="Todas as Filiais" />

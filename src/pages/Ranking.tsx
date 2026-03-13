@@ -310,6 +310,10 @@ export default function Ranking() {
         <div className="flex items-center justify-center min-h-[50vh] text-muted-foreground">Carregando...</div>
       ) : (
         <div className="space-y-6">
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-foreground">Ranking de Vendas</h1>
+            <p className="text-sm text-muted-foreground mt-1">Acompanhe a performance de vendedores, marcas e produtos no mês selecionado.</p>
+          </div>
           {/* Banner Top Performer */}
           {top1 && (
             <div className="relative overflow-hidden rounded-xl border-2 border-primary bg-gradient-to-br from-primary/10 via-card to-card p-6 shadow-card"

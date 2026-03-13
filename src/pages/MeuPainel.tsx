@@ -463,11 +463,14 @@ export default function MeuPainel() {
               <div className="space-y-1">
                 <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground">
                   {isAdmin ? (
-                    <>Painel Administrativo <span className="inline-block">📊</span></>
+                    <>Painel Administrativo <span className="inline-block" role="img" aria-label="admin">📊</span></>
                   ) : (
-                    <>Olá, {primeiroNome}! <span className="inline-block">💪</span></>
+                    <>Olá, {primeiroNome}! <span className="inline-block" role="img" aria-label="welcome">👋</span></>
                   )}
                 </h2>
+                <p className="text-sm text-secondary-foreground mt-1 mb-2">
+                  {isAdmin ? 'Visualize o desempenho geral da empresa no mês selecionado' : 'Acompanhe suas vendas consolidadas e comissões no mês'}
+                </p>
                 {!isAdmin && (
                   <p className="text-sm text-secondary-foreground">{unidade_nome} • {regime}</p>
                 )}
@@ -587,13 +590,12 @@ export default function MeuPainel() {
             </div>
           )}
 
-          {/* Comparativo Ticket Médio */}
-          <div className="bg-card border border-border rounded-xl p-4 sm:p-6 lg:p-8 shadow-card">
+          <div className="bg-card border border-border rounded-xl p-4 sm:p-6 lg:p-8 shadow-card" title={isAdmin ? "Mostra o ticket médio global comparado à mediana de todas as notas" : "Como seu ticket médio individual se compara à média de toda a empresa"}>
             <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">
               {isAdmin ? 'Ticket Médio vs Mediana' : 'Você vs Média da Empresa'}
             </p>
-            <p className="text-[10px] text-muted-foreground mb-4">
-              {isAdmin ? 'Comparativo do ticket médio geral contra a mediana' : 'Comparativo contra a média geral de vendas'}
+            <p className="text-xs text-muted-foreground mb-4">
+              {isAdmin ? 'Identifique se o ticket médio está inflado por poucas notas altas (se for muito maior que a Mediana)' : 'Comparativo contra a média geral de vendas para identificar espaço para maior conversão'}
             </p>
             <div className="space-y-5">
               <div>
