@@ -764,7 +764,7 @@ export default function MeuPainel() {
         </motion.div>
 
         {/* GRÁFICO VENDAS POR DIA */}
-        <motion.div variants={item} className="bg-card border border-border rounded-xl p-8 shadow-card">
+        <motion.div variants={item} className="bg-card border border-border rounded-xl p-4 sm:p-6 lg:p-8 shadow-card">
           <div className="flex items-center gap-2 mb-6">
             <BarChart3 className="h-4 w-4 text-primary" />
             <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Vendas por Dia</p>
