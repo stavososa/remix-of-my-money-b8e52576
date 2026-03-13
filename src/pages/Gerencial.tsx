@@ -105,7 +105,7 @@ export default function Gerencial() {
   const endDate = dataFim;
 
   // ===== controle_pj (vendedor_nome → unidade) for filial mapping =====
-  const { data: controlePjFilial } = useQuery({
+  const { data: controlePjFilial, isLoading: loadPj } = useQuery({
     queryKey: ['controle-pj-filial'],
     queryFn: async () => {
       const { data, error } = await supabase
