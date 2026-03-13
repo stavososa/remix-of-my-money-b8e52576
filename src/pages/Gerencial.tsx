@@ -211,10 +211,12 @@ export default function Gerencial() {
   const totalNotas = useMemo(() => {
     const set = new Set<string>();
     for (const row of filteredAll) {
-      if (row.nota_fiscal) set.add(row.nota_fiscal);
+      if (row.nota_fiscal) set.add(`${row.nota_fiscal}_${row.cnpj_empresa ?? ''}`);
     }
     return set.size;
   }, [filteredAll]);
+
+  const isBusy = loadAll || fetchingAll;
 
   // ===== Chart: Faturamento por Dia =====
   const chartDiario = useMemo(() => {
