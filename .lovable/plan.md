@@ -1,39 +1,63 @@
 
 
-## Gerencial com dados da tabela `vendas` + filtro por Unidade + graficos
+## Plano: Garantir Responsividade em Todos os Painéis
 
-A tabela `vendas` tem 468 registros (Jan/2026) com valores em formato string brasileiro (ex: "R$ 15,40", "49,30%"). O campo `vendedor_nome` liga aos vendedores/unidades via `vendedores.nome_omie`. Sera necessario fazer JOIN client-side ou via query para associar unidade a cada venda.
+### Problemas Identificados
 
-### Abordagem
+1. **Gerencial.tsx**
+   - Filtros `<select>` com `min-w-[140px]` podem estourar em telas pequenas
+   - KPIs `grid-cols-2 lg:grid-cols-5` — ok, mas valores monetários longos podem quebrar
+   - Gráfico com altura fixa `h-[300px]` — reduzir no mobile
+   - Tabela de vendas: header com `flex items-center justify-between` pode empilhar mal no mobile
+   - `FilterSelect` não tem versão mobile amigável
 
-Buscar dados da tabela `vendas` filtrados por periodo (`data_emissao`), e cruzar com `vendedores` + `unidades` para obter a unidade de cada venda. Parsear valores monetarios/percentuais no frontend (padrão ja existente no projeto).
+2. **MeuPainel.tsx**
+   - Cards de comparativo/gauge com `p-8` — padding excessivo no mobile
+   - Gráficos com altura fixa `height={300}` — pode ser muito em telas pequenas
+   - Tabelas manuais (`<Table>`) sem scroll horizontal explícito em containers pequenos
+   - Ranking PJ table sem mobile cards view (usa `<Table>` direto)
 
-### Alteracoes em `src/pages/Gerencial.tsx`
+3. **Ranking.tsx**
+   - Já tem mobile cards (`md:hidden`) — está bom
+   - Banner top performer com `p-6` e texto `text-2xl` — ok
 
-1. **Nova query: buscar `vendas`** filtradas pelo periodo atual (mes/ano do `data_emissao`), com limite adequado
+4. **DataTable.tsx**
+   - Já tem `overflow-x-auto` — ok
+   - Sem mobile card view alternativa (usado no Gerencial)
 
-2. **Nova query: buscar `vendedores` com `unidades`** para mapear `nome_omie` -> `unidade_nome`
+5. **KPICard.tsx**
+   - Valor `text-2xl` pode ser longo demais em `grid-cols-2` no mobile
+   - Ícone `h-12 w-12` ocupa espaço — pode reduzir no mobile
 
-3. **Processar dados client-side**:
-   - Parsear `total_com_desconto`, `lucros_reais`, `margem_percentual` de string BR para number
-   - Associar cada venda a sua unidade via mapa vendedor->unidade
-   - Agregar por unidade: total vendido, lucro, margem media, qtd vendas
+6. **AppShell.tsx**
+   - PeriodFilter no topbar pode empurrar conteúdo — verificar
 
-4. **Filtro por Unidade**: O select de unidades ja existe. Ao selecionar uma unidade, filtrar as vendas processadas e recalcular todos os KPIs e graficos.
+### Alterações
 
-5. **Novos graficos usando dados de `vendas`**:
-   - **Faturamento por Unidade** (BarChart horizontal - ja existe, alimentar com dados de vendas)
-   - **Margem Media por Unidade** (novo BarChart horizontal, cor verde)
-   - **Top Familias de Produto** (BarChart mostrando as familias mais vendidas, reagindo ao filtro de unidade)
+**1. `src/components/KPICard.tsx`**
+- Reduzir tamanho do valor para `text-xl sm:text-2xl`
+- Reduzir ícone para `h-10 w-10 sm:h-12 sm:w-12`
+- Reduzir padding para `p-4 sm:p-5`
 
-6. **Cards PJ vs CLT**: Recalcular a partir do cruzamento vendas + vendedores (que tem campo `regime`), ao inves de depender exclusivamente da view `v_resumo_regime`
+**2. `src/pages/Gerencial.tsx`**
+- Filtros: adicionar `overflow-x-auto` no container de filtros e reduzir `min-w` no mobile
+- Gráfico: `h-[220px] sm:h-[300px]`
+- Header da tabela: empilhar verticalmente no mobile (`flex-col sm:flex-row`)
+- KPIs: manter `grid-cols-2` mas adicionar `gap-3` no mobile
 
-7. **Layout**: Organizar graficos em grid 2 colunas no desktop
+**3. `src/pages/MeuPainel.tsx`**
+- Reduzir padding de cards de `p-8` para `p-4 sm:p-6 lg:p-8`
+- Gráficos: altura responsiva `height` via container `h-[220px] sm:h-[300px]`
+- Ranking PJ: adicionar mobile cards view (como no Ranking.tsx) usando `md:hidden`/`hidden md:block`
+- Produtos table: já tem `overflow-auto` — ok
 
-### Detalhes tecnicos
+**4. `src/components/DataTable.tsx`**
+- Pagination controls: empilhar no mobile (`flex-col sm:flex-row`)
+- Textos menores no mobile nos headers
 
-- Funcoes de parsing ja existem no projeto (regex para "R$ X,XX" e "XX,XX%")
-- A tabela `vendas` tem 468 linhas para Jan/2026, dentro do limite de 1000 do Supabase
-- Vendedores sem unidade (ex: "CHECK OUT", "COMPRA VENDEDOR") serao agrupados como "Sem Unidade" ou ignorados conforme filtro
-- Manter as queries existentes (`v_ranking`, `v_resumo_unidade`, `v_resumo_regime`) para dados de comissao que nao existem na tabela `vendas`
+**5. `src/components/AppShell.tsx`**
+- PeriodFilter: esconder label no mobile, manter apenas o seletor compacto
+
+### Escopo
+Ajustes de CSS/Tailwind em 5 arquivos. Sem mudança de lógica ou dados.
 
