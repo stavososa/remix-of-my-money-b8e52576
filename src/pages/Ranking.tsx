@@ -114,23 +114,40 @@ export default function Ranking() {
     queryKey: ['vendas-ranking-prod', periodoAno, periodoMes],
     enabled: !loadingPeriodo,
     queryFn: async () => {
-      const PAGE = 1000;
-      let from = 0;
       type VRow = { descricao_produto: string | null; familia_produto: string | null; marca: string | null; total_com_desconto: unknown; quantidade: unknown; vendedor_nome: string | null; lucros_reais: unknown };
-      let result: VRow[] = [];
-      while (true) {
-        const { data } = await supabase
-          .from('vendas')
-          .select('descricao_produto, familia_produto, marca, total_com_desconto, quantidade, vendedor_nome, lucros_reais')
-          .gte('data_emissao', inicioMes)
-          .lte('data_emissao', fimMes)
-          .range(from, from + PAGE - 1);
-        if (!data || data.length === 0) break;
-        result = result.concat(data as VRow[]);
-        if (data.length < PAGE) break;
-        from += PAGE;
+      
+      const { count, error: countErr } = await supabase
+        .from('vendas')
+        .select('*', { count: 'exact', head: true })
+        .gte('data_emissao', inicioMes)
+        .lte('data_emissao', fimMes);
+        
+      if (countErr) throw countErr;
+      if (!count || count === 0) return [];
+
+      const PAGE = 1000;
+      const totalPages = Math.ceil(count / PAGE);
+      const promises = [];
+
+      for (let i = 0; i < totalPages; i++) {
+        const from = i * PAGE;
+        promises.push(
+          supabase
+            .from('vendas')
+            .select('descricao_produto, familia_produto, marca, total_com_desconto, quantidade, vendedor_nome, lucros_reais')
+            .gte('data_emissao', inicioMes)
+            .lte('data_emissao', fimMes)
+            .range(from, from + PAGE - 1)
+        );
       }
-      return result;
+
+      const results = await Promise.all(promises);
+      let allData: VRow[] = [];
+      for (const res of results) {
+        if (res.error) throw res.error;
+        if (res.data) allData = allData.concat(res.data as VRow[]);
+      }
+      return allData;
     },
   });
 

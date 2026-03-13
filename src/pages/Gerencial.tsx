@@ -144,21 +144,36 @@ export default function Gerencial() {
         nota_fiscal: string | null;
         cnpj_empresa: string | null;
       };
-      let allData: VendaRow[] = [];
-      let from = 0;
+      const { count, error: countErr } = await supabase
+        .from('vendas')
+        .select('*', { count: 'exact', head: true })
+        .gte('data_emissao', startDate)
+        .lte('data_emissao', endDate);
+
+      if (countErr) throw countErr;
+      if (!count || count === 0) return [];
+
       const step = 1000;
-      while (true) {
-        const { data, error } = await supabase
-          .from('vendas')
-          .select('data_emissao, vendedor_nome, total_com_desconto, lucros_reais, margem_percentual, familia_produto, marca, nota_fiscal, cnpj_empresa')
-          .gte('data_emissao', startDate)
-          .lte('data_emissao', endDate)
-          .range(from, from + step - 1);
-        if (error) throw error;
-        if (!data || data.length === 0) break;
-        allData = allData.concat(data as VendaRow[]);
-        if (data.length < step) break;
-        from += step;
+      const totalPages = Math.ceil(count / step);
+      const promises = [];
+
+      for (let i = 0; i < totalPages; i++) {
+        const from = i * step;
+        promises.push(
+          supabase
+            .from('vendas')
+            .select('data_emissao, vendedor_nome, total_com_desconto, lucros_reais, margem_percentual, familia_produto, marca, nota_fiscal, cnpj_empresa')
+            .gte('data_emissao', startDate)
+            .lte('data_emissao', endDate)
+            .range(from, from + step - 1)
+        );
+      }
+
+      const results = await Promise.all(promises);
+      let allData: VendaRow[] = [];
+      for (const res of results) {
+        if (res.error) throw res.error;
+        if (res.data) allData = allData.concat(res.data as VendaRow[]);
       }
       return allData;
     },
