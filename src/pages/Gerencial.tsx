@@ -211,7 +211,9 @@ export default function Gerencial() {
   const totalNotas = useMemo(() => {
     const set = new Set<string>();
     for (const row of filteredAll) {
-      if (row.nota_fiscal) set.add(`${row.nota_fiscal}_${row.cnpj_empresa ?? ''}`);
+      if (row.nota_fiscal && row.nota_fiscal.trim() !== '') {
+        set.add(row.nota_fiscal.trim());
+      }
     }
     return set.size;
   }, [filteredAll]);
