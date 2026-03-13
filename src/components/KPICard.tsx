@@ -32,7 +32,7 @@ export function KPICard({ icon: Icon, label, value, subtitle, trend, trendValue,
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ scale: 1.02, y: -2 }}
       transition={{ duration: 0.3 }}
-      className="bg-card border border-border rounded-lg p-5 shadow-card relative overflow-hidden"
+      className="bg-card border border-border rounded-lg p-4 sm:p-5 shadow-card relative overflow-hidden"
       style={{ borderLeftWidth: 4, borderLeftColor: accentColor || 'hsl(215 40% 24%)' }}
     >
       <div className="flex items-start justify-between">
