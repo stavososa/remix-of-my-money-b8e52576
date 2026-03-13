@@ -94,7 +94,7 @@ function RankingTable({ data, nameLabel }: { data: RankedItem[]; nameLabel: stri
 }
 
 export default function Ranking() {
-  const { periodoAno, periodoMes, loading: loadingPeriodo } = usePeriod();
+  const { periodoAno, periodoMes, dataInicio, dataFim, loading: loadingPeriodo } = usePeriod();
 
   const { data: ranking = [], isLoading: loadRanking } = useQuery({
     queryKey: ['ranking', periodoAno, periodoMes],
@@ -111,12 +111,11 @@ export default function Ranking() {
     },
   });
 
-  const mesStr = String(periodoMes).padStart(2, '0');
-  const inicioMes = `${periodoAno}-${mesStr}-01`;
-  const fimMes = `${periodoAno}-${mesStr}-31`;
+  const inicioMes = dataInicio;
+  const fimMes = dataFim;
 
   const { data: vendasRaw = [], isLoading: loadProd } = useQuery({
-    queryKey: ['vendas-ranking-prod', periodoAno, periodoMes],
+    queryKey: ['vendas-ranking-prod', dataInicio, dataFim],
     enabled: !loadingPeriodo,
     queryFn: async () => {
       type VRow = { descricao_produto: string | null; familia_produto: string | null; marca: string | null; total_com_desconto: unknown; quantidade: unknown; vendedor_nome: string | null; lucros_reais: unknown };

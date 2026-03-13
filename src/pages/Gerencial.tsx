@@ -70,7 +70,7 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
 };
 
 export default function Gerencial() {
-  const { periodoAno, periodoMes } = usePeriod();
+  const { periodoAno, periodoMes, dataInicio, dataFim } = usePeriod();
   const [filtroUnidade, setFiltroUnidade] = useState<string>('all');
   const [filtroVendedor, setFiltroVendedor] = useState<string>('all');
   const [filtroFamilia, setFiltroFamilia] = useState<string>('all');
@@ -98,9 +98,8 @@ export default function Gerencial() {
     return () => clearTimeout(id);
   }, []);
 
-  const startDate = `${periodoAno}-${String(periodoMes).padStart(2, '0')}-01`;
-  const endDay = new Date(periodoAno, periodoMes, 0).getDate();
-  const endDate = `${periodoAno}-${String(periodoMes).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
+  const startDate = dataInicio;
+  const endDate = dataFim;
 
   // ===== controle_pj (vendedor_nome → unidade) for filial mapping =====
   const { data: controlePjFilial } = useQuery({
@@ -131,7 +130,7 @@ export default function Gerencial() {
 
   // ===== FULL PERIOD DATA (for KPIs & charts) =====
   const { data: allVendas, isLoading: loadAll } = useQuery({
-    queryKey: ['gerencial-all-vendas', periodoAno, periodoMes],
+    queryKey: ['gerencial-all-vendas', startDate, endDate],
     queryFn: async () => {
       type VendaRow = {
         data_emissao: string | null;
@@ -264,7 +263,7 @@ export default function Gerencial() {
 
   // Fetch paginated vendas for table
   const { data: vendasResult, isLoading: loadVendas } = useQuery({
-    queryKey: ['gerencial-vendas', periodoAno, periodoMes, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, searchDebounced, tabelaPagina],
+    queryKey: ['gerencial-vendas', startDate, endDate, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, searchDebounced, tabelaPagina],
     queryFn: async () => {
       const offset = (tabelaPagina - 1) * TABLE_PAGE_SIZE;
       let query = supabase
