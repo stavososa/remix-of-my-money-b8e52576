@@ -14,6 +14,7 @@ interface DataTableProps<T> {
   rowClassName?: (row: T) => string;
   pageSize?: number;
   maxHeight?: string;
+  onRowClick?: (row: T) => void;
   // Server-side pagination props
   serverPagination?: {
     totalCount: number;
