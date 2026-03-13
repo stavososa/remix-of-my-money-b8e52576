@@ -362,7 +362,7 @@ export default function Gerencial() {
           <p className="text-sm text-muted-foreground mt-1">Filtre resultados específicos por loja, vendedor e identifique tendências reais.</p>
         </div>
         {/* Filters */}
-        <div className="flex flex-wrap items-center gap-1.5 sm:gap-3">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-3">
           <FilterSelect label="Filial" value={filtroUnidade} onChange={handleFilterChange(setFiltroUnidade)} options={filtros.unidades.map(u => ({ value: u, label: u }))} allLabel="Todas as Filiais" />
           <FilterSelect label="Vendedor" value={filtroVendedor} onChange={handleFilterChange(setFiltroVendedor)} options={filtros.vendedores.map(v => ({ value: v, label: v }))} allLabel="Todos os Vendedores" />
           <FilterSelect label="Família" value={filtroFamilia} onChange={handleFilterChange(setFiltroFamilia)} options={filtros.familias.map(f => ({ value: f, label: f }))} allLabel="Todas as Famílias" />
@@ -475,7 +475,7 @@ function FilterSelect({ label, value, onChange, options, allLabel }: {
     <select
       value={value}
       onChange={e => onChange(e.target.value)}
-      className="bg-secondary border border-border rounded-md px-2 sm:px-3 py-2 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring min-w-[110px] sm:min-w-[140px] max-w-[220px]"
+      className="bg-secondary border border-border rounded-md px-2 sm:px-3 py-2 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring w-full sm:w-auto sm:min-w-[140px] sm:max-w-[220px]"
       title={label}
     >
       <option value="all">{allLabel}</option>
