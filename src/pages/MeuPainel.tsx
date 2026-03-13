@@ -465,6 +465,22 @@ export default function MeuPainel() {
                 )}
                 <p className="text-xs text-muted-foreground">{mesNome(periodoMes)} / {periodoAno}</p>
               </div>
+              {isAdmin && filialOptions.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                  <Select value={filtroFilial} onValueChange={setFiltroFilial}>
+                    <SelectTrigger className="w-[200px] bg-background/50 border-border">
+                      <SelectValue placeholder="Todas as Filiais" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as Filiais</SelectItem>
+                      {filialOptions.map(f => (
+                        <SelectItem key={f} value={f}>{f}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               {!isAdmin && (
                 <div className="flex flex-col items-center">
                   <div
