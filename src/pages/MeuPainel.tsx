@@ -110,7 +110,7 @@ export default function MeuPainel() {
       const { data } = await supabase.from('controle_pj').select('nome_vendas, unidade');
       return (data ?? []) as { nome_vendas: string | null; unidade: string | null }[];
     },
-    staleTime: 10 * 60 * 1000, // dados estruturais: cache longo
+    staleTime: Infinity,
     gcTime: 30 * 60 * 1000,
   });
 
