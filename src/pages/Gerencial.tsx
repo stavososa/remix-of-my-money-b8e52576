@@ -90,39 +90,32 @@ export default function Gerencial() {
   const endDay = new Date(periodoAno, periodoMes, 0).getDate();
   const endDate = `${periodoAno}-${String(periodoMes).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
 
-  // ===== controle_pj for vendedor→unidade mapping =====
-  const { data: controlePj } = useQuery({
-    queryKey: ['controle-pj-unidades'],
+  // ===== unidades (cnpj→nome) for filial mapping =====
+  const { data: unidadesData } = useQuery({
+    queryKey: ['unidades-cnpj'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('controle_pj')
-        .select('nome_vendas, unidade');
+        .from('unidades')
+        .select('cnpj, nome' as any);
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as { cnpj: string | null; nome: string }[];
     },
     staleTime: 10 * 60 * 1000,
   });
 
-  const vendedorUnidadeMap = useMemo(() => {
+  const cnpjFilialMap = useMemo(() => {
     const map = new Map<string, string>();
-    if (!controlePj) return map;
-    for (const row of controlePj) {
-      if (row.nome_vendas && row.unidade) {
-        map.set(normalize(row.nome_vendas), row.unidade);
-      }
+    if (!unidadesData) return map;
+    for (const u of unidadesData) {
+      if (u.cnpj) map.set(u.cnpj.trim(), u.nome);
     }
     return map;
-  }, [controlePj]);
+  }, [unidadesData]);
 
-  const getUnidade = useCallback((vendedorNome: string): string => {
-    if (!vendedorNome) return 'Sem Filial';
-    const norm = normalize(vendedorNome);
-    if (vendedorUnidadeMap.has(norm)) return vendedorUnidadeMap.get(norm)!;
-    for (const [key, uni] of vendedorUnidadeMap.entries()) {
-      if (norm.includes(key) || key.includes(norm)) return uni;
-    }
-    return 'Sem Filial';
-  }, [vendedorUnidadeMap]);
+  const getFilial = useCallback((cnpjEmpresa: string | null | undefined): string => {
+    if (!cnpjEmpresa) return 'Sem Filial';
+    return cnpjFilialMap.get(cnpjEmpresa.trim()) ?? 'Sem Filial';
+  }, [cnpjFilialMap]);
 
   // ===== FULL PERIOD DATA (for KPIs & charts) =====
   const { data: allVendas, isLoading: loadAll } = useQuery({
