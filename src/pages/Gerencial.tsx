@@ -380,7 +380,7 @@ export default function Gerencial() {
 
         {/* Sales Table */}
         <div>
-          <div className="flex items-center justify-between mb-3 gap-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-3 gap-2 sm:gap-3">
             <h3 className="text-sm font-semibold text-secondary-foreground whitespace-nowrap">
               Vendas Detalhadas ({vendasTotalCount} registros)
               {(loadVendas || loadAll) && <span className="ml-2 text-xs text-muted-foreground">(carregando...)</span>}
