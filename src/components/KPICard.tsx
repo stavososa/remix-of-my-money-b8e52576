@@ -38,7 +38,7 @@ export function KPICard({ icon: Icon, label, value, subtitle, trend, trendValue,
       <div className="flex items-start justify-between">
         <div className="space-y-1">
           <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">{label}</p>
-          <p className="text-2xl font-bold text-foreground">{value}</p>
+          <p className="text-xl sm:text-2xl font-bold text-foreground truncate">{value}</p>
           {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
           {trend && trendValue && TrendIcon && (
             <div className={`flex items-center gap-1 text-xs font-medium ${trendColors[trend]}`}>
