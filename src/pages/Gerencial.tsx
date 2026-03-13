@@ -42,15 +42,27 @@ const normalize = (s: string) =>
 
 const TABLE_PAGE_SIZE = 30;
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+interface TooltipEntry {
+  color: string;
+  name: string;
+  value: number | string;
+}
+
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: TooltipEntry[];
+  label?: string;
+}
+
+const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-card border border-border rounded-lg p-3 shadow-lg text-xs">
       <p className="font-medium text-foreground mb-1">{label}</p>
-      {payload.map((p: any, i: number) => (
+      {payload.map((p, i) => (
         <p key={i} style={{ color: p.color }} className="flex justify-between gap-4">
           <span>{p.name}:</span>
-          <span className="font-semibold">{typeof p.value === 'number' && p.value > 100 ? fmt(p.value) : p.name === 'Margem' ? fmtPct(p.value) : fmt(p.value)}</span>
+          <span className="font-semibold">{typeof p.value === 'number' && p.value > 100 ? fmt(p.value) : p.name === 'Margem' ? fmtPct(p.value as number) : fmt(p.value as number)}</span>
         </p>
       ))}
     </div>
@@ -121,21 +133,47 @@ export default function Gerencial() {
   const { data: allVendas, isLoading: loadAll } = useQuery({
     queryKey: ['gerencial-all-vendas', periodoAno, periodoMes],
     queryFn: async () => {
-      const allData: any[] = [];
-      let from = 0;
+      type VendaRow = {
+        data_emissao: string | null;
+        vendedor_nome: string | null;
+        total_com_desconto: unknown;
+        lucros_reais: unknown;
+        margem_percentual: unknown;
+        familia_produto: string | null;
+        marca: string | null;
+        nota_fiscal: string | null;
+        cnpj_empresa: string | null;
+      };
+      const { count, error: countErr } = await supabase
+        .from('vendas')
+        .select('*', { count: 'exact', head: true })
+        .gte('data_emissao', startDate)
+        .lte('data_emissao', endDate);
+
+      if (countErr) throw countErr;
+      if (!count || count === 0) return [];
+
       const step = 1000;
-      while (true) {
-        const { data, error } = await supabase
-          .from('vendas')
-          .select('data_emissao, vendedor_nome, total_com_desconto, lucros_reais, margem_percentual, familia_produto, marca, nota_fiscal, cnpj_empresa')
-          .gte('data_emissao', startDate)
-          .lte('data_emissao', endDate)
-          .range(from, from + step - 1);
-        if (error) throw error;
-        if (!data || data.length === 0) break;
-        allData.push(...data);
-        if (data.length < step) break;
-        from += step;
+      const totalPages = Math.ceil(count / step);
+      const promises = [];
+
+      for (let i = 0; i < totalPages; i++) {
+        const from = i * step;
+        promises.push(
+          supabase
+            .from('vendas')
+            .select('data_emissao, vendedor_nome, total_com_desconto, lucros_reais, margem_percentual, familia_produto, marca, nota_fiscal, cnpj_empresa')
+            .gte('data_emissao', startDate)
+            .lte('data_emissao', endDate)
+            .range(from, from + step - 1)
+        );
+      }
+
+      const results = await Promise.all(promises);
+      let allData: VendaRow[] = [];
+      for (const res of results) {
+        if (res.error) throw res.error;
+        if (res.data) allData = allData.concat(res.data as VendaRow[]);
       }
       return allData;
     },
@@ -314,6 +352,10 @@ export default function Gerencial() {
   return (
     <AppShell title="Gerencial">
       <div className="space-y-6">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-foreground">Painel Gerencial</h1>
+          <p className="text-sm text-muted-foreground mt-1">Filtre resultados específicos por loja, vendedor e identifique tendências reais.</p>
+        </div>
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 overflow-x-auto">
           <FilterSelect label="Filial" value={filtroUnidade} onChange={handleFilterChange(setFiltroUnidade)} options={filtros.unidades.map(u => ({ value: u, label: u }))} allLabel="Todas as Filiais" />
