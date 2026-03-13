@@ -1,52 +1,39 @@
 
 
-## Plano: Mapear Filial via `controle_pj` (nome_vendas → unidade)
+## Gerencial com dados da tabela `vendas` + filtro por Unidade + graficos
 
-### Problema Atual
-A query `unidades.cnpj` retorna erro 400 porque a coluna `cnpj` não existe na tabela `unidades`. O mapeamento de filial está quebrado.
+A tabela `vendas` tem 468 registros (Jan/2026) com valores em formato string brasileiro (ex: "R$ 15,40", "49,30%"). O campo `vendedor_nome` liga aos vendedores/unidades via `vendedores.nome_omie`. Sera necessario fazer JOIN client-side ou via query para associar unidade a cada venda.
 
-### Nova Lógica
-Usar a tabela `controle_pj` como ponte:
-- `vendas.vendedor_nome` ↔ `controle_pj.nome_vendas` → `controle_pj.unidade` (nome da filial)
+### Abordagem
 
-### Alterações em `src/pages/Gerencial.tsx`
+Buscar dados da tabela `vendas` filtrados por periodo (`data_emissao`), e cruzar com `vendedores` + `unidades` para obter a unidade de cada venda. Parsear valores monetarios/percentuais no frontend (padrão ja existente no projeto).
 
-1. **Substituir query `unidades-cnpj`** por query em `controle_pj` buscando `nome_vendas, unidade`:
-   ```typescript
-   const { data: controlePjData } = useQuery({
-     queryKey: ['controle-pj-filial'],
-     queryFn: async () => {
-       const { data } = await supabase.from('controle_pj').select('nome_vendas, unidade');
-       return data ?? [];
-     },
-   });
-   ```
+### Alteracoes em `src/pages/Gerencial.tsx`
 
-2. **Substituir `cnpjFilialMap`** por `vendedorFilialMap` (Map de `nome_vendas` → `unidade`):
-   ```typescript
-   const vendedorFilialMap = useMemo(() => {
-     const map = new Map<string, string>();
-     for (const row of controlePjData ?? []) {
-       if (row.nome_vendas && row.unidade) map.set(row.nome_vendas.trim(), row.unidade);
-     }
-     return map;
-   }, [controlePjData]);
-   ```
+1. **Nova query: buscar `vendas`** filtradas pelo periodo atual (mes/ano do `data_emissao`), com limite adequado
 
-3. **Substituir `getFilial(cnpj_empresa)`** por `getFilial(vendedor_nome)`:
-   ```typescript
-   const getFilial = (vendedorNome: string | null | undefined): string => {
-     if (!vendedorNome) return 'Sem Filial';
-     return vendedorFilialMap.get(vendedorNome.trim()) ?? 'Sem Filial';
-   };
-   ```
+2. **Nova query: buscar `vendedores` com `unidades`** para mapear `nome_omie` -> `unidade_nome`
 
-4. **Atualizar todos os usos**: trocar `getFilial(row.cnpj_empresa)` por `getFilial(row.vendedor_nome)` nos filtros, KPIs, opções e tabela.
+3. **Processar dados client-side**:
+   - Parsear `total_com_desconto`, `lucros_reais`, `margem_percentual` de string BR para number
+   - Associar cada venda a sua unidade via mapa vendedor->unidade
+   - Agregar por unidade: total vendido, lucro, margem media, qtd vendas
 
-5. **Filtro server-side da tabela**: Em vez de filtrar por `cnpj_empresa`, buscar todos os `nome_vendas` da filial selecionada e filtrar por `vendedor_nome.in(nomes)`.
+4. **Filtro por Unidade**: O select de unidades ja existe. Ao selecionar uma unidade, filtrar as vendas processadas e recalcular todos os KPIs e graficos.
 
-6. **Remover `cnpj_empresa`** do select das queries (não é mais necessário para o mapeamento).
+5. **Novos graficos usando dados de `vendas`**:
+   - **Faturamento por Unidade** (BarChart horizontal - ja existe, alimentar com dados de vendas)
+   - **Margem Media por Unidade** (novo BarChart horizontal, cor verde)
+   - **Top Familias de Produto** (BarChart mostrando as familias mais vendidas, reagindo ao filtro de unidade)
 
-### Alterações em `src/pages/MeuPainel.tsx`
-Aplicar a mesma lógica: usar `controle_pj` para mapear `vendedor_nome` → filial no filtro de filial do dashboard admin.
+6. **Cards PJ vs CLT**: Recalcular a partir do cruzamento vendas + vendedores (que tem campo `regime`), ao inves de depender exclusivamente da view `v_resumo_regime`
+
+7. **Layout**: Organizar graficos em grid 2 colunas no desktop
+
+### Detalhes tecnicos
+
+- Funcoes de parsing ja existem no projeto (regex para "R$ X,XX" e "XX,XX%")
+- A tabela `vendas` tem 468 linhas para Jan/2026, dentro do limite de 1000 do Supabase
+- Vendedores sem unidade (ex: "CHECK OUT", "COMPRA VENDEDOR") serao agrupados como "Sem Unidade" ou ignorados conforme filtro
+- Manter as queries existentes (`v_ranking`, `v_resumo_unidade`, `v_resumo_regime`) para dados de comissao que nao existem na tabela `vendas`
 

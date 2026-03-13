@@ -103,28 +103,28 @@ export default function MeuPainel() {
     setFiltroFilial('all');
   }, [periodoAno, periodoMes]);
 
-  // ── Unidades (CNPJ → Nome) ──
-  const { data: unidadesData } = useQuery({
-    queryKey: ['unidades-cnpj-painel'],
+  // ── controle_pj (vendedor_nome → unidade) for filial mapping ──
+  const { data: controlePjFilial } = useQuery({
+    queryKey: ['controle-pj-filial'],
     queryFn: async () => {
-      const { data } = await (supabase.from('unidades') as any).select('cnpj, nome');
-      return (data ?? []) as { cnpj: string | null; nome: string }[];
+      const { data } = await supabase.from('controle_pj').select('nome_vendas, unidade');
+      return (data ?? []) as { nome_vendas: string | null; unidade: string | null }[];
     },
-    staleTime: 0,
+    staleTime: 10 * 60 * 1000,
   });
 
-  const cnpjFilialMap = useMemo(() => {
+  const vendedorFilialMap = useMemo(() => {
     const map = new Map<string, string>();
-    for (const u of unidadesData ?? []) {
-      if (u.cnpj) map.set(u.cnpj.trim(), u.nome);
+    for (const row of controlePjFilial ?? []) {
+      if (row.nome_vendas && row.unidade) map.set(row.nome_vendas.trim(), row.unidade);
     }
     return map;
-  }, [unidadesData]);
+  }, [controlePjFilial]);
 
-  const getFilial = useCallback((cnpjEmpresa: string | null | undefined): string => {
-    if (!cnpjEmpresa) return 'Sem Filial';
-    return cnpjFilialMap.get(cnpjEmpresa.trim()) ?? 'Sem Filial';
-  }, [cnpjFilialMap]);
+  const getFilial = useCallback((vendedorNome: string | null | undefined): string => {
+    if (!vendedorNome) return 'Sem Filial';
+    return vendedorFilialMap.get(vendedorNome.trim()) ?? 'Sem Filial';
+  }, [vendedorFilialMap]);
 
   // ── Shared queries ──
 
@@ -311,14 +311,14 @@ export default function MeuPainel() {
     if (!isAdmin) return [];
     const set = new Set<string>();
     for (const v of vendasSourceRaw) {
-      set.add(getFilial((v as any).cnpj_empresa));
+      set.add(getFilial(v.vendedor_nome));
     }
     return Array.from(set).sort();
   }, [vendasSourceRaw, isAdmin, getFilial]);
 
   const vendasSource = useMemo(() => {
     if (filtroFilial === 'all') return vendasSourceRaw;
-    return vendasSourceRaw.filter(v => getFilial((v as any).cnpj_empresa) === filtroFilial);
+    return vendasSourceRaw.filter(v => getFilial(v.vendedor_nome) === filtroFilial);
   }, [vendasSourceRaw, filtroFilial, getFilial]);
 
   const vendasAgg = (() => {
