@@ -140,7 +140,7 @@ export default function MeuPainel() {
         .order('posicao', { ascending: true });
       return data ?? [];
     },
-    staleTime: 2 * 60 * 1000, // ranking: cache 2 min
+    staleTime: Infinity,
   });
 
   type ControlePjRow = {
