@@ -311,7 +311,7 @@ export default function MeuPainel() {
     if (!isAdmin) return [];
     const set = new Set<string>();
     for (const v of vendasSourceRaw) {
-      set.add(getFilial((v as any).cnpj_empresa));
+      set.add(getFilial(v.vendedor_nome));
     }
     return Array.from(set).sort();
   }, [vendasSourceRaw, isAdmin, getFilial]);
