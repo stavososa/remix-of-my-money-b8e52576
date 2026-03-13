@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { usePeriod } from '@/contexts/PeriodContext';
 import { X, Search, DollarSign, TrendingUp, Percent, ShoppingCart, FileText } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -70,6 +71,7 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
 };
 
 export default function Gerencial() {
+  const isMobile = useIsMobile();
   const { periodoAno, periodoMes, dataInicio, dataFim } = usePeriod();
   const [filtroUnidade, setFiltroUnidade] = useState<string>('all');
   const [filtroVendedor, setFiltroVendedor] = useState<string>('all');
@@ -384,12 +386,12 @@ export default function Gerencial() {
         )}
 
         {/* KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
-          <KPICard icon={DollarSign} label="Faturamento" value={isBusy ? '—' : fmt(kpis.totalFat)} accentColor="hsl(38 90% 55%)" />
-          <KPICard icon={TrendingUp} label="Lucro" value={isBusy ? '—' : fmt(kpis.totalLucro)} accentColor="hsl(142 71% 45%)" />
-          <KPICard icon={Percent} label="Margem Média" value={isBusy ? '—' : fmtPct(kpis.margemMedia)} accentColor="hsl(200 80% 50%)" />
-          <KPICard icon={ShoppingCart} label="Vendas" value={isBusy ? '—' : kpis.count.toLocaleString('pt-BR')} accentColor="hsl(280 60% 55%)" />
-          <KPICard icon={FileText} label="Notas Fiscais" value={isBusy ? '—' : totalNotas.toLocaleString('pt-BR')} accentColor="hsl(350 75% 55%)" />
+        <div className={isMobile ? "grid grid-cols-5 gap-2 place-items-center" : "grid grid-cols-5 gap-4"}>
+          <KPICard compact={isMobile} icon={DollarSign} label="Faturamento" value={isBusy ? '—' : fmt(kpis.totalFat)} accentColor="hsl(38 90% 55%)" />
+          <KPICard compact={isMobile} icon={TrendingUp} label="Lucro" value={isBusy ? '—' : fmt(kpis.totalLucro)} accentColor="hsl(142 71% 45%)" />
+          <KPICard compact={isMobile} icon={Percent} label="Margem Média" value={isBusy ? '—' : fmtPct(kpis.margemMedia)} accentColor="hsl(200 80% 50%)" />
+          <KPICard compact={isMobile} icon={ShoppingCart} label="Vendas" value={isBusy ? '—' : kpis.count.toLocaleString('pt-BR')} accentColor="hsl(280 60% 55%)" />
+          <KPICard compact={isMobile} icon={FileText} label="Notas Fiscais" value={isBusy ? '—' : totalNotas.toLocaleString('pt-BR')} accentColor="hsl(350 75% 55%)" />
         </div>
 
         {/* Chart: Faturamento por Dia (full width) */}
