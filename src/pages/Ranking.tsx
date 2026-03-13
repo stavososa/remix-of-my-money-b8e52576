@@ -111,9 +111,8 @@ export default function Ranking() {
     },
   });
 
-  const mesStr = String(periodoMes).padStart(2, '0');
-  const inicioMes = `${periodoAno}-${mesStr}-01`;
-  const fimMes = `${periodoAno}-${mesStr}-31`;
+  const inicioMes = dataInicio;
+  const fimMes = dataFim;
 
   const { data: vendasRaw = [], isLoading: loadProd } = useQuery({
     queryKey: ['vendas-ranking-prod', periodoAno, periodoMes],

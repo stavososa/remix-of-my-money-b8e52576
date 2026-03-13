@@ -98,9 +98,8 @@ export default function Gerencial() {
     return () => clearTimeout(id);
   }, []);
 
-  const startDate = `${periodoAno}-${String(periodoMes).padStart(2, '0')}-01`;
-  const endDay = new Date(periodoAno, periodoMes, 0).getDate();
-  const endDate = `${periodoAno}-${String(periodoMes).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
+  const startDate = dataInicio;
+  const endDate = dataFim;
 
   // ===== controle_pj (vendedor_nome → unidade) for filial mapping =====
   const { data: controlePjFilial } = useQuery({
