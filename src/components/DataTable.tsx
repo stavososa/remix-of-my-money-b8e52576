@@ -23,7 +23,7 @@ interface DataTableProps<T> {
   };
 }
 
-export function DataTable<T extends Record<string, any>>({ columns, data, rowClassName, pageSize, maxHeight, serverPagination }: DataTableProps<T>) {
+export function DataTable<T extends Record<string, any>>({ columns, data, rowClassName, pageSize, maxHeight, onRowClick, serverPagination }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<keyof T | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
