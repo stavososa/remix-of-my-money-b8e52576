@@ -127,7 +127,7 @@ export default function Gerencial() {
       while (true) {
         const { data, error } = await supabase
           .from('vendas')
-          .select('data_emissao, vendedor_nome, total_com_desconto, lucros_reais, margem_percentual, familia_produto, marca, nota_fiscal')
+          .select('data_emissao, vendedor_nome, total_com_desconto, lucros_reais, margem_percentual, familia_produto, marca, nota_fiscal, cnpj_empresa')
           .gte('data_emissao', startDate)
           .lte('data_emissao', endDate)
           .range(from, from + step - 1);
