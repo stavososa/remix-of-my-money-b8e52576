@@ -1,39 +1,62 @@
 
 
-## Gerencial com dados da tabela `vendas` + filtro por Unidade + graficos
+## Plano: Filtro de Período Personalizado com Seleção de Dias
 
-A tabela `vendas` tem 468 registros (Jan/2026) com valores em formato string brasileiro (ex: "R$ 15,40", "49,30%"). O campo `vendedor_nome` liga aos vendedores/unidades via `vendedores.nome_omie`. Sera necessario fazer JOIN client-side ou via query para associar unidade a cada venda.
+### Conceito
 
-### Abordagem
+Substituir os selects de mês/ano por um componente mais completo que mantém a seleção por mês/ano mas adiciona:
+- Botões rápidos: **3 dias**, **7 dias**, **15 dias**, **Mês inteiro** (default)
+- Seleção personalizada de datas (date range picker)
+- Os botões de dias contam regressivamente a partir do **último dia com dados** no mês selecionado
 
-Buscar dados da tabela `vendas` filtrados por periodo (`data_emissao`), e cruzar com `vendedores` + `unidades` para obter a unidade de cada venda. Parsear valores monetarios/percentuais no frontend (padrão ja existente no projeto).
+### Mudanças no PeriodContext
 
-### Alteracoes em `src/pages/Gerencial.tsx`
+Expandir a interface para incluir `dataInicio` e `dataFim` (strings `YYYY-MM-DD`):
 
-1. **Nova query: buscar `vendas`** filtradas pelo periodo atual (mes/ano do `data_emissao`), com limite adequado
+```typescript
+interface PeriodContextType {
+  periodoAno: number;
+  periodoMes: number;
+  dataInicio: string;  // NOVO
+  dataFim: string;     // NOVO
+  loading: boolean;
+  setPeriodo: (ano: number, mes: number) => void;
+  setCustomRange: (inicio: string, fim: string) => void; // NOVO
+  resetRange: () => void; // NOVO - volta para mês inteiro
+}
+```
 
-2. **Nova query: buscar `vendedores` com `unidades`** para mapear `nome_omie` -> `unidade_nome`
+- Quando `periodoAno/periodoMes` mudam, `dataInicio` e `dataFim` resetam para o mês inteiro (dia 1 até último dia do mês).
+- Quando um preset ou range custom é selecionado, apenas `dataInicio` e `dataFim` mudam.
 
-3. **Processar dados client-side**:
-   - Parsear `total_com_desconto`, `lucros_reais`, `margem_percentual` de string BR para number
-   - Associar cada venda a sua unidade via mapa vendedor->unidade
-   - Agregar por unidade: total vendido, lucro, margem media, qtd vendas
+### Mudanças no PeriodFilter
 
-4. **Filtro por Unidade**: O select de unidades ja existe. Ao selecionar uma unidade, filtrar as vendas processadas e recalcular todos os KPIs e graficos.
+Redesenhar o componente:
+1. Manter selects de mês/ano
+2. Adicionar uma linha de botões de preset: `3d | 7d | 15d | Mês`
+3. Adicionar um botão "Personalizado" que abre um Popover com dois Calendar (data início e data fim)
+4. Os presets calculam: buscar o `dataFim` como último dia do mês selecionado (ou último dia com dados via query já existente no context), e `dataInicio = dataFim - N dias`
+5. Botão ativo destacado visualmente
 
-5. **Novos graficos usando dados de `vendas`**:
-   - **Faturamento por Unidade** (BarChart horizontal - ja existe, alimentar com dados de vendas)
-   - **Margem Media por Unidade** (novo BarChart horizontal, cor verde)
-   - **Top Familias de Produto** (BarChart mostrando as familias mais vendidas, reagindo ao filtro de unidade)
+### Mudanças nas Páginas Consumidoras
 
-6. **Cards PJ vs CLT**: Recalcular a partir do cruzamento vendas + vendedores (que tem campo `regime`), ao inves de depender exclusivamente da view `v_resumo_regime`
+Em **Gerencial.tsx**, **MeuPainel.tsx**, **Ranking.tsx**, **AdminRegras.tsx**:
+- Substituir o cálculo manual de `startDate`/`endDate` por `dataInicio`/`dataFim` do context
+- As queries já filtram por `.gte('data_emissao', startDate).lte('data_emissao', endDate)` — basta trocar as variáveis
+- Views (`v_ranking`) que filtram por `periodo_ano`/`periodo_mes` continuam usando esses campos (não afetadas pelo range de dias)
 
-7. **Layout**: Organizar graficos em grid 2 colunas no desktop
+### Arquivos Alterados
 
-### Detalhes tecnicos
+| Arquivo | Alteração |
+|---|---|
+| `src/contexts/PeriodContext.tsx` | Adicionar `dataInicio`, `dataFim`, `setCustomRange`, `resetRange` |
+| `src/components/PeriodFilter.tsx` | Redesenhar com presets + date range picker usando Popover + Calendar |
+| `src/pages/Gerencial.tsx` | Usar `dataInicio`/`dataFim` do context em vez de calcular |
+| `src/pages/MeuPainel.tsx` | Idem |
+| `src/pages/Ranking.tsx` | Idem para queries de `vendas` (ranking view mantém mês/ano) |
 
-- Funcoes de parsing ja existem no projeto (regex para "R$ X,XX" e "XX,XX%")
-- A tabela `vendas` tem 468 linhas para Jan/2026, dentro do limite de 1000 do Supabase
-- Vendedores sem unidade (ex: "CHECK OUT", "COMPRA VENDEDOR") serao agrupados como "Sem Unidade" ou ignorados conforme filtro
-- Manter as queries existentes (`v_ranking`, `v_resumo_unidade`, `v_resumo_regime`) para dados de comissao que nao existem na tabela `vendas`
+### UI do Filtro (mobile-friendly)
+
+No desktop: selects de mês/ano + botões de preset + botão personalizado — tudo em uma linha.
+No mobile: empilha em duas linhas (mês/ano em cima, presets embaixo) com `flex-wrap`.
 
