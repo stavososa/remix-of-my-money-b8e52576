@@ -156,7 +156,7 @@ export default function MeuPainel() {
       const { data } = await supabase.from('controle_pj').select('*');
       return (data ?? []) as ControlePjRow[];
     },
-    staleTime: 10 * 60 * 1000, // dados estruturais: cache longo
+    staleTime: Infinity,
     gcTime: 30 * 60 * 1000,
   });
 
