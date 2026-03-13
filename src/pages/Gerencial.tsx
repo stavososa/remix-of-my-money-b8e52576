@@ -386,7 +386,7 @@ export default function Gerencial() {
         )}
 
         {/* KPIs */}
-        <div className={isMobile ? "grid grid-cols-5 gap-2 place-items-center" : "grid grid-cols-5 gap-4"}>
+        <div className={isMobile ? "flex items-center justify-center gap-3" : "grid grid-cols-5 gap-4"}>
           <KPICard compact={isMobile} icon={DollarSign} label="Faturamento" value={isBusy ? '—' : fmt(kpis.totalFat)} accentColor="hsl(38 90% 55%)" />
           <KPICard compact={isMobile} icon={TrendingUp} label="Lucro" value={isBusy ? '—' : fmt(kpis.totalLucro)} accentColor="hsl(142 71% 45%)" />
           <KPICard compact={isMobile} icon={Percent} label="Margem Média" value={isBusy ? '—' : fmtPct(kpis.margemMedia)} accentColor="hsl(200 80% 50%)" />
