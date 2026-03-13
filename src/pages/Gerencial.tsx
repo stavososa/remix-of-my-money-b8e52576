@@ -263,7 +263,7 @@ export default function Gerencial() {
 
   // Fetch paginated vendas for table
   const { data: vendasResult, isLoading: loadVendas } = useQuery({
-    queryKey: ['gerencial-vendas', periodoAno, periodoMes, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, searchDebounced, tabelaPagina],
+    queryKey: ['gerencial-vendas', startDate, endDate, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, searchDebounced, tabelaPagina],
     queryFn: async () => {
       const offset = (tabelaPagina - 1) * TABLE_PAGE_SIZE;
       let query = supabase

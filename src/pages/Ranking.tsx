@@ -115,7 +115,7 @@ export default function Ranking() {
   const fimMes = dataFim;
 
   const { data: vendasRaw = [], isLoading: loadProd } = useQuery({
-    queryKey: ['vendas-ranking-prod', periodoAno, periodoMes],
+    queryKey: ['vendas-ranking-prod', dataInicio, dataFim],
     enabled: !loadingPeriodo,
     queryFn: async () => {
       type VRow = { descricao_produto: string | null; familia_produto: string | null; marca: string | null; total_com_desconto: unknown; quantidade: unknown; vendedor_nome: string | null; lucros_reais: unknown };
