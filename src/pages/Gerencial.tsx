@@ -482,7 +482,7 @@ export default function Gerencial() {
                   <div key={String(col.key)} className="flex justify-between gap-2 py-1.5 border-b border-border last:border-0">
                     <span className="text-muted-foreground font-medium">{col.label}</span>
                     <span className="text-foreground text-right font-semibold">
-                      {col.render ? col.render(selectedVenda[col.key], selectedVenda) : String(selectedVenda[col.key] ?? '—')}
+                      {col.render ? (col.render as any)(selectedVenda[col.key], selectedVenda) : String(selectedVenda[col.key] ?? '—')}
                     </span>
                   </div>
                 ))}
