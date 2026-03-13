@@ -48,7 +48,7 @@ export function KPICard({ icon: Icon, label, value, subtitle, trend, trendValue,
           )}
         </div>
         <div
-          className="h-12 w-12 rounded-full flex items-center justify-center"
+          className="h-10 w-10 sm:h-12 sm:w-12 rounded-full flex items-center justify-center shrink-0"
           style={{
             background: accentColor
               ? `linear-gradient(135deg, ${accentColor}22, ${accentColor}11)`
