@@ -205,7 +205,7 @@ export default function Gerencial() {
       if (row.vendedor_nome) vendedores.add(row.vendedor_nome);
       if (row.familia_produto && row.familia_produto !== 'Outros') familias.add(row.familia_produto);
       if (row.marca && row.marca !== 'Sem Marca') marcas.add(row.marca);
-      const uni = getUnidade(row.vendedor_nome);
+      const uni = getFilial(row.cnpj_empresa);
       if (uni !== 'Sem Filial') unidades.add(uni);
     }
     return {
@@ -214,7 +214,7 @@ export default function Gerencial() {
       marcas: [...marcas].sort(),
       unidades: [...unidades].sort(),
     };
-  }, [allVendas, getUnidade]);
+  }, [allVendas, getFilial]);
 
   // Get vendedores for a given unidade (for server-side filtering)
   const getVendedoresByUnidade = useCallback((unidade: string): string[] => {
