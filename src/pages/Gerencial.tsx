@@ -396,7 +396,12 @@ export default function Gerencial() {
         </div>
 
         {/* Chart: Faturamento por Dia (full width) */}
-        <Card className="border-border">
+        <Card className="border-border relative">
+          {isBusy && (
+            <div className="absolute inset-0 z-10 bg-background/60 backdrop-blur-[1px] rounded-lg flex items-center justify-center">
+              <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold text-foreground">Faturamento por Dia</CardTitle>
           </CardHeader>
