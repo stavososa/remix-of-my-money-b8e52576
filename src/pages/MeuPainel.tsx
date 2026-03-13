@@ -770,7 +770,7 @@ export default function MeuPainel() {
             <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Vendas por Dia</p>
           </div>
           {vendasPorDia.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={220}>
               <BarChart data={vendasPorDia}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 40% 24%)" />
                 <XAxis dataKey="dia" tick={{ fill: 'hsl(210 20% 60%)', fontSize: 11 }} />
