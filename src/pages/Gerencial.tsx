@@ -146,7 +146,7 @@ export default function Gerencial() {
   const filteredAll = useMemo(() => {
     if (!allVendas) return [];
     return allVendas.filter(row => {
-      if (filtroUnidade !== 'all' && getFilial(row.cnpj_empresa) !== filtroUnidade) return false;
+      if (filtroUnidade !== 'all' && getFilial(row.vendedor_nome) !== filtroUnidade) return false;
       if (filtroVendedor !== 'all' && row.vendedor_nome !== filtroVendedor) return false;
       if (filtroFamilia !== 'all' && row.familia_produto !== filtroFamilia) return false;
       if (filtroMarca !== 'all' && row.marca !== filtroMarca) return false;
