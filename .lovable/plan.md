@@ -1,39 +1,33 @@
 
 
-## Gerencial com dados da tabela `vendas` + filtro por Unidade + graficos
+## Plano: Corrigir contagem de Notas Fiscais para corresponder aos valores reais
 
-A tabela `vendas` tem 468 registros (Jan/2026) com valores em formato string brasileiro (ex: "R$ 15,40", "49,30%"). O campo `vendedor_nome` liga aos vendedores/unidades via `vendedores.nome_omie`. Sera necessario fazer JOIN client-side ou via query para associar unidade a cada venda.
+### Problema
 
-### Abordagem
+A contagem atual usa chave composta `nota_fiscal + cnpj_empresa`, o que infla o número (a mesma NF aparece em CNPJs diferentes e é contada múltiplas vezes). O resultado correto do banco é:
+- **2026-02**: 8.794 notas únicas
+- **2026-03**: 6.522 notas únicas
 
-Buscar dados da tabela `vendas` filtrados por periodo (`data_emissao`), e cruzar com `vendedores` + `unidades` para obter a unidade de cada venda. Parsear valores monetarios/percentuais no frontend (padrão ja existente no projeto).
+### Alteração
 
-### Alteracoes em `src/pages/Gerencial.tsx`
+**`src/pages/Gerencial.tsx`** — linha 211-216
 
-1. **Nova query: buscar `vendas`** filtradas pelo periodo atual (mes/ano do `data_emissao`), com limite adequado
+Mudar o `Set` para contar apenas `nota_fiscal` (sem `cnpj_empresa`):
 
-2. **Nova query: buscar `vendedores` com `unidades`** para mapear `nome_omie` -> `unidade_nome`
+```typescript
+const totalNotas = useMemo(() => {
+  const set = new Set<string>();
+  for (const row of filteredAll) {
+    if (row.nota_fiscal && row.nota_fiscal.trim() !== '') {
+      set.add(row.nota_fiscal.trim());
+    }
+  }
+  return set.size;
+}, [filteredAll]);
+```
 
-3. **Processar dados client-side**:
-   - Parsear `total_com_desconto`, `lucros_reais`, `margem_percentual` de string BR para number
-   - Associar cada venda a sua unidade via mapa vendedor->unidade
-   - Agregar por unidade: total vendido, lucro, margem media, qtd vendas
+Isso alinha a contagem com a query SQL do usuário (`SELECT DISTINCT nota_fiscal`).
 
-4. **Filtro por Unidade**: O select de unidades ja existe. Ao selecionar uma unidade, filtrar as vendas processadas e recalcular todos os KPIs e graficos.
-
-5. **Novos graficos usando dados de `vendas`**:
-   - **Faturamento por Unidade** (BarChart horizontal - ja existe, alimentar com dados de vendas)
-   - **Margem Media por Unidade** (novo BarChart horizontal, cor verde)
-   - **Top Familias de Produto** (BarChart mostrando as familias mais vendidas, reagindo ao filtro de unidade)
-
-6. **Cards PJ vs CLT**: Recalcular a partir do cruzamento vendas + vendedores (que tem campo `regime`), ao inves de depender exclusivamente da view `v_resumo_regime`
-
-7. **Layout**: Organizar graficos em grid 2 colunas no desktop
-
-### Detalhes tecnicos
-
-- Funcoes de parsing ja existem no projeto (regex para "R$ X,XX" e "XX,XX%")
-- A tabela `vendas` tem 468 linhas para Jan/2026, dentro do limite de 1000 do Supabase
-- Vendedores sem unidade (ex: "CHECK OUT", "COMPRA VENDEDOR") serao agrupados como "Sem Unidade" ou ignorados conforme filtro
-- Manter as queries existentes (`v_ranking`, `v_resumo_unidade`, `v_resumo_regime`) para dados de comissao que nao existem na tabela `vendas`
+### Escopo
+Uma única mudança de ~5 linhas em um arquivo.
 
