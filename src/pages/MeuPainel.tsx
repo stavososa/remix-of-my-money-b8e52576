@@ -193,7 +193,7 @@ export default function MeuPainel() {
         .order('data_emissao', { ascending: true });
       return (data ?? []).filter(r => r.data_emissao);
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: Infinity,
   });
 
   const { data: vendasGeraisRaw } = useQuery({
