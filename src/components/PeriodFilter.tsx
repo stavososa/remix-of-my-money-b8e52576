@@ -83,12 +83,12 @@ export function PeriodFilter() {
     : null;
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-nowrap items-center gap-1.5 sm:gap-2">
       {/* Month / Year selects */}
       <select
         value={periodoMes}
         onChange={(e) => handleMonthChange(Number(e.target.value))}
-        className="bg-secondary border border-border text-foreground rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+        className="bg-secondary border border-border text-foreground rounded-md px-2 sm:px-3 py-1 sm:py-1.5 text-[11px] sm:text-sm focus:outline-none focus:ring-1 focus:ring-ring shrink-0"
       >
         {MESES.map((m, i) => (
           <option key={i} value={i + 1}>{m}</option>
@@ -97,7 +97,7 @@ export function PeriodFilter() {
       <select
         value={periodoAno}
         onChange={(e) => handleYearChange(Number(e.target.value))}
-        className="bg-secondary border border-border text-foreground rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+        className="bg-secondary border border-border text-foreground rounded-md px-2 sm:px-3 py-1 sm:py-1.5 text-[11px] sm:text-sm focus:outline-none focus:ring-1 focus:ring-ring shrink-0"
       >
         {ANOS.map((a) => (
           <option key={a} value={a}>{a}</option>
@@ -105,16 +105,16 @@ export function PeriodFilter() {
       </select>
 
       {/* Divider */}
-      <div className="h-6 w-px bg-border hidden sm:block" />
+      <div className="h-5 w-px bg-border hidden sm:block shrink-0" />
 
       {/* Preset buttons */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
         {PRESETS.map(({ key, label, days }) => (
           <Button
             key={key}
             variant={activePreset === key ? 'default' : 'outline'}
             size="sm"
-            className={cn('h-8 px-3 text-xs', activePreset === key && 'shadow-sm')}
+            className={cn('h-7 sm:h-8 px-2 sm:px-3 text-[10px] sm:text-xs', activePreset === key && 'shadow-sm')}
             onClick={() => handlePreset(key, days)}
           >
             {label}
@@ -127,14 +127,14 @@ export function PeriodFilter() {
             <Button
               variant={activePreset === 'custom' ? 'default' : 'outline'}
               size="sm"
-              className={cn('h-8 px-3 text-xs gap-1.5', activePreset === 'custom' && 'shadow-sm')}
+              className={cn('h-7 sm:h-8 px-2 sm:px-3 text-[10px] sm:text-xs gap-1', activePreset === 'custom' && 'shadow-sm')}
               onClick={openCustom}
             >
-              <CalendarIcon className="h-3.5 w-3.5" />
-              {rangeLabel ?? 'Personalizado'}
+              <CalendarIcon className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+              {rangeLabel ?? 'Custom'}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-4" align="end">
+          <PopoverContent className="w-auto p-3 sm:p-4" align="start" side="bottom">
             <div className="space-y-3">
               <p className="text-sm font-medium text-foreground">Selecione o período</p>
               <div className="flex flex-col sm:flex-row gap-4">
