@@ -742,7 +742,7 @@ export default function MeuPainel() {
             }
 
             return (
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={chartDataEmpresa}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 40% 24%)" />
                   <XAxis dataKey="label" tick={{ fill: 'hsl(210 20% 60%)', fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
