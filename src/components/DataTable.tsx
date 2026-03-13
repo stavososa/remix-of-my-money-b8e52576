@@ -83,14 +83,14 @@ export function DataTable<T extends Record<string, any>>({ columns, data, rowCla
   return (
     <div>
       <div className="overflow-x-auto rounded-lg border border-border" style={maxHeight ? { maxHeight, overflowY: 'auto' } : undefined}>
-        <table className="w-full text-sm">
+        <table className="w-full text-[11px] sm:text-sm">
           <thead>
             <tr className="bg-secondary">
               {columns.map((col) => (
                 <th
                   key={String(col.key)}
                   onClick={() => !isServerPaginated && handleSort(col.key)}
-                  className={`px-4 py-3 font-medium text-secondary-foreground ${!isServerPaginated ? 'cursor-pointer hover:text-foreground' : ''} select-none ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}
+                  className={`px-2 sm:px-4 py-2 sm:py-3 font-medium text-secondary-foreground whitespace-nowrap ${!isServerPaginated ? 'cursor-pointer hover:text-foreground' : ''} select-none ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}
                 >
                   <span className="inline-flex items-center gap-1">
                     {col.label}
@@ -106,7 +106,7 @@ export function DataTable<T extends Record<string, any>>({ columns, data, rowCla
                 {columns.map((col) => (
                   <td
                     key={String(col.key)}
-                    className={`px-4 py-3 ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}
+                    className={`px-2 sm:px-4 py-2 sm:py-3 ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}
                   >
                     {col.render ? col.render(row[col.key], row) : String(row[col.key] ?? '')}
                   </td>
@@ -114,7 +114,7 @@ export function DataTable<T extends Record<string, any>>({ columns, data, rowCla
               </tr>
             ))}
             {displayData.length === 0 && (
-              <tr><td colSpan={columns.length} className="px-4 py-8 text-center text-muted-foreground">Nenhum dado encontrado</td></tr>
+              <tr><td colSpan={columns.length} className="px-2 sm:px-4 py-8 text-center text-muted-foreground">Nenhum dado encontrado</td></tr>
             )}
           </tbody>
         </table>
@@ -122,29 +122,29 @@ export function DataTable<T extends Record<string, any>>({ columns, data, rowCla
 
       {/* Pagination controls */}
       {totalPages > 1 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 px-2 py-3">
-          <span className="text-xs text-muted-foreground">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-1.5 sm:gap-2 px-2 py-2 sm:py-3">
+          <span className="text-[10px] sm:text-xs text-muted-foreground">
             {((safePage - 1) * ps) + 1}–{Math.min(safePage * ps, totalItems)} de {totalItems}
           </span>
           <div className="flex items-center gap-1">
             <button
               onClick={() => handlePageChange(safePage - 1)}
               disabled={safePage <= 1}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-foreground bg-secondary hover:bg-secondary/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2.5 py-1 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-medium text-foreground bg-secondary hover:bg-secondary/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              <ChevronLeft className="h-3.5 w-3.5" />
+              <ChevronLeft className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
               Anterior
             </button>
-            <span className="px-3 text-xs text-muted-foreground">
+            <span className="px-2 sm:px-3 text-[10px] sm:text-xs text-muted-foreground">
               {safePage} / {totalPages}
             </span>
             <button
               onClick={() => handlePageChange(safePage + 1)}
               disabled={safePage >= totalPages}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-foreground bg-secondary hover:bg-secondary/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2.5 py-1 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-medium text-foreground bg-secondary hover:bg-secondary/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Próximo
-              <ChevronRight className="h-3.5 w-3.5" />
+              <ChevronRight className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
             </button>
           </div>
         </div>
