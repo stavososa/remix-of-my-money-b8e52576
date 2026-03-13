@@ -157,6 +157,7 @@ export function PeriodFilter() {
                     selected={tempTo}
                     onSelect={setTempTo}
                     defaultMonth={firstDayOfMonth}
+                    disabled={(date) => date > new Date()}
                     className={cn('p-3 pointer-events-auto')}
                     locale={ptBR}
                   />
