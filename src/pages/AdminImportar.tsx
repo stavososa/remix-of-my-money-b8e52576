@@ -261,8 +261,11 @@ export default function AdminImportar() {
 
         {/* Success Result */}
         {resultado && !erro && !importing && (
-          <div className="bg-card border-l-4 border-l-success border border-border rounded-lg p-5 shadow-card space-y-4">
-            <h4 className="font-semibold text-foreground text-lg">✅ Importação concluída!</h4>
+          <div className="bg-card border-l-4 border-l-success border border-border rounded-lg p-5 shadow-card space-y-4 hover:bg-success/[0.02] transition-colors">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-success" />
+              <h4 className="font-semibold text-foreground text-lg">Importação concluída!</h4>
+            </div>
             <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
               <span className="text-muted-foreground">Período:</span>
               <span className="text-foreground font-medium">{resultado.periodo ?? `${MESES[mes]}/${ano}`}</span>
@@ -279,10 +282,10 @@ export default function AdminImportar() {
             </div>
 
             {nomesNaoEncontrados.length > 0 && (
-              <div className="bg-primary/10 border border-primary/30 rounded-lg p-4 space-y-2">
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-2 hover:bg-primary/[0.08] transition-colors">
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-semibold text-foreground">⚠️ Vendedores não encontrados:</span>
+                  <span className="text-sm font-semibold text-foreground">Vendedores não encontrados:</span>
                 </div>
                 <ul className="list-disc list-inside text-sm text-secondary-foreground space-y-0.5">
                   {nomesNaoEncontrados.map((n: string, i: number) => (

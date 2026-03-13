@@ -20,11 +20,16 @@ const fmtCompact = (v: number) =>
 const formatPct = (v: number | null) =>
   v != null ? `${v.toFixed(1)}%` : '—';
 
+const MedalhaIcone = ({ pos }: { pos: number }) => {
+  if (pos === 1) return <Crown className="h-5 w-5 text-[#FFD700]" />; // Gold
+  if (pos === 2) return <Trophy className="h-5 w-5 text-[#C0C0C0]" />; // Silver
+  if (pos === 3) return <Trophy className="h-5 w-5 text-[#CD7F32]" />; // Bronze
+  return <span className="text-muted-foreground font-mono text-sm">{pos}</span>;
+};
+
 const medalha = (pos: number | null) => {
-  if (pos === 1) return '🥇';
-  if (pos === 2) return '🥈';
-  if (pos === 3) return '🥉';
-  return String(pos ?? '—');
+  if (pos == null) return '—';
+  return <MedalhaIcone pos={pos} />;
 };
 
 function parseBRL(val: unknown): number {
@@ -57,7 +62,7 @@ interface ProductRank {
 
 function RankingTable({ data, nameLabel }: { data: RankedItem[]; nameLabel: string }) {
   const columns = [
-    { key: 'posicao' as const, label: '#', render: (v: number) => <span className={v <= 3 ? 'text-lg' : ''}>{medalha(v)}</span> },
+    { key: 'posicao' as const, label: '#', render: (v: number) => <div className="flex justify-center">{medalha(v)}</div> },
     { key: 'name' as const, label: nameLabel },
     { key: 'total_vendido' as const, label: 'Faturamento', align: 'right' as const, render: (v: number) => fmtCompact(v) },
     { key: 'lucro' as const, label: 'Lucro Real', align: 'right' as const, render: (v: number) => fmtCompact(v) },
@@ -71,9 +76,9 @@ function RankingTable({ data, nameLabel }: { data: RankedItem[]; nameLabel: stri
       </div>
       <div className="md:hidden space-y-3">
         {data.slice(0, 50).map((item) => (
-          <div key={item.name} className={`bg-card border border-border rounded-lg p-4 shadow-card ${item.posicao <= 3 ? 'border-primary/40' : ''}`}>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">{medalha(item.posicao)}</span>
+          <div key={item.name} className={`bg-card border border-border rounded-lg p-4 shadow-card cursor-pointer hover:border-primary/40 transition-all duration-200 ${item.posicao <= 3 ? 'border-primary/20 bg-primary/[0.02]' : ''}`}>
+            <div className="flex items-center gap-3 mb-2">
+              <MedalhaIcone pos={item.posicao} />
               <span className="font-bold text-foreground text-sm">{item.name}</span>
             </div>
             <div className="grid grid-cols-3 gap-2 text-sm">
