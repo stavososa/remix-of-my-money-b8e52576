@@ -74,7 +74,7 @@ export default function AdminRegras() {
       qc.invalidateQueries({ queryKey: ['regras'] });
       setModal(null);
     },
-    onError: (e: Error) => toast.error(`Erro: ${e.message}`),
+    onError: (e: any) => toast.error(`Erro: ${e.message}`),
   });
 
   const deleteMutation = useMutation({
@@ -87,7 +87,7 @@ export default function AdminRegras() {
       qc.invalidateQueries({ queryKey: ['regras'] });
       setConfirmDelete(null);
     },
-    onError: (e: Error) => toast.error(`Erro: ${e.message}`),
+    onError: (e: any) => toast.error(`Erro: ${e.message}`),
   });
 
   const toggleAtivo = useMutation({
@@ -96,10 +96,8 @@ export default function AdminRegras() {
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['regras'] }),
-    onError: (e: Error) => toast.error(`Erro: ${e.message}`),
+    onError: (e: any) => toast.error(`Erro: ${e.message}`),
   });
-
-  type RegraRow = typeof regras[0];
 
   const columns = [
     { key: 'nome' as const, label: 'Nome' },
@@ -117,7 +115,7 @@ export default function AdminRegras() {
     },
     {
       key: 'ativo' as const, label: 'Status',
-      render: (v: boolean, row: RegraRow) => (
+      render: (v: boolean, row: any) => (
         <button
           onClick={(e) => { e.stopPropagation(); toggleAtivo.mutate({ id: row.id, ativo: !v }); }}
           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${v ? 'bg-success' : 'bg-secondary'}`}
@@ -128,7 +126,7 @@ export default function AdminRegras() {
     },
     {
       key: 'id' as const, label: 'Ações',
-      render: (_: string, row: RegraRow) => (
+      render: (_: string, row: any) => (
         <div className="flex gap-2">
           <button
             onClick={(e) => {
@@ -185,7 +183,7 @@ export default function AdminRegras() {
               <DataTable columns={columns} data={regras} />
             </div>
             <div className="md:hidden space-y-3">
-              {regras.map((r) => (
+              {regras.map((r: any) => (
                 <div key={r.id} className="bg-card border border-border rounded-lg p-4 shadow-card">
                   <div className="flex justify-between items-start mb-2">
                     <div>

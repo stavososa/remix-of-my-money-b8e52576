@@ -33,19 +33,7 @@ export default function AdminImportar() {
   const [spreadsheetId, setSpreadsheetId] = useState('');
   const [sheetName, setSheetName] = useState('Pasta1');
   const [importing, setImporting] = useState(false);
-
-  interface ImportResult {
-    periodo?: string;
-    vendedores_processados?: number | string;
-    total_vendido?: number;
-    total_geral_vendido?: number;
-    total_comissoes?: number;
-    linhas_processadas?: number | string;
-    linhas_ignoradas?: number | string;
-    nomes_nao_encontrados?: string[];
-  }
-
-  const [resultado, setResultado] = useState<ImportResult | null>(null);
+  const [resultado, setResultado] = useState<any>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [expandedLog, setExpandedLog] = useState<string | null>(null);
@@ -106,13 +94,12 @@ export default function AdminImportar() {
       const data = await response.json();
       setResultado(data);
       toast.success('Importação concluída');
-    } catch (error: unknown) {
+    } catch (error: any) {
       clearTimeout(timeout);
-      const err = error as { name?: string; message?: string };
-      if (err.name === 'AbortError') {
+      if (error.name === 'AbortError') {
         setErro('Timeout: a importação demorou mais de 3 minutos. Verifique o log.');
       } else {
-        setErro(`Erro na importação: ${err.message ?? 'Erro desconhecido'}`);
+        setErro(`Erro na importação: ${error.message}`);
       }
     } finally {
       setImporting(false);
@@ -125,22 +112,10 @@ export default function AdminImportar() {
     setResultado(null);
   };
 
-  type LogRow = {
-    id: string;
-    periodo_mes: number;
-    periodo_ano: number;
-    created_at: string | null;
-    qtd_vendedores: number | null;
-    total_geral_vendido: number | null;
-    total_comissoes: number | null;
-    status: string | null;
-    nomes_nao_encontrados: unknown;
-  };
-
   const logColumns = [
     {
       key: 'periodo_mes' as const, label: 'Período',
-      render: (_: number, row: LogRow) => `${MESES[row.periodo_mes]}/${row.periodo_ano}`,
+      render: (_: number, row: any) => `${MESES[row.periodo_mes]}/${row.periodo_ano}`,
     },
     {
       key: 'created_at' as const, label: 'Data/Hora',
@@ -166,8 +141,8 @@ export default function AdminImportar() {
     },
     {
       key: 'nomes_nao_encontrados' as const, label: 'Alertas',
-      render: (v: unknown, row: LogRow) => {
-        const nomes = Array.isArray(v) ? (v as string[]) : [];
+      render: (v: any, row: any) => {
+        const nomes = Array.isArray(v) ? v : [];
         if (nomes.length === 0) return <span className="text-muted-foreground text-xs">—</span>;
         return (
           <button
@@ -261,11 +236,8 @@ export default function AdminImportar() {
 
         {/* Success Result */}
         {resultado && !erro && !importing && (
-          <div className="bg-card border-l-4 border-l-success border border-border rounded-lg p-5 shadow-card space-y-4 hover:bg-success/[0.02] transition-colors">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-success" />
-              <h4 className="font-semibold text-foreground text-lg">Importação concluída!</h4>
-            </div>
+          <div className="bg-card border-l-4 border-l-success border border-border rounded-lg p-5 shadow-card space-y-4">
+            <h4 className="font-semibold text-foreground text-lg">✅ Importação concluída!</h4>
             <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
               <span className="text-muted-foreground">Período:</span>
               <span className="text-foreground font-medium">{resultado.periodo ?? `${MESES[mes]}/${ano}`}</span>
@@ -282,10 +254,10 @@ export default function AdminImportar() {
             </div>
 
             {nomesNaoEncontrados.length > 0 && (
-              <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-2 hover:bg-primary/[0.08] transition-colors">
+              <div className="bg-primary/10 border border-primary/30 rounded-lg p-4 space-y-2">
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-semibold text-foreground">Vendedores não encontrados:</span>
+                  <span className="text-sm font-semibold text-foreground">⚠️ Vendedores não encontrados:</span>
                 </div>
                 <ul className="list-disc list-inside text-sm text-secondary-foreground space-y-0.5">
                   {nomesNaoEncontrados.map((n: string, i: number) => (

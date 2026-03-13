@@ -110,8 +110,7 @@ export default function MeuPainel() {
       const { data } = await supabase.from('controle_pj').select('nome_vendas, unidade');
       return (data ?? []) as { nome_vendas: string | null; unidade: string | null }[];
     },
-    staleTime: 10 * 60 * 1000, // dados estruturais: cache longo
-    gcTime: 30 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
   });
 
   const vendedorFilialMap = useMemo(() => {
@@ -140,24 +139,16 @@ export default function MeuPainel() {
         .order('posicao', { ascending: true });
       return data ?? [];
     },
-    staleTime: 2 * 60 * 1000, // ranking: cache 2 min
+    staleTime: 0,
   });
-
-  type ControlePjRow = {
-    nome_vendas: string | null;
-    nome: string;
-    unidade: string | null;
-    [key: string]: unknown;
-  };
 
   const { data: controlePj } = useQuery({
     queryKey: ['controle-pj'],
     queryFn: async () => {
       const { data } = await supabase.from('controle_pj').select('*');
-      return (data ?? []) as ControlePjRow[];
+      return data ?? [];
     },
-    staleTime: 10 * 60 * 1000, // dados estruturais: cache longo
-    gcTime: 30 * 60 * 1000,
+    staleTime: 0,
   });
 
   // Build nome lookup: use both nome_vendas and nome (case-insensitive)
@@ -165,14 +156,14 @@ export default function MeuPainel() {
     const pjList = controlePj ?? [];
     const names: string[] = [];
     for (const c of pjList) {
-      if (c.nome_vendas) names.push(c.nome_vendas);
+      if ((c as any).nome_vendas) names.push((c as any).nome_vendas);
       if (c.nome) names.push(c.nome);
     }
-    return [...new Set(names.filter((n): n is string => Boolean(n)))];
+    return [...new Set(names.filter(Boolean))];
   }, [controlePj]);
 
   const { data: vendasCountRaw } = useQuery({
-    queryKey: ['vendas-count-pj', [...nomeVendasList].sort().join(',')],
+    queryKey: ['vendas-count-pj', nomeVendasList.sort().join(',')],
     enabled: nomeVendasList.length > 0,
     queryFn: async () => {
       const { data } = await supabase
@@ -180,7 +171,7 @@ export default function MeuPainel() {
         .select('vendedor_nome, total_com_desconto');
       return data ?? [];
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: 0,
   });
 
   // Vendas com data (para gráfico cronológico)
@@ -193,7 +184,7 @@ export default function MeuPainel() {
         .order('data_emissao', { ascending: true });
       return (data ?? []).filter(r => r.data_emissao);
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: 0,
   });
 
   const { data: vendasGeraisRaw } = useQuery({
@@ -202,7 +193,7 @@ export default function MeuPainel() {
       const { data } = await supabase.from('vendas_gerais').select('total_mercadoria');
       return data ?? [];
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: 0,
   });
 
   // ── Admin: all sales ──
@@ -217,7 +208,7 @@ export default function MeuPainel() {
         .limit(5000);
       return data ?? [];
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: 0,
   });
 
   // ── Vendedor: individual sales ──
@@ -235,20 +226,20 @@ export default function MeuPainel() {
   });
 
   // Find the nome_vendas that matches logged-in vendedor
-  const myNomeVendas = useMemo(() => {
+  const myNomeVendas = (() => {
     if (isAdmin) return null;
     const pjList = controlePj ?? [];
     // Match by nome_completo
     const byName = pjList.find(p => nome_completo && p.nome.toLowerCase().trim() === nome_completo.toLowerCase().trim());
-    if (byName) return byName.nome_vendas;
+    if (byName) return (byName as any).nome_vendas as string | null;
     // Match by nome_omie
     const omie = vendedorNomeOmie.data?.nome_omie;
     if (omie) {
-      const byOmie = pjList.find(p => p.nome_vendas && p.nome_vendas.toLowerCase().trim() === omie.toLowerCase().trim());
-      if (byOmie) return byOmie.nome_vendas;
+      const byOmie = pjList.find(p => (p as any).nome_vendas && (p as any).nome_vendas.toLowerCase().trim() === omie.toLowerCase().trim());
+      if (byOmie) return (byOmie as any).nome_vendas as string | null;
     }
     return null;
-  }, [isAdmin, controlePj, nome_completo, vendedorNomeOmie.data]);
+  })();
 
   const { data: vendasIndividuais } = useQuery({
     queryKey: ['vendas-individual', myNomeVendas],
@@ -279,7 +270,7 @@ export default function MeuPainel() {
   });
 
   // ── Ranking PJ (shared) ──
-  const rankingPj = useMemo(() => {
+  const rankingPj = (() => {
     const pjList = controlePj ?? [];
     const vendasRows = vendasCountRaw ?? [];
     // Normalize helper
@@ -294,7 +285,8 @@ export default function MeuPainel() {
       revenueMap[key] = (revenueMap[key] ?? 0) + parseMoneyBR(v.total_com_desconto);
     });
     const ranked = pjList.map(pj => {
-      const nomeVendas = pj.nome_vendas;
+      const nomeVendas = (pj as any).nome_vendas as string | null;
+      // Try nome_vendas first, then nome
       const key1 = nomeVendas ? norm(nomeVendas) : '';
       const key2 = pj.nome ? norm(pj.nome) : '';
       const qtd = (key1 && countMap[key1]) ? countMap[key1] : (key2 && countMap[key2]) ? countMap[key2] : 0;
@@ -309,7 +301,7 @@ export default function MeuPainel() {
     });
     ranked.sort((a, b) => b.qtd_vendas - a.qtd_vendas);
     return ranked.map((r, i) => ({ ...r, posicao: i + 1 }));
-  }, [controlePj, vendasCountRaw]);
+  })();
 
   // ── Aggregations ──
   const vendasSourceRaw = isAdmin ? (allVendas ?? []) : (vendasIndividuais ?? []);
@@ -414,7 +406,7 @@ export default function MeuPainel() {
   const remainingVendas = vendasTableData.length - 10;
 
   // ── Produtos mais vendidos (agregação) ──
-  const topProdutos = useMemo(() => {
+  const topProdutos = (() => {
     const map = new Map<string, { count: number; qty: number; total: number; marca: string }>();
     vendasSource.forEach(v => {
       const nome = v.descricao_produto ?? '';
@@ -428,9 +420,9 @@ export default function MeuPainel() {
       });
     });
     return Array.from(map.entries())
-      .map(([nome, d]) => ({ nome, ...d }))
+      .map(([nome, d], _i) => ({ nome, ...d }))
       .sort((a, b) => b.count - a.count);
-  }, [vendasSource]);
+  })();
   const displayedProdutos = showAllProdutos ? topProdutos : topProdutos.slice(0, 10);
   const remainingProdutos = topProdutos.length - 10;
 
@@ -463,14 +455,11 @@ export default function MeuPainel() {
               <div className="space-y-1">
                 <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground">
                   {isAdmin ? (
-                    <>Painel Administrativo <span className="inline-block" role="img" aria-label="admin">📊</span></>
+                    <>Painel Administrativo <span className="inline-block">📊</span></>
                   ) : (
-                    <>Olá, {primeiroNome}! <span className="inline-block" role="img" aria-label="welcome">👋</span></>
+                    <>Olá, {primeiroNome}! <span className="inline-block">💪</span></>
                   )}
                 </h2>
-                <p className="text-sm text-secondary-foreground mt-1 mb-2">
-                  {isAdmin ? 'Visualize o desempenho geral da empresa no mês selecionado' : 'Acompanhe suas vendas consolidadas e comissões no mês'}
-                </p>
                 {!isAdmin && (
                   <p className="text-sm text-secondary-foreground">{unidade_nome} • {regime}</p>
                 )}
@@ -590,12 +579,13 @@ export default function MeuPainel() {
             </div>
           )}
 
-          <div className="bg-card border border-border rounded-xl p-4 sm:p-6 lg:p-8 shadow-card" title={isAdmin ? "Mostra o ticket médio global comparado à mediana de todas as notas" : "Como seu ticket médio individual se compara à média de toda a empresa"}>
+          {/* Comparativo Ticket Médio */}
+          <div className="bg-card border border-border rounded-xl p-4 sm:p-6 lg:p-8 shadow-card">
             <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">
               {isAdmin ? 'Ticket Médio vs Mediana' : 'Você vs Média da Empresa'}
             </p>
-            <p className="text-xs text-muted-foreground mb-4">
-              {isAdmin ? 'Identifique se o ticket médio está inflado por poucas notas altas (se for muito maior que a Mediana)' : 'Comparativo contra a média geral de vendas para identificar espaço para maior conversão'}
+            <p className="text-[10px] text-muted-foreground mb-4">
+              {isAdmin ? 'Comparativo do ticket médio geral contra a mediana' : 'Comparativo contra a média geral de vendas'}
             </p>
             <div className="space-y-5">
               <div>

@@ -32,8 +32,8 @@ export function KPICard({ icon: Icon, label, value, subtitle, trend, trendValue,
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ scale: 1.02, y: -2 }}
       transition={{ duration: 0.3 }}
-      className="bg-card border border-border rounded-lg p-4 sm:p-5 shadow-card relative overflow-hidden cursor-pointer flex flex-col justify-center"
-      title={subtitle ? `${label}: ${subtitle}` : label}
+      className="bg-card border border-border rounded-lg p-4 sm:p-5 shadow-card relative overflow-hidden"
+      style={{ borderLeftWidth: 4, borderLeftColor: accentColor || 'hsl(215 40% 24%)' }}
     >
       <div className="flex items-start justify-between">
         <div className="space-y-1">
@@ -50,9 +50,9 @@ export function KPICard({ icon: Icon, label, value, subtitle, trend, trendValue,
         <div
           className="h-10 w-10 sm:h-12 sm:w-12 rounded-full flex items-center justify-center shrink-0"
           style={{
-            backgroundColor: accentColor
-              ? `${accentColor.replace('hsl', 'hsla').replace(')', ' / 0.15)')}`
-              : 'hsl(38 90% 55% / 0.15)',
+            background: accentColor
+              ? `linear-gradient(135deg, ${accentColor}22, ${accentColor}11)`
+              : 'linear-gradient(135deg, hsl(38 90% 55% / 0.15), hsl(38 90% 55% / 0.05))',
           }}
         >
           <Icon className="h-5 w-5" style={{ color: accentColor || 'hsl(38 90% 55%)' }} />

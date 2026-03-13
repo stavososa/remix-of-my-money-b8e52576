@@ -20,16 +20,11 @@ const fmtCompact = (v: number) =>
 const formatPct = (v: number | null) =>
   v != null ? `${v.toFixed(1)}%` : '—';
 
-const MedalhaIcone = ({ pos }: { pos: number }) => {
-  if (pos === 1) return <Crown className="h-5 w-5 text-[#FFD700]" />; // Gold
-  if (pos === 2) return <Trophy className="h-5 w-5 text-[#C0C0C0]" />; // Silver
-  if (pos === 3) return <Trophy className="h-5 w-5 text-[#CD7F32]" />; // Bronze
-  return <span className="text-muted-foreground font-mono text-sm">{pos}</span>;
-};
-
 const medalha = (pos: number | null) => {
-  if (pos == null) return '—';
-  return <MedalhaIcone pos={pos} />;
+  if (pos === 1) return '🥇';
+  if (pos === 2) return '🥈';
+  if (pos === 3) return '🥉';
+  return String(pos ?? '—');
 };
 
 function parseBRL(val: unknown): number {
@@ -62,7 +57,7 @@ interface ProductRank {
 
 function RankingTable({ data, nameLabel }: { data: RankedItem[]; nameLabel: string }) {
   const columns = [
-    { key: 'posicao' as const, label: '#', render: (v: number) => <div className="flex justify-center">{medalha(v)}</div> },
+    { key: 'posicao' as const, label: '#', render: (v: number) => <span className={v <= 3 ? 'text-lg' : ''}>{medalha(v)}</span> },
     { key: 'name' as const, label: nameLabel },
     { key: 'total_vendido' as const, label: 'Faturamento', align: 'right' as const, render: (v: number) => fmtCompact(v) },
     { key: 'lucro' as const, label: 'Lucro Real', align: 'right' as const, render: (v: number) => fmtCompact(v) },
@@ -72,13 +67,13 @@ function RankingTable({ data, nameLabel }: { data: RankedItem[]; nameLabel: stri
   return (
     <>
       <div className="hidden md:block">
-        <DataTable columns={columns} data={data.slice(0, 50)} rowClassName={(row: RankedItem) => row.posicao <= 3 ? 'bg-primary/5' : ''} />
+        <DataTable columns={columns} data={data.slice(0, 50)} rowClassName={(row: any) => row.posicao <= 3 ? 'bg-primary/5' : ''} />
       </div>
       <div className="md:hidden space-y-3">
         {data.slice(0, 50).map((item) => (
-          <div key={item.name} className={`bg-card border border-border rounded-lg p-4 shadow-card cursor-pointer hover:border-primary/40 transition-all duration-200 ${item.posicao <= 3 ? 'border-primary/20 bg-primary/[0.02]' : ''}`}>
-            <div className="flex items-center gap-3 mb-2">
-              <MedalhaIcone pos={item.posicao} />
+          <div key={item.name} className={`bg-card border border-border rounded-lg p-4 shadow-card ${item.posicao <= 3 ? 'border-primary/40' : ''}`}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-lg">{medalha(item.posicao)}</span>
               <span className="font-bold text-foreground text-sm">{item.name}</span>
             </div>
             <div className="grid grid-cols-3 gap-2 text-sm">
@@ -119,38 +114,20 @@ export default function Ranking() {
     queryKey: ['vendas-ranking-prod', periodoAno, periodoMes],
     enabled: !loadingPeriodo,
     queryFn: async () => {
-      type VRow = { descricao_produto: string | null; familia_produto: string | null; marca: string | null; total_com_desconto: unknown; quantidade: unknown; vendedor_nome: string | null; lucros_reais: unknown };
-      
-      const { count, error: countErr } = await supabase
-        .from('vendas')
-        .select('*', { count: 'exact', head: true })
-        .gte('data_emissao', inicioMes)
-        .lte('data_emissao', fimMes);
-        
-      if (countErr) throw countErr;
-      if (!count || count === 0) return [];
-
+      let allData: any[] = [];
+      let from = 0;
       const PAGE = 1000;
-      const totalPages = Math.ceil(count / PAGE);
-      const promises = [];
-
-      for (let i = 0; i < totalPages; i++) {
-        const from = i * PAGE;
-        promises.push(
-          supabase
-            .from('vendas')
-            .select('descricao_produto, familia_produto, marca, total_com_desconto, quantidade, vendedor_nome, lucros_reais')
-            .gte('data_emissao', inicioMes)
-            .lte('data_emissao', fimMes)
-            .range(from, from + PAGE - 1)
-        );
-      }
-
-      const results = await Promise.all(promises);
-      let allData: VRow[] = [];
-      for (const res of results) {
-        if (res.error) throw res.error;
-        if (res.data) allData = allData.concat(res.data as VRow[]);
+      while (true) {
+        const { data } = await supabase
+          .from('vendas')
+          .select('descricao_produto, familia_produto, marca, total_com_desconto, quantidade, vendedor_nome, lucros_reais')
+          .gte('data_emissao', inicioMes)
+          .lte('data_emissao', fimMes)
+          .range(from, from + PAGE - 1);
+        if (!data || data.length === 0) break;
+        allData.push(...data);
+        if (data.length < PAGE) break;
+        from += PAGE;
       }
       return allData;
     },
@@ -310,10 +287,6 @@ export default function Ranking() {
         <div className="flex items-center justify-center min-h-[50vh] text-muted-foreground">Carregando...</div>
       ) : (
         <div className="space-y-6">
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-foreground">Ranking de Vendas</h1>
-            <p className="text-sm text-muted-foreground mt-1">Acompanhe a performance de vendedores, marcas e produtos no mês selecionado.</p>
-          </div>
           {/* Banner Top Performer */}
           {top1 && (
             <div className="relative overflow-hidden rounded-xl border-2 border-primary bg-gradient-to-br from-primary/10 via-card to-card p-6 shadow-card"
@@ -366,7 +339,7 @@ export default function Ranking() {
               </div>
 
               <div className="hidden md:block">
-                <DataTable columns={vendedorColumns} data={rankingData} rowClassName={(row: typeof rankingData[0]) => row.posicao != null && row.posicao <= 3 ? 'bg-primary/5' : ''} />
+                <DataTable columns={vendedorColumns} data={rankingData} rowClassName={(row: any) => row.posicao != null && row.posicao <= 3 ? 'bg-primary/5' : ''} />
               </div>
 
               <div className="md:hidden space-y-3">
@@ -401,7 +374,7 @@ export default function Ranking() {
               </div>
 
               <div className="hidden md:block">
-                <DataTable columns={produtoColumns} data={productRanking.slice(0, 50)} rowClassName={(row: ProductRank) => row.posicao <= 3 ? 'bg-primary/5' : ''} />
+                <DataTable columns={produtoColumns} data={productRanking.slice(0, 50)} rowClassName={(row: any) => row.posicao <= 3 ? 'bg-primary/5' : ''} />
               </div>
 
               <div className="md:hidden space-y-3">
