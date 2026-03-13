@@ -1,39 +1,37 @@
 
 
-## Gerencial com dados da tabela `vendas` + filtro por Unidade + graficos
+## Plano: Corrigir contagem de Notas Fiscais e prevenir dados parciais nos KPIs
 
-A tabela `vendas` tem 468 registros (Jan/2026) com valores em formato string brasileiro (ex: "R$ 15,40", "49,30%"). O campo `vendedor_nome` liga aos vendedores/unidades via `vendedores.nome_omie`. Sera necessario fazer JOIN client-side ou via query para associar unidade a cada venda.
+### Problemas Identificados
 
-### Abordagem
+1. **KPIs "piscam" ao carregar**: React Query mostra dados em cache (stale) imediatamente e depois atualiza com dados frescos, causando a mudança de valores visível ao usuário.
 
-Buscar dados da tabela `vendas` filtrados por periodo (`data_emissao`), e cruzar com `vendedores` + `unidades` para obter a unidade de cada venda. Parsear valores monetarios/percentuais no frontend (padrão ja existente no projeto).
+2. **Contagem de Notas Fiscais potencialmente incorreta**: O código atual conta `nota_fiscal` como `Set<string>`, mas o mesmo número de NF pode existir em lojas diferentes (`cnpj_empresa` diferente). Ex: NF "000013699" na loja `/0011-75` e NF "000013699" na loja `/0013-37` são notas diferentes, mas seriam contadas como uma só.
 
-### Alteracoes em `src/pages/Gerencial.tsx`
+### Alterações
 
-1. **Nova query: buscar `vendas`** filtradas pelo periodo atual (mes/ano do `data_emissao`), com limite adequado
+**`src/pages/Gerencial.tsx`**
 
-2. **Nova query: buscar `vendedores` com `unidades`** para mapear `nome_omie` -> `unidade_nome`
+1. **Bloquear exibição até dados completos**: Mostrar skeleton/loading nos KPIs e gráfico enquanto `loadAll` for `true` ou `isFetching` estiver ativo (dados stale sendo atualizados). Isso impede que os números "pulem".
 
-3. **Processar dados client-side**:
-   - Parsear `total_com_desconto`, `lucros_reais`, `margem_percentual` de string BR para number
-   - Associar cada venda a sua unidade via mapa vendedor->unidade
-   - Agregar por unidade: total vendido, lucro, margem media, qtd vendas
+2. **Corrigir contagem de NF**: Mudar o `Set` para usar a chave composta `nota_fiscal + cnpj_empresa` em vez de apenas `nota_fiscal`:
+   ```typescript
+   const totalNotas = useMemo(() => {
+     const set = new Set<string>();
+     for (const row of filteredAll) {
+       if (row.nota_fiscal) set.add(`${row.nota_fiscal}_${row.cnpj_empresa ?? ''}`);
+     }
+     return set.size;
+   }, [filteredAll]);
+   ```
 
-4. **Filtro por Unidade**: O select de unidades ja existe. Ao selecionar uma unidade, filtrar as vendas processadas e recalcular todos os KPIs e graficos.
+3. **Adicionar `isFetching` da query**: Extrair `isFetching` além de `isLoading` para detectar refetches em background:
+   ```typescript
+   const { data: allVendas, isLoading: loadAll, isFetching: fetchingAll } = useQuery({...});
+   ```
 
-5. **Novos graficos usando dados de `vendas`**:
-   - **Faturamento por Unidade** (BarChart horizontal - ja existe, alimentar com dados de vendas)
-   - **Margem Media por Unidade** (novo BarChart horizontal, cor verde)
-   - **Top Familias de Produto** (BarChart mostrando as familias mais vendidas, reagindo ao filtro de unidade)
+4. **Overlay de loading**: Quando `loadAll || fetchingAll`, exibir um indicador sutil (spinner ou skeleton) sobre os KPIs e gráfico, garantindo que o usuário só veja valores finais.
 
-6. **Cards PJ vs CLT**: Recalcular a partir do cruzamento vendas + vendedores (que tem campo `regime`), ao inves de depender exclusivamente da view `v_resumo_regime`
-
-7. **Layout**: Organizar graficos em grid 2 colunas no desktop
-
-### Detalhes tecnicos
-
-- Funcoes de parsing ja existem no projeto (regex para "R$ X,XX" e "XX,XX%")
-- A tabela `vendas` tem 468 linhas para Jan/2026, dentro do limite de 1000 do Supabase
-- Vendedores sem unidade (ex: "CHECK OUT", "COMPRA VENDEDOR") serao agrupados como "Sem Unidade" ou ignorados conforme filtro
-- Manter as queries existentes (`v_ranking`, `v_resumo_unidade`, `v_resumo_regime`) para dados de comissao que nao existem na tabela `vendas`
+### Resultado
+Os KPIs (incluindo Notas Fiscais) só serão exibidos com valores definitivos após o carregamento completo de todos os dados do período.
 
