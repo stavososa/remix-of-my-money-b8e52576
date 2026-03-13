@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { KPICard } from '@/components/KPICard';
 import { DataTable } from '@/components/DataTable';
@@ -6,8 +6,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usePeriod } from '@/contexts/PeriodContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { DollarSign, Target, Percent, FileText, TrendingUp, Trophy, Flame, BarChart3, ShoppingCart, TrendingDown, Store, Medal, ChevronDown, ChevronUp } from 'lucide-react';
+import { DollarSign, Target, Percent, FileText, TrendingUp, Trophy, Flame, BarChart3, ShoppingCart, TrendingDown, Store, Medal, ChevronDown, ChevronUp, Building2 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
   BarChart, Bar, LineChart, Line, ReferenceLine,
