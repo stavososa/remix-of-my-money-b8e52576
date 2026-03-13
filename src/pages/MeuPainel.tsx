@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { KPICard } from '@/components/KPICard';
 import { DataTable } from '@/components/DataTable';
@@ -6,8 +6,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usePeriod } from '@/contexts/PeriodContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { DollarSign, Target, Percent, FileText, TrendingUp, Trophy, Flame, BarChart3, ShoppingCart, TrendingDown, Store, Medal, ChevronDown, ChevronUp } from 'lucide-react';
+import { DollarSign, Target, Percent, FileText, TrendingUp, Trophy, Flame, BarChart3, ShoppingCart, TrendingDown, Store, Medal, ChevronDown, ChevronUp, Building2 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
   BarChart, Bar, LineChart, Line, ReferenceLine,
@@ -95,6 +96,35 @@ export default function MeuPainel() {
   const isAdmin = role === 'admin';
   const [showAllVendas, setShowAllVendas] = useState(false);
   const [showAllProdutos, setShowAllProdutos] = useState(false);
+  const [filtroFilial, setFiltroFilial] = useState('all');
+
+  // Reset filtro ao trocar período
+  useEffect(() => {
+    setFiltroFilial('all');
+  }, [periodoAno, periodoMes]);
+
+  // ── Unidades (CNPJ → Nome) ──
+  const { data: unidadesData } = useQuery({
+    queryKey: ['unidades-cnpj-painel'],
+    queryFn: async () => {
+      const { data } = await (supabase.from('unidades') as any).select('cnpj, nome');
+      return (data ?? []) as { cnpj: string | null; nome: string }[];
+    },
+    staleTime: 0,
+  });
+
+  const cnpjFilialMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const u of unidadesData ?? []) {
+      if (u.cnpj) map.set(u.cnpj.trim(), u.nome);
+    }
+    return map;
+  }, [unidadesData]);
+
+  const getFilial = useCallback((cnpjEmpresa: string | null | undefined): string => {
+    if (!cnpjEmpresa) return 'Sem Filial';
+    return cnpjFilialMap.get(cnpjEmpresa.trim()) ?? 'Sem Filial';
+  }, [cnpjFilialMap]);
 
   // ── Shared queries ──
 
@@ -173,7 +203,7 @@ export default function MeuPainel() {
     queryFn: async () => {
       const { data } = await supabase
         .from('vendas')
-        .select('data_emissao, total_com_desconto, lucros_reais, margem_percentual, nota_fiscal, vendedor_nome, descricao_produto, marca, quantidade')
+        .select('data_emissao, total_com_desconto, lucros_reais, margem_percentual, nota_fiscal, vendedor_nome, descricao_produto, marca, quantidade, cnpj_empresa')
         .order('data_emissao', { ascending: false })
         .limit(5000);
       return data ?? [];
@@ -274,7 +304,22 @@ export default function MeuPainel() {
   })();
 
   // ── Aggregations ──
-  const vendasSource = isAdmin ? (allVendas ?? []) : (vendasIndividuais ?? []);
+  const vendasSourceRaw = isAdmin ? (allVendas ?? []) : (vendasIndividuais ?? []);
+
+  // Filial options for admin filter
+  const filialOptions = useMemo(() => {
+    if (!isAdmin) return [];
+    const set = new Set<string>();
+    for (const v of vendasSourceRaw) {
+      set.add(getFilial((v as any).cnpj_empresa));
+    }
+    return Array.from(set).sort();
+  }, [vendasSourceRaw, isAdmin, getFilial]);
+
+  const vendasSource = useMemo(() => {
+    if (filtroFilial === 'all') return vendasSourceRaw;
+    return vendasSourceRaw.filter(v => getFilial((v as any).cnpj_empresa) === filtroFilial);
+  }, [vendasSourceRaw, filtroFilial, getFilial]);
 
   const vendasAgg = (() => {
     const rows = vendasSource;
@@ -420,6 +465,22 @@ export default function MeuPainel() {
                 )}
                 <p className="text-xs text-muted-foreground">{mesNome(periodoMes)} / {periodoAno}</p>
               </div>
+              {isAdmin && filialOptions.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                  <Select value={filtroFilial} onValueChange={setFiltroFilial}>
+                    <SelectTrigger className="w-[200px] bg-background/50 border-border">
+                      <SelectValue placeholder="Todas as Filiais" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as Filiais</SelectItem>
+                      {filialOptions.map(f => (
+                        <SelectItem key={f} value={f}>{f}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               {!isAdmin && (
                 <div className="flex flex-col items-center">
                   <div

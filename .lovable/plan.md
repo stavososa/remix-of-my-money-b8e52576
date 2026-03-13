@@ -1,29 +1,39 @@
 
 
-## Plano: Adicionar filtro por Filial no MeuPainel (Dashboard)
+## Gerencial com dados da tabela `vendas` + filtro por Unidade + graficos
 
-### O que muda
+A tabela `vendas` tem 468 registros (Jan/2026) com valores em formato string brasileiro (ex: "R$ 15,40", "49,30%"). O campo `vendedor_nome` liga aos vendedores/unidades via `vendedores.nome_omie`. Sera necessario fazer JOIN client-side ou via query para associar unidade a cada venda.
 
-Adicionar um select de Filial no topo do painel administrativo, filtrando todos os KPIs, gráficos, tabelas e ranking pelo CNPJ da venda.
+### Abordagem
 
-### Alterações em `src/pages/MeuPainel.tsx`
+Buscar dados da tabela `vendas` filtrados por periodo (`data_emissao`), e cruzar com `vendedores` + `unidades` para obter a unidade de cada venda. Parsear valores monetarios/percentuais no frontend (padrão ja existente no projeto).
 
-1. **Novo estado**: `filtroFilial` (default `'all'`)
+### Alteracoes em `src/pages/Gerencial.tsx`
 
-2. **Nova query**: Buscar `unidades` com `cnpj, nome` (mesma do Gerencial)
+1. **Nova query: buscar `vendas`** filtradas pelo periodo atual (mes/ano do `data_emissao`), com limite adequado
 
-3. **Mapa + helper**: `cnpjFilialMap` e `getFilial(cnpj_empresa)` (copiados do Gerencial)
+2. **Nova query: buscar `vendedores` com `unidades`** para mapear `nome_omie` -> `unidade_nome`
 
-4. **Atualizar query `allVendas`**: Incluir `cnpj_empresa` no select (atualmente não é buscado)
+3. **Processar dados client-side**:
+   - Parsear `total_com_desconto`, `lucros_reais`, `margem_percentual` de string BR para number
+   - Associar cada venda a sua unidade via mapa vendedor->unidade
+   - Agregar por unidade: total vendido, lucro, margem media, qtd vendas
 
-5. **Filtrar `vendasSource`**: Quando `filtroFilial !== 'all'`, filtrar as vendas antes de calcular `vendasAgg`, `vendasPorDia`, `vendasTableData`, `topProdutos` e `rankingPj`
+4. **Filtro por Unidade**: O select de unidades ja existe. Ao selecionar uma unidade, filtrar as vendas processadas e recalcular todos os KPIs e graficos.
 
-6. **UI do filtro**: Renderizar um `Select` de Filial no header do admin (abaixo do título ou ao lado), com opções extraídas dos CNPJs únicos das vendas mapeados para nomes de filial. Visível apenas para admin.
+5. **Novos graficos usando dados de `vendas`**:
+   - **Faturamento por Unidade** (BarChart horizontal - ja existe, alimentar com dados de vendas)
+   - **Margem Media por Unidade** (novo BarChart horizontal, cor verde)
+   - **Top Familias de Produto** (BarChart mostrando as familias mais vendidas, reagindo ao filtro de unidade)
 
-7. **Reset**: Limpar `filtroFilial` ao trocar período
+6. **Cards PJ vs CLT**: Recalcular a partir do cruzamento vendas + vendedores (que tem campo `regime`), ao inves de depender exclusivamente da view `v_resumo_regime`
 
-### Escopo
+7. **Layout**: Organizar graficos em grid 2 colunas no desktop
 
-- Apenas para admin (`isAdmin = true`). Vendedores individuais não precisam deste filtro.
-- Reutiliza a mesma lógica de mapeamento CNPJ→Filial já implementada no Gerencial.
+### Detalhes tecnicos
+
+- Funcoes de parsing ja existem no projeto (regex para "R$ X,XX" e "XX,XX%")
+- A tabela `vendas` tem 468 linhas para Jan/2026, dentro do limite de 1000 do Supabase
+- Vendedores sem unidade (ex: "CHECK OUT", "COMPRA VENDEDOR") serao agrupados como "Sem Unidade" ou ignorados conforme filtro
+- Manter as queries existentes (`v_ranking`, `v_resumo_unidade`, `v_resumo_regime`) para dados de comissao que nao existem na tabela `vendas`
 
