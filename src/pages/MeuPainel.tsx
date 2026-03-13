@@ -203,7 +203,7 @@ export default function MeuPainel() {
     queryFn: async () => {
       const { data } = await supabase
         .from('vendas')
-        .select('data_emissao, total_com_desconto, lucros_reais, margem_percentual, nota_fiscal, vendedor_nome, descricao_produto, marca, quantidade')
+        .select('data_emissao, total_com_desconto, lucros_reais, margem_percentual, nota_fiscal, vendedor_nome, descricao_produto, marca, quantidade, cnpj_empresa')
         .order('data_emissao', { ascending: false })
         .limit(5000);
       return data ?? [];
