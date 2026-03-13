@@ -94,7 +94,7 @@ function RankingTable({ data, nameLabel }: { data: RankedItem[]; nameLabel: stri
 }
 
 export default function Ranking() {
-  const { periodoAno, periodoMes, loading: loadingPeriodo } = usePeriod();
+  const { periodoAno, periodoMes, dataInicio, dataFim, loading: loadingPeriodo } = usePeriod();
 
   const { data: ranking = [], isLoading: loadRanking } = useQuery({
     queryKey: ['ranking', periodoAno, periodoMes],
