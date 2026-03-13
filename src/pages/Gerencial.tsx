@@ -90,32 +90,32 @@ export default function Gerencial() {
   const endDay = new Date(periodoAno, periodoMes, 0).getDate();
   const endDate = `${periodoAno}-${String(periodoMes).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
 
-  // ===== unidades (cnpj→nome) for filial mapping =====
-  const { data: unidadesData } = useQuery({
-    queryKey: ['unidades-cnpj'],
+  // ===== controle_pj (vendedor_nome → unidade) for filial mapping =====
+  const { data: controlePjFilial } = useQuery({
+    queryKey: ['controle-pj-filial'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('unidades')
-        .select('cnpj, nome' as any);
+        .from('controle_pj')
+        .select('nome_vendas, unidade');
       if (error) throw error;
-      return (data ?? []) as unknown as { cnpj: string | null; nome: string }[];
+      return (data ?? []) as { nome_vendas: string | null; unidade: string | null }[];
     },
     staleTime: 10 * 60 * 1000,
   });
 
-  const cnpjFilialMap = useMemo(() => {
+  const vendedorFilialMap = useMemo(() => {
     const map = new Map<string, string>();
-    if (!unidadesData) return map;
-    for (const u of unidadesData) {
-      if (u.cnpj) map.set(u.cnpj.trim(), u.nome);
+    if (!controlePjFilial) return map;
+    for (const row of controlePjFilial) {
+      if (row.nome_vendas && row.unidade) map.set(row.nome_vendas.trim(), row.unidade);
     }
     return map;
-  }, [unidadesData]);
+  }, [controlePjFilial]);
 
-  const getFilial = useCallback((cnpjEmpresa: string | null | undefined): string => {
-    if (!cnpjEmpresa) return 'Sem Filial';
-    return cnpjFilialMap.get(cnpjEmpresa.trim()) ?? 'Sem Filial';
-  }, [cnpjFilialMap]);
+  const getFilial = useCallback((vendedorNome: string | null | undefined): string => {
+    if (!vendedorNome) return 'Sem Filial';
+    return vendedorFilialMap.get(vendedorNome.trim()) ?? 'Sem Filial';
+  }, [vendedorFilialMap]);
 
   // ===== FULL PERIOD DATA (for KPIs & charts) =====
   const { data: allVendas, isLoading: loadAll } = useQuery({
