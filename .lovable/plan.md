@@ -1,39 +1,23 @@
 
 
-## Gerencial com dados da tabela `vendas` + filtro por Unidade + graficos
+## Plano: KPIs como ícones clicáveis no mobile
 
-A tabela `vendas` tem 468 registros (Jan/2026) com valores em formato string brasileiro (ex: "R$ 15,40", "49,30%"). O campo `vendedor_nome` liga aos vendedores/unidades via `vendedores.nome_omie`. Sera necessario fazer JOIN client-side ou via query para associar unidade a cada venda.
+### Conceito
+No mobile, os 5 KPI cards são substituídos por uma barra horizontal de 5 ícones circulares. Ao clicar em um ícone, um pequeno popover/tooltip mostra o label e o valor. No desktop, tudo continua como está.
 
-### Abordagem
+### Alterações
 
-Buscar dados da tabela `vendas` filtrados por periodo (`data_emissao`), e cruzar com `vendedores` + `unidades` para obter a unidade de cada venda. Parsear valores monetarios/percentuais no frontend (padrão ja existente no projeto).
+**`src/components/KPICard.tsx`**
+- Adicionar prop `compact?: boolean` (controlada pelo pai)
+- Quando `compact=true`: renderizar apenas o ícone circular (sem label/value), com um `Popover` que ao clicar exibe label + value em um pequeno card flutuante
+- Usar `Popover` do Radix (já existe em `src/components/ui/popover.tsx`)
 
-### Alteracoes em `src/pages/Gerencial.tsx`
+**`src/pages/Gerencial.tsx`** (linhas 387-393)
+- Importar `useIsMobile` de `src/hooks/use-mobile.tsx`
+- Passar `compact={isMobile}` para cada `KPICard`
+- No mobile, mudar o grid para `grid-cols-5` (uma coluna por ícone) com gap menor, centralizando os ícones em uma única linha horizontal
+- No desktop, manter `lg:grid-cols-5` com cards completos
 
-1. **Nova query: buscar `vendas`** filtradas pelo periodo atual (mes/ano do `data_emissao`), com limite adequado
-
-2. **Nova query: buscar `vendedores` com `unidades`** para mapear `nome_omie` -> `unidade_nome`
-
-3. **Processar dados client-side**:
-   - Parsear `total_com_desconto`, `lucros_reais`, `margem_percentual` de string BR para number
-   - Associar cada venda a sua unidade via mapa vendedor->unidade
-   - Agregar por unidade: total vendido, lucro, margem media, qtd vendas
-
-4. **Filtro por Unidade**: O select de unidades ja existe. Ao selecionar uma unidade, filtrar as vendas processadas e recalcular todos os KPIs e graficos.
-
-5. **Novos graficos usando dados de `vendas`**:
-   - **Faturamento por Unidade** (BarChart horizontal - ja existe, alimentar com dados de vendas)
-   - **Margem Media por Unidade** (novo BarChart horizontal, cor verde)
-   - **Top Familias de Produto** (BarChart mostrando as familias mais vendidas, reagindo ao filtro de unidade)
-
-6. **Cards PJ vs CLT**: Recalcular a partir do cruzamento vendas + vendedores (que tem campo `regime`), ao inves de depender exclusivamente da view `v_resumo_regime`
-
-7. **Layout**: Organizar graficos em grid 2 colunas no desktop
-
-### Detalhes tecnicos
-
-- Funcoes de parsing ja existem no projeto (regex para "R$ X,XX" e "XX,XX%")
-- A tabela `vendas` tem 468 linhas para Jan/2026, dentro do limite de 1000 do Supabase
-- Vendedores sem unidade (ex: "CHECK OUT", "COMPRA VENDEDOR") serao agrupados como "Sem Unidade" ou ignorados conforme filtro
-- Manter as queries existentes (`v_ranking`, `v_resumo_unidade`, `v_resumo_regime`) para dados de comissao que nao existem na tabela `vendas`
+### Resultado
+No smartphone, os 5 KPIs ocupam uma única linha como ícones compactos. Tocar em qualquer um abre um popover com o nome e valor. No desktop, nada muda.
 
