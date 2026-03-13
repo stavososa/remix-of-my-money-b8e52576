@@ -205,7 +205,7 @@ export default function Gerencial() {
       if (row.vendedor_nome) vendedores.add(row.vendedor_nome);
       if (row.familia_produto && row.familia_produto !== 'Outros') familias.add(row.familia_produto);
       if (row.marca && row.marca !== 'Sem Marca') marcas.add(row.marca);
-      const uni = getFilial(row.cnpj_empresa);
+      const uni = getFilial(row.vendedor_nome);
       if (uni !== 'Sem Filial') unidades.add(uni);
     }
     return {
