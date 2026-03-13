@@ -216,13 +216,13 @@ export default function Gerencial() {
     };
   }, [allVendas, getFilial]);
 
-  // Get CNPJs for a given filial (for server-side filtering)
-  const getCnpjsByFilial = useCallback((filial: string): string[] => {
-    if (!unidadesData) return [];
-    return unidadesData
-      .filter(u => u.nome === filial && u.cnpj)
-      .map(u => u.cnpj!.trim());
-  }, [unidadesData]);
+  // Get vendedor names for a given filial (for server-side filtering)
+  const getVendedoresByFilial = useCallback((filial: string): string[] => {
+    if (!controlePjFilial) return [];
+    return controlePjFilial
+      .filter(row => row.unidade === filial && row.nome_vendas)
+      .map(row => row.nome_vendas!.trim());
+  }, [controlePjFilial]);
 
   // Fetch paginated vendas for table
   const { data: vendasResult, isLoading: loadVendas } = useQuery({
