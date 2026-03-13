@@ -580,7 +580,7 @@ export default function MeuPainel() {
           )}
 
           {/* Comparativo Ticket Médio */}
-          <div className="bg-card border border-border rounded-xl p-8 shadow-card">
+          <div className="bg-card border border-border rounded-xl p-4 sm:p-6 lg:p-8 shadow-card">
             <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">
               {isAdmin ? 'Ticket Médio vs Mediana' : 'Você vs Média da Empresa'}
             </p>
