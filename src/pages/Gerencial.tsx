@@ -130,7 +130,7 @@ export default function Gerencial() {
 
   // ===== FULL PERIOD DATA (for KPIs & charts) =====
   const { data: allVendas, isLoading: loadAll } = useQuery({
-    queryKey: ['gerencial-all-vendas', periodoAno, periodoMes],
+    queryKey: ['gerencial-all-vendas', startDate, endDate],
     queryFn: async () => {
       type VendaRow = {
         data_emissao: string | null;
