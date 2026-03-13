@@ -32,13 +32,13 @@ export function KPICard({ icon: Icon, label, value, subtitle, trend, trendValue,
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ scale: 1.02, y: -2 }}
       transition={{ duration: 0.3 }}
-      className="bg-card border border-border rounded-lg p-5 shadow-card relative overflow-hidden"
+      className="bg-card border border-border rounded-lg p-4 sm:p-5 shadow-card relative overflow-hidden"
       style={{ borderLeftWidth: 4, borderLeftColor: accentColor || 'hsl(215 40% 24%)' }}
     >
       <div className="flex items-start justify-between">
         <div className="space-y-1">
           <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">{label}</p>
-          <p className="text-2xl font-bold text-foreground">{value}</p>
+          <p className="text-xl sm:text-2xl font-bold text-foreground truncate">{value}</p>
           {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
           {trend && trendValue && TrendIcon && (
             <div className={`flex items-center gap-1 text-xs font-medium ${trendColors[trend]}`}>
@@ -48,7 +48,7 @@ export function KPICard({ icon: Icon, label, value, subtitle, trend, trendValue,
           )}
         </div>
         <div
-          className="h-12 w-12 rounded-full flex items-center justify-center"
+          className="h-10 w-10 sm:h-12 sm:w-12 rounded-full flex items-center justify-center shrink-0"
           style={{
             background: accentColor
               ? `linear-gradient(135deg, ${accentColor}22, ${accentColor}11)`

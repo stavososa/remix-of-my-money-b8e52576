@@ -122,7 +122,7 @@ export function DataTable<T extends Record<string, any>>({ columns, data, rowCla
 
       {/* Pagination controls */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between px-2 py-3">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 px-2 py-3">
           <span className="text-xs text-muted-foreground">
             {((safePage - 1) * ps) + 1}–{Math.min(safePage * ps, totalItems)} de {totalItems}
           </span>

@@ -525,7 +525,7 @@ export default function MeuPainel() {
         <motion.div variants={item} className={`grid grid-cols-1 ${isAdmin ? 'lg:grid-cols-2' : 'lg:grid-cols-3'} gap-6`}>
           {/* Posição PJ - only for vendedor */}
           {!isAdmin && (
-            <div className="bg-card border border-border rounded-xl p-8 shadow-card flex flex-col items-center text-center relative overflow-hidden">
+            <div className="bg-card border border-border rounded-xl p-4 sm:p-6 lg:p-8 shadow-card flex flex-col items-center text-center relative overflow-hidden">
               <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-4">Sua Posição PJ</p>
               <div className="relative">
                 {minhaPosicaoPj && minhaPosicaoPj.posicao <= 3 && (
@@ -580,7 +580,7 @@ export default function MeuPainel() {
           )}
 
           {/* Comparativo Ticket Médio */}
-          <div className="bg-card border border-border rounded-xl p-8 shadow-card">
+          <div className="bg-card border border-border rounded-xl p-4 sm:p-6 lg:p-8 shadow-card">
             <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">
               {isAdmin ? 'Ticket Médio vs Mediana' : 'Você vs Média da Empresa'}
             </p>
@@ -644,7 +644,7 @@ export default function MeuPainel() {
           </div>
 
           {/* Gauge */}
-          <div className="bg-card border border-border rounded-xl p-8 shadow-card flex flex-col items-center text-center">
+          <div className="bg-card border border-border rounded-xl p-4 sm:p-6 lg:p-8 shadow-card flex flex-col items-center text-center">
             <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">
               {isAdmin ? 'Margem Média Geral' : 'Seu Ticket vs Média'}
             </p>
@@ -696,7 +696,7 @@ export default function MeuPainel() {
         </motion.div>
 
         {/* VENDAS DA EMPRESA - LineChart por Data */}
-        <motion.div variants={item} className="bg-card border border-border rounded-xl p-8 shadow-card">
+        <motion.div variants={item} className="bg-card border border-border rounded-xl p-4 sm:p-6 lg:p-8 shadow-card">
           <div className="flex items-center gap-2 mb-6">
             <BarChart3 className="h-4 w-4 text-primary" />
             <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Vendas da Empresa</p>
@@ -742,7 +742,7 @@ export default function MeuPainel() {
             }
 
             return (
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={chartDataEmpresa}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 40% 24%)" />
                   <XAxis dataKey="label" tick={{ fill: 'hsl(210 20% 60%)', fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
@@ -764,13 +764,13 @@ export default function MeuPainel() {
         </motion.div>
 
         {/* GRÁFICO VENDAS POR DIA */}
-        <motion.div variants={item} className="bg-card border border-border rounded-xl p-8 shadow-card">
+        <motion.div variants={item} className="bg-card border border-border rounded-xl p-4 sm:p-6 lg:p-8 shadow-card">
           <div className="flex items-center gap-2 mb-6">
             <BarChart3 className="h-4 w-4 text-primary" />
             <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Vendas por Dia</p>
           </div>
           {vendasPorDia.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={220}>
               <BarChart data={vendasPorDia}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 40% 24%)" />
                 <XAxis dataKey="dia" tick={{ fill: 'hsl(210 20% 60%)', fontSize: 11 }} />

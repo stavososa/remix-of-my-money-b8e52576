@@ -315,7 +315,7 @@ export default function Gerencial() {
     <AppShell title="Gerencial">
       <div className="space-y-6">
         {/* Filters */}
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 overflow-x-auto">
           <FilterSelect label="Filial" value={filtroUnidade} onChange={handleFilterChange(setFiltroUnidade)} options={filtros.unidades.map(u => ({ value: u, label: u }))} allLabel="Todas as Filiais" />
           <FilterSelect label="Vendedor" value={filtroVendedor} onChange={handleFilterChange(setFiltroVendedor)} options={filtros.vendedores.map(v => ({ value: v, label: v }))} allLabel="Todos os Vendedores" />
           <FilterSelect label="Família" value={filtroFamilia} onChange={handleFilterChange(setFiltroFamilia)} options={filtros.familias.map(f => ({ value: f, label: f }))} allLabel="Todas as Famílias" />
@@ -339,7 +339,7 @@ export default function Gerencial() {
         )}
 
         {/* KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
           <KPICard icon={DollarSign} label="Faturamento" value={fmt(kpis.totalFat)} accentColor="hsl(38 90% 55%)" />
           <KPICard icon={TrendingUp} label="Lucro" value={fmt(kpis.totalLucro)} accentColor="hsl(142 71% 45%)" />
           <KPICard icon={Percent} label="Margem Média" value={fmtPct(kpis.margemMedia)} accentColor="hsl(200 80% 50%)" />
@@ -353,7 +353,7 @@ export default function Gerencial() {
             <CardTitle className="text-sm font-semibold text-foreground">Faturamento por Dia</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
+            <div className="h-[220px] sm:h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartDiario}>
                   <defs>
@@ -380,7 +380,7 @@ export default function Gerencial() {
 
         {/* Sales Table */}
         <div>
-          <div className="flex items-center justify-between mb-3 gap-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-3 gap-2 sm:gap-3">
             <h3 className="text-sm font-semibold text-secondary-foreground whitespace-nowrap">
               Vendas Detalhadas ({vendasTotalCount} registros)
               {(loadVendas || loadAll) && <span className="ml-2 text-xs text-muted-foreground">(carregando...)</span>}
@@ -423,7 +423,7 @@ function FilterSelect({ label, value, onChange, options, allLabel }: {
     <select
       value={value}
       onChange={e => onChange(e.target.value)}
-      className="bg-secondary border border-border rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring min-w-[140px] max-w-[220px]"
+      className="bg-secondary border border-border rounded-md px-2 sm:px-3 py-2 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring min-w-[110px] sm:min-w-[140px] max-w-[220px]"
       title={label}
     >
       <option value="all">{allLabel}</option>
