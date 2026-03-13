@@ -304,7 +304,22 @@ export default function MeuPainel() {
   })();
 
   // ── Aggregations ──
-  const vendasSource = isAdmin ? (allVendas ?? []) : (vendasIndividuais ?? []);
+  const vendasSourceRaw = isAdmin ? (allVendas ?? []) : (vendasIndividuais ?? []);
+
+  // Filial options for admin filter
+  const filialOptions = useMemo(() => {
+    if (!isAdmin) return [];
+    const set = new Set<string>();
+    for (const v of vendasSourceRaw) {
+      set.add(getFilial((v as any).cnpj_empresa));
+    }
+    return Array.from(set).sort();
+  }, [vendasSourceRaw, isAdmin, getFilial]);
+
+  const vendasSource = useMemo(() => {
+    if (filtroFilial === 'all') return vendasSourceRaw;
+    return vendasSourceRaw.filter(v => getFilial((v as any).cnpj_empresa) === filtroFilial);
+  }, [vendasSourceRaw, filtroFilial, getFilial]);
 
   const vendasAgg = (() => {
     const rows = vendasSource;
