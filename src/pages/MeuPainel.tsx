@@ -180,7 +180,7 @@ export default function MeuPainel() {
         .select('vendedor_nome, total_com_desconto');
       return data ?? [];
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: Infinity,
   });
 
   // Vendas com data (para gráfico cronológico)
