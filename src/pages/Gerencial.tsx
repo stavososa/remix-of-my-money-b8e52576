@@ -129,7 +129,7 @@ export default function Gerencial() {
   }, [vendedorFilialMap]);
 
   // ===== FULL PERIOD DATA (for KPIs & charts) =====
-  const { data: allVendas, isLoading: loadAll } = useQuery({
+  const { data: allVendas, isLoading: loadAll, isFetching: fetchingAll } = useQuery({
     queryKey: ['gerencial-all-vendas', startDate, endDate],
     queryFn: async () => {
       type VendaRow = {
