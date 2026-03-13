@@ -475,7 +475,7 @@ function FilterSelect({ label, value, onChange, options, allLabel }: {
     <select
       value={value}
       onChange={e => onChange(e.target.value)}
-      className="bg-secondary border border-border rounded-md px-2 sm:px-3 py-2 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring min-w-[110px] sm:min-w-[140px] max-w-[220px]"
+      className="bg-secondary border border-border rounded-md px-2 sm:px-3 py-2 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring w-full sm:w-auto sm:min-w-[140px] sm:max-w-[220px]"
       title={label}
     >
       <option value="all">{allLabel}</option>
