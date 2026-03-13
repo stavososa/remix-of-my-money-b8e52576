@@ -126,14 +126,19 @@ export function AppShell({ children, title }: {children: React.ReactNode;title: 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Topbar */}
-        <header className="h-16 bg-card border-b border-border flex items-center px-4 lg:px-6 gap-4 shrink-0">
-          <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-muted-foreground hover:text-foreground">
-            <Menu className="h-5 w-5" />
-          </button>
-          <h2 className="text-lg font-bold text-foreground flex-1 truncate">{title}</h2>
-          <PeriodFilter />
-          <div className="h-9 w-9 rounded-full bg-primary flex items-center justify-center text-sm font-bold text-primary-foreground shrink-0">
-            {initials}
+        <header className="bg-card border-b border-border shrink-0">
+          <div className="flex items-center px-4 lg:px-6 h-14 lg:h-16 gap-3">
+            <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-muted-foreground hover:text-foreground">
+              <Menu className="h-5 w-5" />
+            </button>
+            <h2 className="text-base lg:text-lg font-bold text-foreground flex-1 truncate">{title}</h2>
+            <div className="hidden sm:block"><PeriodFilter /></div>
+            <div className="h-8 w-8 lg:h-9 lg:w-9 rounded-full bg-primary flex items-center justify-center text-xs lg:text-sm font-bold text-primary-foreground shrink-0">
+              {initials}
+            </div>
+          </div>
+          <div className="sm:hidden overflow-x-auto px-3 pb-2 -webkit-overflow-scrolling-touch">
+            <PeriodFilter />
           </div>
         </header>
 
