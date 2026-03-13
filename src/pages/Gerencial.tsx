@@ -457,10 +457,11 @@ export default function Gerencial() {
             </div>
           </div>
           <DataTable
-            columns={detailColumns}
+            columns={isMobile ? detailColumnsMobile : detailColumns}
             data={mappedRows}
             pageSize={TABLE_PAGE_SIZE}
             maxHeight="500px"
+            onRowClick={isMobile ? (row) => setSelectedVenda(row) : undefined}
             serverPagination={{
               totalCount: vendasTotalCount,
               currentPage: tabelaPagina,
@@ -468,6 +469,27 @@ export default function Gerencial() {
             }}
           />
         </div>
+
+        {/* Mobile detail dialog */}
+        <Dialog open={!!selectedVenda} onOpenChange={(open) => !open && setSelectedVenda(null)}>
+          <DialogContent className="max-w-[340px] rounded-lg">
+            <DialogHeader>
+              <DialogTitle className="text-sm">Detalhes da Venda</DialogTitle>
+            </DialogHeader>
+            {selectedVenda && (
+              <div className="space-y-2 text-xs">
+                {detailColumns.map(col => (
+                  <div key={String(col.key)} className="flex justify-between gap-2 py-1.5 border-b border-border last:border-0">
+                    <span className="text-muted-foreground font-medium">{col.label}</span>
+                    <span className="text-foreground text-right font-semibold">
+                      {col.render ? col.render(selectedVenda[col.key], selectedVenda) : String(selectedVenda[col.key] ?? '—')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </AppShell>
   );
