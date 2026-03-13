@@ -179,7 +179,7 @@ export default function Gerencial() {
       }
       return allData;
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: Infinity,
   });
 
   // Apply client-side filters
