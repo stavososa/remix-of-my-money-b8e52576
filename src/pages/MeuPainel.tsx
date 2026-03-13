@@ -202,7 +202,7 @@ export default function MeuPainel() {
       const { data } = await supabase.from('vendas_gerais').select('total_mercadoria');
       return data ?? [];
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: Infinity,
   });
 
   // ── Admin: all sales ──
