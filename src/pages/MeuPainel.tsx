@@ -525,7 +525,7 @@ export default function MeuPainel() {
         <motion.div variants={item} className={`grid grid-cols-1 ${isAdmin ? 'lg:grid-cols-2' : 'lg:grid-cols-3'} gap-6`}>
           {/* Posição PJ - only for vendedor */}
           {!isAdmin && (
-            <div className="bg-card border border-border rounded-xl p-8 shadow-card flex flex-col items-center text-center relative overflow-hidden">
+            <div className="bg-card border border-border rounded-xl p-4 sm:p-6 lg:p-8 shadow-card flex flex-col items-center text-center relative overflow-hidden">
               <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-4">Sua Posição PJ</p>
               <div className="relative">
                 {minhaPosicaoPj && minhaPosicaoPj.posicao <= 3 && (
