@@ -231,7 +231,7 @@ export default function Gerencial() {
       const offset = (tabelaPagina - 1) * TABLE_PAGE_SIZE;
       let query = supabase
         .from('vendas')
-        .select('id, data_emissao, vendedor_nome, descricao_produto, familia_produto, marca, nota_fiscal, total_com_desconto, lucros_reais, margem_percentual', { count: 'exact' })
+        .select('id, data_emissao, vendedor_nome, descricao_produto, familia_produto, marca, nota_fiscal, total_com_desconto, lucros_reais, margem_percentual, cnpj_empresa', { count: 'exact' })
         .gte('data_emissao', startDate)
         .lte('data_emissao', endDate)
         .order('data_emissao', { ascending: false })
