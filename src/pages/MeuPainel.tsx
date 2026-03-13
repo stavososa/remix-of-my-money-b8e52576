@@ -217,7 +217,7 @@ export default function MeuPainel() {
         .limit(5000);
       return data ?? [];
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: Infinity,
   });
 
   // ── Vendedor: individual sales ──

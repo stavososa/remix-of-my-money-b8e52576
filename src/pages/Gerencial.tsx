@@ -305,7 +305,7 @@ export default function Gerencial() {
       if (error) throw error;
       return { rows: data ?? [], totalCount: count ?? 0 };
     },
-    staleTime: 60 * 1000,
+    staleTime: Infinity,
   });
 
   const vendasRows = vendasResult?.rows ?? [];
