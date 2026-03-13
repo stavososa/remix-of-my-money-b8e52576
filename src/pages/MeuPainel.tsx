@@ -318,7 +318,7 @@ export default function MeuPainel() {
 
   const vendasSource = useMemo(() => {
     if (filtroFilial === 'all') return vendasSourceRaw;
-    return vendasSourceRaw.filter(v => getFilial((v as any).cnpj_empresa) === filtroFilial);
+    return vendasSourceRaw.filter(v => getFilial(v.vendedor_nome) === filtroFilial);
   }, [vendasSourceRaw, filtroFilial, getFilial]);
 
   const vendasAgg = (() => {
