@@ -1,36 +1,39 @@
 
 
-## Plano: Tabela mobile com 3 colunas + popup de detalhes
+## Gerencial com dados da tabela `vendas` + filtro por Unidade + graficos
 
-### Problema
-No mobile (390px), a tabela de vendas detalhadas tem 10 colunas, forçando scroll horizontal excessivo.
+A tabela `vendas` tem 468 registros (Jan/2026) com valores em formato string brasileiro (ex: "R$ 15,40", "49,30%"). O campo `vendedor_nome` liga aos vendedores/unidades via `vendedores.nome_omie`. Sera necessario fazer JOIN client-side ou via query para associar unidade a cada venda.
 
-### Solução
-No mobile, exibir apenas 3 colunas (Data, Vendedor, Produto). Ao clicar em uma linha, abrir um `Dialog` com todos os detalhes da venda.
+### Abordagem
 
-### Alterações
+Buscar dados da tabela `vendas` filtrados por periodo (`data_emissao`), e cruzar com `vendedores` + `unidades` para obter a unidade de cada venda. Parsear valores monetarios/percentuais no frontend (padrão ja existente no projeto).
 
-**`src/pages/Gerencial.tsx`**
+### Alteracoes em `src/pages/Gerencial.tsx`
 
-1. Criar duas versões de colunas:
-   - `detailColumnsMobile`: apenas `data_emissao`, `vendedor_nome`, `descricao_produto`
-   - `detailColumns`: as 10 colunas atuais (para desktop)
+1. **Nova query: buscar `vendas`** filtradas pelo periodo atual (mes/ano do `data_emissao`), com limite adequado
 
-2. Adicionar estado para a linha selecionada: `const [selectedRow, setSelectedRow] = useState<any>(null)`
+2. **Nova query: buscar `vendedores` com `unidades`** para mapear `nome_omie` -> `unidade_nome`
 
-3. Passar `columns={isMobile ? detailColumnsMobile : detailColumns}` ao `DataTable`
+3. **Processar dados client-side**:
+   - Parsear `total_com_desconto`, `lucros_reais`, `margem_percentual` de string BR para number
+   - Associar cada venda a sua unidade via mapa vendedor->unidade
+   - Agregar por unidade: total vendido, lucro, margem media, qtd vendas
 
-4. No mobile, adicionar `onRowClick={(row) => setSelectedRow(row)}` — precisaremos adicionar essa prop ao `DataTable`
+4. **Filtro por Unidade**: O select de unidades ja existe. Ao selecionar uma unidade, filtrar as vendas processadas e recalcular todos os KPIs e graficos.
 
-5. Renderizar um `Dialog` que exibe todos os campos da venda quando `selectedRow` não é null
+5. **Novos graficos usando dados de `vendas`**:
+   - **Faturamento por Unidade** (BarChart horizontal - ja existe, alimentar com dados de vendas)
+   - **Margem Media por Unidade** (novo BarChart horizontal, cor verde)
+   - **Top Familias de Produto** (BarChart mostrando as familias mais vendidas, reagindo ao filtro de unidade)
 
-**`src/components/DataTable.tsx`**
+6. **Cards PJ vs CLT**: Recalcular a partir do cruzamento vendas + vendedores (que tem campo `regime`), ao inves de depender exclusivamente da view `v_resumo_regime`
 
-1. Adicionar prop opcional `onRowClick?: (row: T) => void`
-2. No `<tr>` do tbody, adicionar `onClick={() => onRowClick?.(row)}` e `cursor-pointer` quando `onRowClick` está definido
+7. **Layout**: Organizar graficos em grid 2 colunas no desktop
 
-### Detalhes do Dialog
-Exibirá os campos em lista vertical:
-- Data, Vendedor, Filial, Produto, Família, Marca, NF, Valor, Lucro, Margem
-- Formatados com os mesmos renders das colunas originais
+### Detalhes tecnicos
+
+- Funcoes de parsing ja existem no projeto (regex para "R$ X,XX" e "XX,XX%")
+- A tabela `vendas` tem 468 linhas para Jan/2026, dentro do limite de 1000 do Supabase
+- Vendedores sem unidade (ex: "CHECK OUT", "COMPRA VENDEDOR") serao agrupados como "Sem Unidade" ou ignorados conforme filtro
+- Manter as queries existentes (`v_ranking`, `v_resumo_unidade`, `v_resumo_regime`) para dados de comissao que nao existem na tabela `vendas`
 

@@ -14,6 +14,7 @@ interface DataTableProps<T> {
   rowClassName?: (row: T) => string;
   pageSize?: number;
   maxHeight?: string;
+  onRowClick?: (row: T) => void;
   // Server-side pagination props
   serverPagination?: {
     totalCount: number;
@@ -22,7 +23,7 @@ interface DataTableProps<T> {
   };
 }
 
-export function DataTable<T extends Record<string, any>>({ columns, data, rowClassName, pageSize, maxHeight, serverPagination }: DataTableProps<T>) {
+export function DataTable<T extends Record<string, any>>({ columns, data, rowClassName, pageSize, maxHeight, onRowClick, serverPagination }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<keyof T | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -102,7 +103,7 @@ export function DataTable<T extends Record<string, any>>({ columns, data, rowCla
           </thead>
           <tbody>
             {displayData.map((row, i) => (
-              <tr key={i} className={`border-t border-border hover:bg-secondary/50 ${rowClassName ? rowClassName(row) : (i % 2 === 0 ? 'bg-transparent' : 'bg-secondary/20')}`}>
+              <tr key={i} onClick={() => onRowClick?.(row)} className={`border-t border-border hover:bg-secondary/50 ${onRowClick ? 'cursor-pointer' : ''} ${rowClassName ? rowClassName(row) : (i % 2 === 0 ? 'bg-transparent' : 'bg-secondary/20')}`}>
                 {columns.map((col) => (
                   <td
                     key={String(col.key)}

@@ -9,6 +9,7 @@ import { X, Search, DollarSign, TrendingUp, Percent, ShoppingCart, FileText } fr
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   ResponsiveContainer, AreaChart, Area,
   XAxis, YAxis, Tooltip, CartesianGrid,
@@ -340,6 +341,8 @@ export default function Gerencial() {
     setTabelaPagina(1);
   };
 
+  const [selectedVenda, setSelectedVenda] = useState<any>(null);
+
   const detailColumns = [
     { key: 'data_emissao' as const, label: 'Data', render: (v: string) => v ? v.split('-').reverse().join('/') : '—' },
     { key: 'vendedor_nome' as const, label: 'Vendedor' },
@@ -351,6 +354,12 @@ export default function Gerencial() {
     { key: 'total_parsed' as const, label: 'Valor', align: 'right' as const, render: (v: number) => fmt(v) },
     { key: 'lucro_parsed' as const, label: 'Lucro', align: 'right' as const, render: (v: number) => fmt(v) },
     { key: 'margem_parsed' as const, label: 'Margem', align: 'right' as const, render: (v: number) => fmtPct(v) },
+  ];
+
+  const detailColumnsMobile = [
+    { key: 'data_emissao' as const, label: 'Data', render: (v: string) => v ? v.split('-').reverse().join('/') : '—' },
+    { key: 'vendedor_nome' as const, label: 'Vendedor' },
+    { key: 'descricao_produto' as const, label: 'Produto' },
   ];
   const filtros = filterOptions;
 
@@ -448,10 +457,11 @@ export default function Gerencial() {
             </div>
           </div>
           <DataTable
-            columns={detailColumns}
+            columns={isMobile ? detailColumnsMobile : detailColumns}
             data={mappedRows}
             pageSize={TABLE_PAGE_SIZE}
             maxHeight="500px"
+            onRowClick={isMobile ? (row) => setSelectedVenda(row) : undefined}
             serverPagination={{
               totalCount: vendasTotalCount,
               currentPage: tabelaPagina,
@@ -459,6 +469,27 @@ export default function Gerencial() {
             }}
           />
         </div>
+
+        {/* Mobile detail dialog */}
+        <Dialog open={!!selectedVenda} onOpenChange={(open) => !open && setSelectedVenda(null)}>
+          <DialogContent className="max-w-[340px] rounded-lg">
+            <DialogHeader>
+              <DialogTitle className="text-sm">Detalhes da Venda</DialogTitle>
+            </DialogHeader>
+            {selectedVenda && (
+              <div className="space-y-2 text-xs">
+                {detailColumns.map(col => (
+                  <div key={String(col.key)} className="flex justify-between gap-2 py-1.5 border-b border-border last:border-0">
+                    <span className="text-muted-foreground font-medium">{col.label}</span>
+                    <span className="text-foreground text-right font-semibold">
+                      {col.render ? (col.render as any)(selectedVenda[col.key], selectedVenda) : String(selectedVenda[col.key] ?? '—')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </AppShell>
   );
