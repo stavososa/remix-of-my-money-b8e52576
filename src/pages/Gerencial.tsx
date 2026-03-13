@@ -71,6 +71,7 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
 };
 
 export default function Gerencial() {
+  const isMobile = useIsMobile();
   const { periodoAno, periodoMes, dataInicio, dataFim } = usePeriod();
   const [filtroUnidade, setFiltroUnidade] = useState<string>('all');
   const [filtroVendedor, setFiltroVendedor] = useState<string>('all');
