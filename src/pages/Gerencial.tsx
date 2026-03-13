@@ -114,7 +114,7 @@ export default function Gerencial() {
       if (error) throw error;
       return (data ?? []) as { nome_vendas: string | null; unidade: string | null }[];
     },
-    staleTime: 10 * 60 * 1000,
+    staleTime: Infinity,
   });
 
   const vendedorFilialMap = useMemo(() => {
@@ -179,7 +179,7 @@ export default function Gerencial() {
       }
       return allData;
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: Infinity,
   });
 
   // Apply client-side filters
@@ -305,7 +305,7 @@ export default function Gerencial() {
       if (error) throw error;
       return { rows: data ?? [], totalCount: count ?? 0 };
     },
-    staleTime: 60 * 1000,
+    staleTime: Infinity,
   });
 
   const vendasRows = vendasResult?.rows ?? [];

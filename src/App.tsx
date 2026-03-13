@@ -21,14 +21,16 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 2 * 60 * 1000,       // dados frescos por 2 minutos
-      gcTime: 10 * 60 * 1000,          // mantém cache por 10 minutos
+      staleTime: Infinity,              // dados congelados até queryKey mudar
+      gcTime: 30 * 60 * 1000,            // mantém cache por 30 minutos
       retry: (failureCount, error) => {
         const status = (error as { status?: number })?.status;
         if (status !== undefined && status >= 400 && status < 500) return false;
-        return failureCount < 2;
+        return failureCount < 1;
       },
-      refetchOnWindowFocus: false,     // evita recargas ao trocar de aba
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMount: false,
     },
   },
 });

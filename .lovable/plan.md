@@ -1,39 +1,39 @@
 
 
-## Plano: Congelar dados após carregamento completo
+## Gerencial com dados da tabela `vendas` + filtro por Unidade + graficos
 
-### Problema
-O React Query tem `staleTime: 2 * 60 * 1000` (2 minutos) nas queries de vendas. Após 2 minutos, ao voltar para a aba ou por qualquer trigger interno, o React Query refaz as queries automaticamente. Como os dados são paginados em batches de 1000 (36+ requests paralelos), durante o refetch parcial os KPIs mostram valores intermediários/incorretos até todos os batches completarem.
+A tabela `vendas` tem 468 registros (Jan/2026) com valores em formato string brasileiro (ex: "R$ 15,40", "49,30%"). O campo `vendedor_nome` liga aos vendedores/unidades via `vendedores.nome_omie`. Sera necessario fazer JOIN client-side ou via query para associar unidade a cada venda.
 
-### Causa raiz
-- `staleTime: 2 * 60 * 1000` marca os dados como "stale" após 2 min
-- Mesmo com `refetchOnWindowFocus: false` global, o React Query ainda pode refetchar por outros motivos (remount, reconnect)
-- Durante o refetch, `isFetching` fica true mas os dados parciais do cache anterior podem ser substituídos
+### Abordagem
 
-### Solução
-Mudar `staleTime` para `Infinity` em todas as queries de dados nas páginas Gerencial, MeuPainel e Ranking. Isso faz com que os dados só sejam buscados novamente quando a queryKey muda (ex: troca de período, filtros). Os dados ficam "congelados" até o usuário explicitamente mudar algo.
+Buscar dados da tabela `vendas` filtrados por periodo (`data_emissao`), e cruzar com `vendedores` + `unidades` para obter a unidade de cada venda. Parsear valores monetarios/percentuais no frontend (padrão ja existente no projeto).
 
-### Alterações
+### Alteracoes em `src/pages/Gerencial.tsx`
 
-**`src/pages/Gerencial.tsx`**
-- Query `gerencial-all-vendas`: `staleTime: Infinity`
-- Query `gerencial-vendas` (tabela paginada): `staleTime: Infinity`
-- Query `controle-pj-filial`: já tem 10min, mudar para `Infinity`
+1. **Nova query: buscar `vendas`** filtradas pelo periodo atual (mes/ano do `data_emissao`), com limite adequado
 
-**`src/pages/MeuPainel.tsx`**
-- Todas as queries com `staleTime: 2 * 60 * 1000` → `Infinity`
-- Queries com `staleTime: 10 * 60 * 1000` → `Infinity`
+2. **Nova query: buscar `vendedores` com `unidades`** para mapear `nome_omie` -> `unidade_nome`
 
-**`src/pages/Ranking.tsx`** (se houver queries similares)
-- Mesmo padrão: `staleTime: Infinity`
+3. **Processar dados client-side**:
+   - Parsear `total_com_desconto`, `lucros_reais`, `margem_percentual` de string BR para number
+   - Associar cada venda a sua unidade via mapa vendedor->unidade
+   - Agregar por unidade: total vendido, lucro, margem media, qtd vendas
 
-**`src/App.tsx`**
-- Default global `staleTime`: mudar de `2 * 60 * 1000` para `Infinity`
-- Adicionar `refetchOnReconnect: false` e `refetchOnMount: false` para evitar qualquer refetch automático
+4. **Filtro por Unidade**: O select de unidades ja existe. Ao selecionar uma unidade, filtrar as vendas processadas e recalcular todos os KPIs e graficos.
 
-### Comportamento esperado
-1. Usuário abre o painel → dados carregam completamente
-2. Enquanto carrega, KPIs mostram "—" (já implementado)
-3. Após carregamento, dados ficam congelados
-4. Só atualiza ao mudar período, filtro ou navegar para outra página e voltar com queryKey diferente
+5. **Novos graficos usando dados de `vendas`**:
+   - **Faturamento por Unidade** (BarChart horizontal - ja existe, alimentar com dados de vendas)
+   - **Margem Media por Unidade** (novo BarChart horizontal, cor verde)
+   - **Top Familias de Produto** (BarChart mostrando as familias mais vendidas, reagindo ao filtro de unidade)
+
+6. **Cards PJ vs CLT**: Recalcular a partir do cruzamento vendas + vendedores (que tem campo `regime`), ao inves de depender exclusivamente da view `v_resumo_regime`
+
+7. **Layout**: Organizar graficos em grid 2 colunas no desktop
+
+### Detalhes tecnicos
+
+- Funcoes de parsing ja existem no projeto (regex para "R$ X,XX" e "XX,XX%")
+- A tabela `vendas` tem 468 linhas para Jan/2026, dentro do limite de 1000 do Supabase
+- Vendedores sem unidade (ex: "CHECK OUT", "COMPRA VENDEDOR") serao agrupados como "Sem Unidade" ou ignorados conforme filtro
+- Manter as queries existentes (`v_ranking`, `v_resumo_unidade`, `v_resumo_regime`) para dados de comissao que nao existem na tabela `vendas`
 

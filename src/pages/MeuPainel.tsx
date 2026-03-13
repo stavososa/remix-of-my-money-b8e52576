@@ -110,7 +110,7 @@ export default function MeuPainel() {
       const { data } = await supabase.from('controle_pj').select('nome_vendas, unidade');
       return (data ?? []) as { nome_vendas: string | null; unidade: string | null }[];
     },
-    staleTime: 10 * 60 * 1000, // dados estruturais: cache longo
+    staleTime: Infinity,
     gcTime: 30 * 60 * 1000,
   });
 
@@ -140,7 +140,7 @@ export default function MeuPainel() {
         .order('posicao', { ascending: true });
       return data ?? [];
     },
-    staleTime: 2 * 60 * 1000, // ranking: cache 2 min
+    staleTime: Infinity,
   });
 
   type ControlePjRow = {
@@ -156,7 +156,7 @@ export default function MeuPainel() {
       const { data } = await supabase.from('controle_pj').select('*');
       return (data ?? []) as ControlePjRow[];
     },
-    staleTime: 10 * 60 * 1000, // dados estruturais: cache longo
+    staleTime: Infinity,
     gcTime: 30 * 60 * 1000,
   });
 
@@ -180,7 +180,7 @@ export default function MeuPainel() {
         .select('vendedor_nome, total_com_desconto');
       return data ?? [];
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: Infinity,
   });
 
   // Vendas com data (para gráfico cronológico)
@@ -193,7 +193,7 @@ export default function MeuPainel() {
         .order('data_emissao', { ascending: true });
       return (data ?? []).filter(r => r.data_emissao);
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: Infinity,
   });
 
   const { data: vendasGeraisRaw } = useQuery({
@@ -202,7 +202,7 @@ export default function MeuPainel() {
       const { data } = await supabase.from('vendas_gerais').select('total_mercadoria');
       return data ?? [];
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: Infinity,
   });
 
   // ── Admin: all sales ──
@@ -217,7 +217,7 @@ export default function MeuPainel() {
         .limit(5000);
       return data ?? [];
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: Infinity,
   });
 
   // ── Vendedor: individual sales ──
