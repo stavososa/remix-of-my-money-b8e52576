@@ -67,7 +67,7 @@ function RankingTable({ data, nameLabel }: { data: RankedItem[]; nameLabel: stri
   return (
     <>
       <div className="hidden md:block">
-        <DataTable columns={columns} data={data.slice(0, 50)} rowClassName={(row: any) => row.posicao <= 3 ? 'bg-primary/5' : ''} />
+        <DataTable columns={columns} data={data.slice(0, 50)} rowClassName={(row: RankedItem) => row.posicao <= 3 ? 'bg-primary/5' : ''} />
       </div>
       <div className="md:hidden space-y-3">
         {data.slice(0, 50).map((item) => (
@@ -114,9 +114,10 @@ export default function Ranking() {
     queryKey: ['vendas-ranking-prod', periodoAno, periodoMes],
     enabled: !loadingPeriodo,
     queryFn: async () => {
-      let allData: any[] = [];
-      let from = 0;
       const PAGE = 1000;
+      let from = 0;
+      type VRow = { descricao_produto: string | null; familia_produto: string | null; marca: string | null; total_com_desconto: unknown; quantidade: unknown; vendedor_nome: string | null; lucros_reais: unknown };
+      let result: VRow[] = [];
       while (true) {
         const { data } = await supabase
           .from('vendas')
@@ -125,11 +126,11 @@ export default function Ranking() {
           .lte('data_emissao', fimMes)
           .range(from, from + PAGE - 1);
         if (!data || data.length === 0) break;
-        allData.push(...data);
+        result = result.concat(data as VRow[]);
         if (data.length < PAGE) break;
         from += PAGE;
       }
-      return allData;
+      return result;
     },
   });
 
@@ -339,7 +340,7 @@ export default function Ranking() {
               </div>
 
               <div className="hidden md:block">
-                <DataTable columns={vendedorColumns} data={rankingData} rowClassName={(row: any) => row.posicao != null && row.posicao <= 3 ? 'bg-primary/5' : ''} />
+                <DataTable columns={vendedorColumns} data={rankingData} rowClassName={(row: typeof rankingData[0]) => row.posicao != null && row.posicao <= 3 ? 'bg-primary/5' : ''} />
               </div>
 
               <div className="md:hidden space-y-3">
@@ -374,7 +375,7 @@ export default function Ranking() {
               </div>
 
               <div className="hidden md:block">
-                <DataTable columns={produtoColumns} data={productRanking.slice(0, 50)} rowClassName={(row: any) => row.posicao <= 3 ? 'bg-primary/5' : ''} />
+                <DataTable columns={produtoColumns} data={productRanking.slice(0, 50)} rowClassName={(row: ProductRank) => row.posicao <= 3 ? 'bg-primary/5' : ''} />
               </div>
 
               <div className="md:hidden space-y-3">

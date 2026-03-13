@@ -33,7 +33,19 @@ export default function AdminImportar() {
   const [spreadsheetId, setSpreadsheetId] = useState('');
   const [sheetName, setSheetName] = useState('Pasta1');
   const [importing, setImporting] = useState(false);
-  const [resultado, setResultado] = useState<any>(null);
+
+  interface ImportResult {
+    periodo?: string;
+    vendedores_processados?: number | string;
+    total_vendido?: number;
+    total_geral_vendido?: number;
+    total_comissoes?: number;
+    linhas_processadas?: number | string;
+    linhas_ignoradas?: number | string;
+    nomes_nao_encontrados?: string[];
+  }
+
+  const [resultado, setResultado] = useState<ImportResult | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [expandedLog, setExpandedLog] = useState<string | null>(null);
@@ -94,12 +106,13 @@ export default function AdminImportar() {
       const data = await response.json();
       setResultado(data);
       toast.success('Importação concluída');
-    } catch (error: any) {
+    } catch (error: unknown) {
       clearTimeout(timeout);
-      if (error.name === 'AbortError') {
+      const err = error as { name?: string; message?: string };
+      if (err.name === 'AbortError') {
         setErro('Timeout: a importação demorou mais de 3 minutos. Verifique o log.');
       } else {
-        setErro(`Erro na importação: ${error.message}`);
+        setErro(`Erro na importação: ${err.message ?? 'Erro desconhecido'}`);
       }
     } finally {
       setImporting(false);
@@ -112,10 +125,22 @@ export default function AdminImportar() {
     setResultado(null);
   };
 
+  type LogRow = {
+    id: string;
+    periodo_mes: number;
+    periodo_ano: number;
+    created_at: string | null;
+    qtd_vendedores: number | null;
+    total_geral_vendido: number | null;
+    total_comissoes: number | null;
+    status: string | null;
+    nomes_nao_encontrados: unknown;
+  };
+
   const logColumns = [
     {
       key: 'periodo_mes' as const, label: 'Período',
-      render: (_: number, row: any) => `${MESES[row.periodo_mes]}/${row.periodo_ano}`,
+      render: (_: number, row: LogRow) => `${MESES[row.periodo_mes]}/${row.periodo_ano}`,
     },
     {
       key: 'created_at' as const, label: 'Data/Hora',
@@ -141,8 +166,8 @@ export default function AdminImportar() {
     },
     {
       key: 'nomes_nao_encontrados' as const, label: 'Alertas',
-      render: (v: any, row: any) => {
-        const nomes = Array.isArray(v) ? v : [];
+      render: (v: unknown, row: LogRow) => {
+        const nomes = Array.isArray(v) ? (v as string[]) : [];
         if (nomes.length === 0) return <span className="text-muted-foreground text-xs">—</span>;
         return (
           <button

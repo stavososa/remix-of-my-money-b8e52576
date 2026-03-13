@@ -42,15 +42,27 @@ const normalize = (s: string) =>
 
 const TABLE_PAGE_SIZE = 30;
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+interface TooltipEntry {
+  color: string;
+  name: string;
+  value: number | string;
+}
+
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: TooltipEntry[];
+  label?: string;
+}
+
+const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-card border border-border rounded-lg p-3 shadow-lg text-xs">
       <p className="font-medium text-foreground mb-1">{label}</p>
-      {payload.map((p: any, i: number) => (
+      {payload.map((p, i) => (
         <p key={i} style={{ color: p.color }} className="flex justify-between gap-4">
           <span>{p.name}:</span>
-          <span className="font-semibold">{typeof p.value === 'number' && p.value > 100 ? fmt(p.value) : p.name === 'Margem' ? fmtPct(p.value) : fmt(p.value)}</span>
+          <span className="font-semibold">{typeof p.value === 'number' && p.value > 100 ? fmt(p.value) : p.name === 'Margem' ? fmtPct(p.value as number) : fmt(p.value as number)}</span>
         </p>
       ))}
     </div>
@@ -121,7 +133,18 @@ export default function Gerencial() {
   const { data: allVendas, isLoading: loadAll } = useQuery({
     queryKey: ['gerencial-all-vendas', periodoAno, periodoMes],
     queryFn: async () => {
-      const allData: any[] = [];
+      type VendaRow = {
+        data_emissao: string | null;
+        vendedor_nome: string | null;
+        total_com_desconto: unknown;
+        lucros_reais: unknown;
+        margem_percentual: unknown;
+        familia_produto: string | null;
+        marca: string | null;
+        nota_fiscal: string | null;
+        cnpj_empresa: string | null;
+      };
+      let allData: VendaRow[] = [];
       let from = 0;
       const step = 1000;
       while (true) {
@@ -133,7 +156,7 @@ export default function Gerencial() {
           .range(from, from + step - 1);
         if (error) throw error;
         if (!data || data.length === 0) break;
-        allData.push(...data);
+        allData = allData.concat(data as VendaRow[]);
         if (data.length < step) break;
         from += step;
       }
