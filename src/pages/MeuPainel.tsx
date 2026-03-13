@@ -96,6 +96,35 @@ export default function MeuPainel() {
   const isAdmin = role === 'admin';
   const [showAllVendas, setShowAllVendas] = useState(false);
   const [showAllProdutos, setShowAllProdutos] = useState(false);
+  const [filtroFilial, setFiltroFilial] = useState('all');
+
+  // Reset filtro ao trocar período
+  useEffect(() => {
+    setFiltroFilial('all');
+  }, [periodoAno, periodoMes]);
+
+  // ── Unidades (CNPJ → Nome) ──
+  const { data: unidadesData } = useQuery({
+    queryKey: ['unidades-cnpj-painel'],
+    queryFn: async () => {
+      const { data } = await (supabase.from('unidades') as any).select('cnpj, nome');
+      return (data ?? []) as { cnpj: string | null; nome: string }[];
+    },
+    staleTime: 0,
+  });
+
+  const cnpjFilialMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const u of unidadesData ?? []) {
+      if (u.cnpj) map.set(u.cnpj.trim(), u.nome);
+    }
+    return map;
+  }, [unidadesData]);
+
+  const getFilial = useCallback((cnpjEmpresa: string | null | undefined): string => {
+    if (!cnpjEmpresa) return 'Sem Filial';
+    return cnpjFilialMap.get(cnpjEmpresa.trim()) ?? 'Sem Filial';
+  }, [cnpjFilialMap]);
 
   // ── Shared queries ──
 
