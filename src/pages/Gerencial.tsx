@@ -98,7 +98,7 @@ export default function Gerencial() {
         .from('unidades')
         .select('cnpj, nome' as any);
       if (error) throw error;
-      return (data ?? []) as { cnpj: string | null; nome: string }[];
+      return (data ?? []) as unknown as { cnpj: string | null; nome: string }[];
     },
     staleTime: 10 * 60 * 1000,
   });
