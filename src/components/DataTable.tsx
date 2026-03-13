@@ -103,7 +103,7 @@ export function DataTable<T extends Record<string, any>>({ columns, data, rowCla
           </thead>
           <tbody>
             {displayData.map((row, i) => (
-              <tr key={i} className={`border-t border-border hover:bg-secondary/50 ${rowClassName ? rowClassName(row) : (i % 2 === 0 ? 'bg-transparent' : 'bg-secondary/20')}`}>
+              <tr key={i} onClick={() => onRowClick?.(row)} className={`border-t border-border hover:bg-secondary/50 ${onRowClick ? 'cursor-pointer' : ''} ${rowClassName ? rowClassName(row) : (i % 2 === 0 ? 'bg-transparent' : 'bg-secondary/20')}`}>
                 {columns.map((col) => (
                   <td
                     key={String(col.key)}
