@@ -30,7 +30,7 @@ const parsePctBR = (str: unknown): number => {
   const s = String(str);
   const cleaned = s.replace('%', '').replace(/\s/g, '').replace(',', '.');
   const val = parseFloat(cleaned);
-  return isNaN(val) ? 0 : val;
+  return isNaN(val) ? 0 : val * 100;
 };
 
 const fmt = (v: number) =>
