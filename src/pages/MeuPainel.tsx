@@ -28,7 +28,7 @@ const parseMoneyBR = (str: unknown): number => {
 
 const parsePctBR = (str: unknown): number => {
   if (str == null) return 0;
-  if (typeof str === 'number') return str;
+  if (typeof str === 'number') return str * 100;
   const s = String(str);
   const cleaned = s.replace('%', '').replace(/\s/g, '').replace(',', '.');
   const val = parseFloat(cleaned);
