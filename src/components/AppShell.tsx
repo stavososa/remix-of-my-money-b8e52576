@@ -3,7 +3,7 @@ import logoImg from '@/assets/logo-atacadao-maromba.png';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { PeriodFilter } from '@/components/PeriodFilter';
-import { Trophy, User, BarChart3, FileText, Download, LogOut, Menu, X } from 'lucide-react';
+import { Trophy, User, BarChart3, FileText, Download, LogOut, Menu, X, Gift } from 'lucide-react';
 import { CustomBadge } from '@/components/StatusBadge';
 
 interface NavItem {
@@ -21,8 +21,10 @@ const navItems: NavItem[] = [
 
 
 const adminItems: NavItem[] = [
-{ label: 'Regras de Comissão', to: '/admin/regras', icon: FileText, roles: ['admin'] },
-{ label: 'Importar Dados', to: '/admin/importar', icon: Download, roles: ['admin'] }];
+  { label: 'Regras de Comissão', to: '/admin/regras', icon: FileText, roles: ['admin'] },
+  { label: 'Importar Dados', to: '/admin/importar', icon: Download, roles: ['admin'] },
+  { label: 'Bonificação', to: '/admin/bonificacao', icon: Gift, roles: ['admin'] },
+];
 
 
 export function AppShell({ children, title }: {children: React.ReactNode;title: string;}) {
