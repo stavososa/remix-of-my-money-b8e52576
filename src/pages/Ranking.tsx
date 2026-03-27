@@ -360,6 +360,36 @@ export default function Ranking() {
             </div>
           )}
 
+          {/* Bonificações Ativas */}
+          {bonificacoes.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Gift className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-bold text-foreground">Premiações</h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {bonificacoes.map((b) => (
+                  <Card key={b.id} className="overflow-hidden border-primary/20 bg-gradient-to-br from-primary/5 to-card">
+                    {b.imagem_url && (
+                      <div className="h-40 w-full overflow-hidden">
+                        <img src={b.imagem_url} alt={b.titulo} className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                    <CardContent className="p-4 space-y-2">
+                      <h3 className="font-bold text-foreground">{b.titulo}</h3>
+                      {b.descricao && <p className="text-sm text-muted-foreground">{b.descricao}</p>}
+                      <div className="flex items-center gap-2 text-sm">
+                        <Crown className="h-4 w-4 text-primary" />
+                        <span className="font-semibold text-primary">Top {b.qtd_premiados}</span>
+                        <span className="text-muted-foreground">do ranking serão premiados</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Tabs */}
           <Tabs defaultValue="vendedores" className="w-full">
             <TabsList className="w-full sm:w-auto">
