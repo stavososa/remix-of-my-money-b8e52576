@@ -156,10 +156,19 @@ export default function Ranking() {
     },
   });
 
-  const { data: bonificacoes = [] } = useQuery({
+  interface Bonificacao {
+    id: string;
+    titulo: string;
+    descricao: string | null;
+    imagem_url: string | null;
+    qtd_premiados: number;
+    ativo: boolean;
+  }
+
+  const { data: bonificacoes = [] } = useQuery<Bonificacao[]>({
     queryKey: ['bonificacoes-ativas'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('bonificacoes')
         .select('*')
         .eq('ativo', true)
