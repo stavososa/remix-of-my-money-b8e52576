@@ -5,9 +5,10 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { usePeriod } from '@/contexts/PeriodContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { Trophy, DollarSign, Users, Receipt, Crown, Package, ShoppingCart, Tag, Layers } from 'lucide-react';
+import { Trophy, DollarSign, Users, Receipt, Crown, Package, ShoppingCart, Tag, Layers, Gift } from 'lucide-react';
 import { DataTable } from '@/components/DataTable';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Card, CardContent } from '@/components/ui/card';
 
 
 const MESES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -152,6 +153,31 @@ export default function Ranking() {
         if (res.data) allData = allData.concat(res.data as VRow[]);
       }
       return allData;
+    },
+  });
+
+  interface Bonificacao {
+    id: string;
+    titulo: string;
+    descricao: string | null;
+    imagem_url: string | null;
+    qtd_premiados: number;
+    ativo: boolean;
+  }
+
+  const { data: bonificacoes = [] } = useQuery<Bonificacao[]>({
+    queryKey: ['bonificacoes-ativas'],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('bonificacoes')
+        .select('*')
+        .eq('ativo', true)
+        .order('created_at', { ascending: false });
+      if (error) {
+        console.warn('Bonificações não disponíveis:', error.message);
+        return [];
+      }
+      return data ?? [];
     },
   });
 
@@ -330,6 +356,36 @@ export default function Ranking() {
                   <p className="text-xs text-secondary-foreground">Total Vendido</p>
                   <p className="text-2xl font-extrabold text-foreground">{formatBRL(top1.total_vendido)}</p>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Bonificações Ativas */}
+          {bonificacoes.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Gift className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-bold text-foreground">Premiações</h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {bonificacoes.map((b) => (
+                  <Card key={b.id} className="overflow-hidden border-primary/20 bg-gradient-to-br from-primary/5 to-card">
+                    {b.imagem_url && (
+                      <div className="h-40 w-full overflow-hidden">
+                        <img src={b.imagem_url} alt={b.titulo} className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                    <CardContent className="p-4 space-y-2">
+                      <h3 className="font-bold text-foreground">{b.titulo}</h3>
+                      {b.descricao && <p className="text-sm text-muted-foreground">{b.descricao}</p>}
+                      <div className="flex items-center gap-2 text-sm">
+                        <Crown className="h-4 w-4 text-primary" />
+                        <span className="font-semibold text-primary">Top {b.qtd_premiados}</span>
+                        <span className="text-muted-foreground">do ranking serão premiados</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             </div>
           )}
