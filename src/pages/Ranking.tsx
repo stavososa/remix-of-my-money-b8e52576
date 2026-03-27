@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { KPICard } from '@/components/KPICard';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -9,7 +9,7 @@ import { Trophy, DollarSign, Users, Receipt, Crown, Package, ShoppingCart, Tag, 
 import { DataTable } from '@/components/DataTable';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
-
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 const MESES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
@@ -95,6 +95,7 @@ function RankingTable({ data, nameLabel }: { data: RankedItem[]; nameLabel: stri
 }
 
 export default function Ranking() {
+  const [selectedBonificacao, setSelectedBonificacao] = useState<Bonificacao | null>(null);
   const { periodoAno, periodoMes, dataInicio, dataFim, loading: loadingPeriodo } = usePeriod();
 
   const { data: ranking = [], isLoading: loadRanking } = useQuery({
@@ -369,7 +370,11 @@ export default function Ranking() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {bonificacoes.map((b) => (
-                  <Card key={b.id} className="overflow-hidden border-primary/20 bg-gradient-to-br from-primary/5 to-card">
+                  <Card
+                    key={b.id}
+                    className="overflow-hidden border-primary/20 bg-gradient-to-br from-primary/5 to-card cursor-pointer hover:border-primary/40 hover:shadow-md transition-all duration-200"
+                    onClick={() => setSelectedBonificacao(b)}
+                  >
                     {b.imagem_url && (
                       <div className="h-40 w-full overflow-hidden">
                         <img src={b.imagem_url} alt={b.titulo} className="w-full h-full object-cover" />
@@ -377,16 +382,54 @@ export default function Ranking() {
                     )}
                     <CardContent className="p-4 space-y-2">
                       <h3 className="font-bold text-foreground">{b.titulo}</h3>
-                      {b.descricao && <p className="text-sm text-muted-foreground">{b.descricao}</p>}
+                      {b.descricao && <p className="text-sm text-muted-foreground line-clamp-2">{b.descricao}</p>}
                       <div className="flex items-center gap-2 text-sm">
                         <Crown className="h-4 w-4 text-primary" />
                         <span className="font-semibold text-primary">Top {b.qtd_premiados}</span>
                         <span className="text-muted-foreground">do ranking serão premiados</span>
                       </div>
+                      <p className="text-xs text-primary/70 mt-1">Clique para ver detalhes →</p>
                     </CardContent>
                   </Card>
                 ))}
               </div>
+
+              {/* Dialog de detalhes da bonificação */}
+              <Dialog open={!!selectedBonificacao} onOpenChange={(open) => !open && setSelectedBonificacao(null)}>
+                <DialogContent className="sm:max-w-lg">
+                  {selectedBonificacao && (
+                    <>
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                          <Gift className="h-5 w-5 text-primary" />
+                          {selectedBonificacao.titulo}
+                        </DialogTitle>
+                      </DialogHeader>
+                      {selectedBonificacao.imagem_url && (
+                        <div className="w-full max-h-64 overflow-hidden rounded-lg">
+                          <img
+                            src={selectedBonificacao.imagem_url}
+                            alt={selectedBonificacao.titulo}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+                      {selectedBonificacao.descricao && (
+                        <DialogDescription className="text-sm text-muted-foreground whitespace-pre-wrap">
+                          {selectedBonificacao.descricao}
+                        </DialogDescription>
+                      )}
+                      <div className="flex items-center gap-3 p-4 rounded-lg bg-primary/10 border border-primary/20">
+                        <Crown className="h-6 w-6 text-primary" />
+                        <div>
+                          <p className="font-bold text-foreground">Top {selectedBonificacao.qtd_premiados} premiados</p>
+                          <p className="text-sm text-muted-foreground">Os {selectedBonificacao.qtd_premiados} primeiros do ranking serão contemplados com esta premiação.</p>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </DialogContent>
+              </Dialog>
             </div>
           )}
 
