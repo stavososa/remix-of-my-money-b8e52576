@@ -15,6 +15,7 @@ const MeuPainel = lazy(() => import("./pages/MeuPainel"));
 const Gerencial = lazy(() => import("./pages/Gerencial"));
 const AdminRegras = lazy(() => import("./pages/AdminRegras"));
 const AdminImportar = lazy(() => import("./pages/AdminImportar"));
+const AdminBonificacao = lazy(() => import("./pages/AdminBonificacao"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // QueryClient otimizado: cache de 2min, mantém dados 10min, sem retry em erros 4xx
@@ -59,6 +60,7 @@ const App = () => (
                 <Route path="/gerencial" element={<RequireAuth><RequireAdmin><Gerencial /></RequireAdmin></RequireAuth>} />
                 <Route path="/admin/regras" element={<RequireAuth><RequireAdmin><AdminRegras /></RequireAdmin></RequireAuth>} />
                 <Route path="/admin/importar" element={<RequireAuth><RequireAdmin><AdminImportar /></RequireAdmin></RequireAuth>} />
+                <Route path="/admin/bonificacao" element={<RequireAuth><RequireAdmin><AdminBonificacao /></RequireAdmin></RequireAuth>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
