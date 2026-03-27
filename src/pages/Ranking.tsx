@@ -5,9 +5,10 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { usePeriod } from '@/contexts/PeriodContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { Trophy, DollarSign, Users, Receipt, Crown, Package, ShoppingCart, Tag, Layers } from 'lucide-react';
+import { Trophy, DollarSign, Users, Receipt, Crown, Package, ShoppingCart, Tag, Layers, Gift } from 'lucide-react';
 import { DataTable } from '@/components/DataTable';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Card, CardContent } from '@/components/ui/card';
 
 
 const MESES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
