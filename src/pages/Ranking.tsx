@@ -156,6 +156,22 @@ export default function Ranking() {
     },
   });
 
+  const { data: bonificacoes = [] } = useQuery({
+    queryKey: ['bonificacoes-ativas'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('bonificacoes')
+        .select('*')
+        .eq('ativo', true)
+        .order('created_at', { ascending: false });
+      if (error) {
+        console.warn('Bonificações não disponíveis:', error.message);
+        return [];
+      }
+      return data ?? [];
+    },
+  });
+
   const isLoading = loadingPeriodo || loadRanking || loadProd;
 
   // Agrupar produtos
