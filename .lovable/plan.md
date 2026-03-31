@@ -1,58 +1,81 @@
 
+## Plano: Fazer as filiais aparecerem sempre no filtro do Gerencial
 
-## Plano: Filtro de Filial por CNPJ (unidades.cnpj ↔ vendas.cnpj_empresa)
+### Diagnóstico
+O problema principal está em `src/pages/Gerencial.tsx` no bloco `filterOptions`.
 
-### Situação atual
-- A tabela `unidades` **já possui** a coluna `cnpj` com dados preenchidos (ex: RECREIO = `44.578.137/0011-75`)
-- A tabela `vendas` possui `cnpj_empresa`
-- O código atual usa `controle_pj` + matching por nome de vendedor — abordagem frágil
+Hoje a lógica faz isso:
+- se `allVendas` ainda não carregou, retorna tudo vazio
+- junto com isso, também zera `unidades`
 
-### Nova abordagem
-Parear `vendas.cnpj_empresa` com `unidades.cnpj` diretamente. Sem intermediários.
+Ou seja: mesmo que `unidadesList` já tenha trazido as filiais da tabela `unidades`, o dropdown de Filial continua vazio porque está indevidamente dependente de `allVendas`.
 
-### Alterações
+Além disso, há um ponto secundário:
+- `src/integrations/supabase/types.ts` ainda não inclui `cnpj` na tabela `unidades`
+- o código está usando `as any`, o que mascara o problema de tipagem
 
-**1. Atualizar types.ts** — Regenerar tipos para incluir `cnpj` na tabela `unidades` (adicionar `cnpj: string | null` ao Row/Insert/Update)
+Também vale reforçar o pareamento:
+- `unidades.cnpj` e `vendas.cnpj_empresa` devem ser comparados com normalização
+- se um lado estiver com máscara e o outro sem, o filtro pode não funcionar corretamente após selecionar a filial
 
-**2. Refatorar `src/pages/Gerencial.tsx`**
+### O que será implementado
 
-- **Remover**: query `controle-pj-filial`, `vendedorFilialMap`, `getFilial` (baseado em nomes), `getVendedoresByFilial`
+1. Ajustar `filterOptions` em `src/pages/Gerencial.tsx`
+- remover a dependência que esvazia `unidades` quando `allVendas` não existe
+- fazer as opções de Filial virem diretamente de `unidadesList`
+- manter vendedores, famílias e marcas dependentes de `allVendas`
 
-- **Adicionar**: query para `unidades` buscando `nome, cnpj`:
+2. Separar melhor a origem dos filtros
+- `Filial` = tabela `unidades`
+- `Vendedor`, `Família`, `Marca` = tabela `vendas`
+
+3. Normalizar CNPJ no mapeamento
+- criar função de normalização para comparar apenas os dígitos
+- aplicar no `cnpjFilialMap`
+- aplicar no `getFilial`
+- aplicar no helper `getCnpjsByFilial`, se necessário
+
+4. Atualizar os tipos do Supabase
+- incluir `cnpj: string | null` em `public.unidades` no arquivo `src/integrations/supabase/types.ts`
+- remover a necessidade de `as any` nessa consulta
+
+5. Melhorar o comportamento visual do filtro
+- garantir que o select de Filial mostre as opções assim que `unidadesList` carregar
+- mesmo se não houver vendas no período, as filiais ainda devem aparecer para seleção
+
+### Resultado esperado
+- o dropdown de Filial volta a listar os nomes da coluna `nome` da tabela `unidades`
+- ao selecionar uma filial, o sistema filtra usando o vínculo correto:
+  `unidades.cnpj ↔ vendas.cnpj_empresa`
+- KPIs, gráfico e tabela detalhada passam a refletir somente a filial escolhida
+- o filtro continua funcionando mesmo com CNPJ mascarado em um lado e limpo no outro
+
+### Detalhes técnicos
+Arquivos envolvidos:
+- `src/pages/Gerencial.tsx`
+- `src/integrations/supabase/types.ts`
+
+Correção central:
 ```ts
-const { data: unidadesList } = useQuery({
-  queryKey: ['unidades-cnpj'],
-  queryFn: async () => {
-    const { data } = await supabase.from('unidades').select('nome, cnpj');
-    return data ?? [];
-  },
-  staleTime: Infinity,
-});
+const unidades = (unidadesList ?? [])
+  .filter(u => u.cnpj)
+  .map(u => u.nome)
+  .sort();
 ```
 
-- **Novo `cnpjFilialMap`**: `Map<string, string>` onde chave = cnpj normalizado, valor = nome da unidade
-
-- **Novo `getFilial(cnpj_empresa)`**: lookup direto pelo CNPJ da venda:
+Em vez de depender deste early return:
 ```ts
-const getFilial = (cnpj: string | null) => {
-  if (!cnpj) return 'Sem Filial';
-  return cnpjFilialMap.get(cnpj.trim()) ?? 'Sem Filial';
-};
+if (!allVendas) return { vendedores: [], unidades: [], familias: [], marcas: [] };
 ```
 
-- **`filteredAll`**: trocar `getFilial(row.vendedor_nome)` por `getFilial(row.cnpj_empresa)`
+Ajuste esperado de estrutura:
+```text
+filterOptions
+├─ unidades -> derivadas apenas de unidadesList
+├─ vendedores -> derivados de allVendas
+├─ familias -> derivados de allVendas
+└─ marcas -> derivados de allVendas
+```
 
-- **`filterOptions.unidades`**: extrair dos dados de `unidadesList` em vez de iterar vendas
-
-- **Filtro server-side (tabela paginada)**: quando `filtroUnidade !== 'all'`, buscar os CNPJs da filial e usar `.in('cnpj_empresa', cnpjs)` — direto, sem mapear por vendedor
-
-- **`mappedRows`** na tabela detalhada: `unidade_nome = getFilial(row.cnpj_empresa)`
-
-### Nenhuma migration necessária
-A coluna `cnpj` já existe no banco. Só precisa atualizar o type no código.
-
-### Resultado
-- Filtro por filial 100% confiável via CNPJ
-- Sem dependência de nomes de vendedores
-- RECREIO e todas as outras filiais funcionam automaticamente
-
+Observação:
+o erro de recursão infinita em `perfis` aparece no console, mas é outro problema e não é a causa principal deste dropdown vazio.
