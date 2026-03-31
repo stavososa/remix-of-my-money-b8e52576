@@ -104,40 +104,32 @@ export default function Gerencial() {
   const startDate = dataInicio;
   const endDate = dataFim;
 
-  // ===== controle_pj (vendedor_nome → unidade) for filial mapping =====
-  const { data: controlePjFilial, isLoading: loadPj } = useQuery({
-    queryKey: ['controle-pj-filial'],
+  // ===== unidades (cnpj → nome) for filial mapping =====
+  const { data: unidadesList, isLoading: loadUnidades } = useQuery({
+    queryKey: ['unidades-cnpj'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('controle_pj')
-        .select('nome_vendas, unidade');
+        .from('unidades')
+        .select('nome, cnpj') as any;
       if (error) throw error;
-      return (data ?? []) as { nome_vendas: string | null; unidade: string | null }[];
+      return (data ?? []) as { nome: string; cnpj: string | null }[];
     },
     staleTime: Infinity,
   });
 
-  const vendedorFilialMap = useMemo(() => {
+  const cnpjFilialMap = useMemo(() => {
     const map = new Map<string, string>();
-    if (!controlePjFilial) return map;
-    for (const row of controlePjFilial) {
-      if (row.nome_vendas && row.unidade) map.set(row.nome_vendas.trim().toUpperCase(), row.unidade);
+    if (!unidadesList) return map;
+    for (const row of unidadesList) {
+      if (row.cnpj) map.set(row.cnpj.trim(), row.nome);
     }
     return map;
-  }, [controlePjFilial]);
+  }, [unidadesList]);
 
-  const getFilial = useCallback((vendedorNome: string | null | undefined): string => {
-    if (!vendedorNome) return 'Sem Filial';
-    const key = vendedorNome.trim().toUpperCase();
-    // Exact match first
-    const exact = vendedorFilialMap.get(key);
-    if (exact) return exact;
-    // Partial match fallback: check if vendedor_nome contains any nome_vendas or vice-versa
-    for (const [nome, unidade] of vendedorFilialMap.entries()) {
-      if (key.includes(nome) || nome.includes(key)) return unidade;
-    }
-    return 'Sem Filial';
-  }, [vendedorFilialMap]);
+  const getFilial = useCallback((cnpj: string | null | undefined): string => {
+    if (!cnpj) return 'Sem Filial';
+    return cnpjFilialMap.get(cnpj.trim()) ?? 'Sem Filial';
+  }, [cnpjFilialMap]);
 
   // ===== FULL PERIOD DATA (for KPIs & charts) =====
   const { data: allVendas, isLoading: loadAll, isFetching: fetchingAll } = useQuery({
@@ -194,7 +186,7 @@ export default function Gerencial() {
   const filteredAll = useMemo(() => {
     if (!allVendas) return [];
     return allVendas.filter(row => {
-      if (filtroUnidade !== 'all' && getFilial(row.vendedor_nome) !== filtroUnidade) return false;
+      if (filtroUnidade !== 'all' && getFilial(row.cnpj_empresa) !== filtroUnidade) return false;
       if (filtroVendedor !== 'all' && row.vendedor_nome !== filtroVendedor) return false;
       if (filtroFamilia !== 'all' && row.familia_produto !== filtroFamilia) return false;
       if (filtroMarca !== 'all' && row.marca !== filtroMarca) return false;
@@ -229,7 +221,7 @@ export default function Gerencial() {
     return set.size;
   }, [filteredAll]);
 
-  const isBusy = loadAll || fetchingAll || loadPj;
+  const isBusy = loadAll || fetchingAll || loadUnidades;
 
   // ===== Chart: Faturamento por Dia =====
   const chartDiario = useMemo(() => {
@@ -252,37 +244,34 @@ export default function Gerencial() {
     const vendedores = new Set<string>();
     const familias = new Set<string>();
     const marcas = new Set<string>();
-    const unidades = new Set<string>();
     for (const row of allVendas) {
       if (row.vendedor_nome) vendedores.add(row.vendedor_nome);
       if (row.familia_produto && row.familia_produto !== 'Outros') familias.add(row.familia_produto);
       if (row.marca && row.marca !== 'Sem Marca') marcas.add(row.marca);
-      const uni = getFilial(row.vendedor_nome);
-      if (uni !== 'Sem Filial') unidades.add(uni);
     }
+    const unidades = (unidadesList ?? [])
+      .filter(u => u.cnpj)
+      .map(u => u.nome)
+      .sort();
     return {
       vendedores: [...vendedores].sort(),
       familias: [...familias].sort(),
       marcas: [...marcas].sort(),
-      unidades: [...unidades].sort(),
+      unidades,
     };
-  }, [allVendas, getFilial]);
+  }, [allVendas, unidadesList]);
 
-  // Get vendedor names for a given filial (for server-side filtering)
-  const getVendedoresByFilial = useCallback((filial: string): string[] => {
-    if (!allVendas) return [];
-    const names = new Set<string>();
-    for (const row of allVendas) {
-      if (row.vendedor_nome && getFilial(row.vendedor_nome) === filial) {
-        names.add(row.vendedor_nome);
-      }
-    }
-    return [...names];
-  }, [allVendas, getFilial]);
+  // Get CNPJs for a given filial (for server-side filtering)
+  const getCnpjsByFilial = useCallback((filial: string): string[] => {
+    if (!unidadesList) return [];
+    return unidadesList
+      .filter(u => u.nome === filial && u.cnpj)
+      .map(u => u.cnpj!.trim());
+  }, [unidadesList]);
 
   // Fetch paginated vendas for table
   const { data: vendasResult, isLoading: loadVendas } = useQuery({
-    queryKey: ['gerencial-vendas', startDate, endDate, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, searchDebounced, tabelaPagina],
+    queryKey: ['gerencial-vendas', startDate, endDate, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, searchDebounced, tabelaPagina, unidadesList],
     queryFn: async () => {
       const offset = (tabelaPagina - 1) * TABLE_PAGE_SIZE;
       let query = supabase
@@ -295,9 +284,9 @@ export default function Gerencial() {
         .range(offset, offset + TABLE_PAGE_SIZE - 1);
 
       if (filtroUnidade !== 'all') {
-        const nomes = getVendedoresByFilial(filtroUnidade);
-        if (nomes.length > 0) {
-          query = query.in('vendedor_nome', nomes);
+        const cnpjs = getCnpjsByFilial(filtroUnidade);
+        if (cnpjs.length > 0) {
+          query = query.in('cnpj_empresa', cnpjs);
         } else {
           return { rows: [], totalCount: 0 };
         }
@@ -326,7 +315,7 @@ export default function Gerencial() {
   const mappedRows = useMemo(() => {
     return vendasRows.map(row => ({
       ...row,
-      unidade_nome: getFilial(row.vendedor_nome),
+      unidade_nome: getFilial(row.cnpj_empresa),
       total_parsed: parseMoneyBR(row.total_com_desconto),
       lucro_parsed: parseMoneyBR(row.lucros_reais),
       margem_parsed: parsePctBR(row.margem_percentual),
