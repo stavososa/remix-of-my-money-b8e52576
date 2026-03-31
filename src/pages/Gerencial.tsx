@@ -284,9 +284,9 @@ export default function Gerencial() {
         .range(offset, offset + TABLE_PAGE_SIZE - 1);
 
       if (filtroUnidade !== 'all') {
-        const nomes = getVendedoresByFilial(filtroUnidade);
-        if (nomes.length > 0) {
-          query = query.in('vendedor_nome', nomes);
+        const cnpjs = getCnpjsByFilial(filtroUnidade);
+        if (cnpjs.length > 0) {
+          query = query.in('cnpj_empresa', cnpjs);
         } else {
           return { rows: [], totalCount: 0 };
         }
