@@ -121,14 +121,14 @@ export default function Gerencial() {
     const map = new Map<string, string>();
     if (!controlePjFilial) return map;
     for (const row of controlePjFilial) {
-      if (row.nome_vendas && row.unidade) map.set(row.nome_vendas.trim(), row.unidade);
+      if (row.nome_vendas && row.unidade) map.set(row.nome_vendas.trim().toUpperCase(), row.unidade);
     }
     return map;
   }, [controlePjFilial]);
 
   const getFilial = useCallback((vendedorNome: string | null | undefined): string => {
     if (!vendedorNome) return 'Sem Filial';
-    return vendedorFilialMap.get(vendedorNome.trim()) ?? 'Sem Filial';
+    return vendedorFilialMap.get(vendedorNome.trim().toUpperCase()) ?? 'Sem Filial';
   }, [vendedorFilialMap]);
 
   // ===== FULL PERIOD DATA (for KPIs & charts) =====
@@ -262,11 +262,15 @@ export default function Gerencial() {
 
   // Get vendedor names for a given filial (for server-side filtering)
   const getVendedoresByFilial = useCallback((filial: string): string[] => {
-    if (!controlePjFilial) return [];
-    return controlePjFilial
-      .filter(row => row.unidade === filial && row.nome_vendas)
-      .map(row => row.nome_vendas!.trim());
-  }, [controlePjFilial]);
+    if (!allVendas) return [];
+    const names = new Set<string>();
+    for (const row of allVendas) {
+      if (row.vendedor_nome && getFilial(row.vendedor_nome) === filial) {
+        names.add(row.vendedor_nome);
+      }
+    }
+    return [...names];
+  }, [allVendas, getFilial]);
 
   // Fetch paginated vendas for table
   const { data: vendasResult, isLoading: loadVendas } = useQuery({
