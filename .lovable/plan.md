@@ -1,51 +1,52 @@
 
 
-## Plano: Corrigir mapeamento case-insensitive de Filial no Gerencial
+## Plano: Correção do pareamento de nomes entre `vendas` e `controle_pj` para filtro de filial
 
 ### Problema
-O `vendedorFilialMap` em `Gerencial.tsx` usa `Map.get()` com match exato (case-sensitive). Se o `vendedor_nome` na tabela `vendas` tiver capitalização diferente do `nome_vendas` na `controle_pj`, o filtro por filial (ex: RECREIO) não encontra correspondência e mostra "Sem Filial".
+Os nomes na tabela `vendas` nem sempre correspondem exatamente aos nomes em `controle_pj`. Exemplos do Recreio:
+- `vendas`: "LILIAN XAVIER LOJA" / `controle_pj`: "LILIAN XAVIER" -- **nao casa**
+- `vendas`: "CHECK OUT RECREIO" / `controle_pj`: nao existe -- **nao casa**
+- `vendas`: "MATHEUS PENEDO LOJA" / `controle_pj`: "MATHEUS PENEDO LOJA" -- casa
 
-### Solução
-Normalizar as chaves do mapa para uppercase/trimmed, e fazer o lookup também normalizado. Mesma lógica já existe na função `normalize()` do arquivo.
+Resultado: ao filtrar por RECREIO, varias vendas ficam de fora.
 
-### Alterações
+### Solucao em duas partes
 
-**`src/pages/Gerencial.tsx`**
+**Parte 1 -- Atualizar `controle_pj` no banco**
 
-1. **`vendedorFilialMap` (linha ~120-127)** — Normalizar a chave com `.toUpperCase().trim()`:
-```ts
-for (const row of controlePjFilial) {
-  if (row.nome_vendas && row.unidade)
-    map.set(row.nome_vendas.trim().toUpperCase(), row.unidade);
-}
+Corrigir os nomes na `controle_pj` para corresponder exatamente aos nomes usados na tabela `vendas`, e adicionar entradas extras para "CHECK OUT" da unidade:
+
+```sql
+-- Corrigir LILIAN XAVIER → LILIAN XAVIER LOJA
+UPDATE controle_pj SET nome_vendas = 'LILIAN XAVIER LOJA' WHERE nome_vendas = 'LILIAN XAVIER' AND unidade = 'RECREIO';
+
+-- Adicionar CHECK OUT RECREIO
+INSERT INTO controle_pj (nome, nome_vendas, unidade) VALUES ('CHECK OUT RECREIO', 'CHECK OUT RECREIO', 'RECREIO');
 ```
 
-2. **`getFilial` (linha ~129-132)** — Normalizar o lookup:
-```ts
-return vendedorFilialMap.get(vendedorNome.trim().toUpperCase()) ?? 'Sem Filial';
-```
+Verificar tambem se os outros nomes (ERISON BIZARELO, LUCAS VILLAR, MARCELLE DE CASTRO) aparecem exatamente assim na tabela `vendas`. Se nao aparecerem, corrigir.
 
-3. **`getVendedoresByFilial` (linha ~264-269)** — Retornar os nomes originais (já funciona, pois o `.in()` do Supabase é case-sensitive, mas os nomes em `vendas` precisam corresponder). Ajustar para buscar os nomes reais da tabela `vendas` usando o mapa normalizado:
-   - Na verdade, o filtro server-side da tabela usa `.in('vendedor_nome', nomes)` — precisamos garantir que os nomes retornados correspondam exatamente aos da tabela `vendas`. Para isso, construir um mapa reverso: ao processar `allVendas`, mapear `vendedor_nome` original → filial normalizada, e usar os nomes originais no filtro `.in()`.
+**Parte 2 -- Melhorar o matching no codigo (fallback parcial)**
 
-4. **Melhor abordagem para `getVendedoresByFilial`**: Em vez de buscar nomes do `controle_pj`, filtrar os `vendedor_nome` originais do `allVendas` que mapeiam para a filial selecionada:
+Em `src/pages/Gerencial.tsx`, alterar o `getFilial` para tentar match parcial quando o exato falhar -- se o `vendedor_nome` da venda **contem** algum `nome_vendas` do `controle_pj`, usa essa filial:
+
 ```ts
-const getVendedoresByFilial = useCallback((filial: string): string[] => {
-  if (!allVendas) return [];
-  const names = new Set<string>();
-  for (const row of allVendas) {
-    if (row.vendedor_nome && getFilial(row.vendedor_nome) === filial) {
-      names.add(row.vendedor_nome);
-    }
+const getFilial = useCallback((vendedorNome: string | null | undefined): string => {
+  if (!vendedorNome) return 'Sem Filial';
+  const key = vendedorNome.trim().toUpperCase();
+  // Exact match first
+  const exact = vendedorFilialMap.get(key);
+  if (exact) return exact;
+  // Partial match: check if vendedor_nome contains any nome_vendas
+  for (const [nome, unidade] of vendedorFilialMap.entries()) {
+    if (key.includes(nome) || nome.includes(key)) return unidade;
   }
-  return [...names];
-}, [allVendas, getFilial]);
+  return 'Sem Filial';
+}, [vendedorFilialMap]);
 ```
-
-Isso garante que os nomes usados no `.in()` são exatamente os mesmos que existem na tabela `vendas`.
 
 ### Resultado
-- Filtro "RECREIO" vai encontrar todos os 6 vendedores inseridos
-- KPIs, gráficos e tabela serão recalculados corretamente ao filtrar por Recreio
-- Nenhuma alteração no banco de dados necessária
+- Filtro "RECREIO" captura vendas de LILIAN XAVIER LOJA, CHECK OUT RECREIO, etc.
+- KPIs, grafico e tabela detalhada mostram valores corretos
+- Fallback parcial garante resiliencia para variacoes futuras de nomes
 
