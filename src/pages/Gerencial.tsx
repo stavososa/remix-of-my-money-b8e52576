@@ -123,14 +123,14 @@ export default function Gerencial() {
     const map = new Map<string, string>();
     if (!unidadesList) return map;
     for (const row of unidadesList) {
-      if (row.cnpj) map.set(row.cnpj.trim(), row.nome);
+      if (row.cnpj) map.set(normalizeCnpj(row.cnpj.trim()), row.nome);
     }
     return map;
   }, [unidadesList]);
 
   const getFilial = useCallback((cnpj: string | null | undefined): string => {
     if (!cnpj) return 'Sem Filial';
-    return cnpjFilialMap.get(cnpj.trim()) ?? 'Sem Filial';
+    return cnpjFilialMap.get(normalizeCnpj(cnpj.trim())) ?? 'Sem Filial';
   }, [cnpjFilialMap]);
 
   // ===== FULL PERIOD DATA (for KPIs & charts) =====
