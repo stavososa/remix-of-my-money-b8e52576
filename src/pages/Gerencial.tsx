@@ -128,7 +128,15 @@ export default function Gerencial() {
 
   const getFilial = useCallback((vendedorNome: string | null | undefined): string => {
     if (!vendedorNome) return 'Sem Filial';
-    return vendedorFilialMap.get(vendedorNome.trim().toUpperCase()) ?? 'Sem Filial';
+    const key = vendedorNome.trim().toUpperCase();
+    // Exact match first
+    const exact = vendedorFilialMap.get(key);
+    if (exact) return exact;
+    // Partial match fallback: check if vendedor_nome contains any nome_vendas or vice-versa
+    for (const [nome, unidade] of vendedorFilialMap.entries()) {
+      if (key.includes(nome) || nome.includes(key)) return unidade;
+    }
+    return 'Sem Filial';
   }, [vendedorFilialMap]);
 
   // ===== FULL PERIOD DATA (for KPIs & charts) =====
