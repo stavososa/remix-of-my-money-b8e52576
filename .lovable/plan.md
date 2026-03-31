@@ -1,52 +1,58 @@
 
 
-## Plano: Correção do pareamento de nomes entre `vendas` e `controle_pj` para filtro de filial
+## Plano: Filtro de Filial por CNPJ (unidades.cnpj ↔ vendas.cnpj_empresa)
 
-### Problema
-Os nomes na tabela `vendas` nem sempre correspondem exatamente aos nomes em `controle_pj`. Exemplos do Recreio:
-- `vendas`: "LILIAN XAVIER LOJA" / `controle_pj`: "LILIAN XAVIER" -- **nao casa**
-- `vendas`: "CHECK OUT RECREIO" / `controle_pj`: nao existe -- **nao casa**
-- `vendas`: "MATHEUS PENEDO LOJA" / `controle_pj`: "MATHEUS PENEDO LOJA" -- casa
+### Situação atual
+- A tabela `unidades` **já possui** a coluna `cnpj` com dados preenchidos (ex: RECREIO = `44.578.137/0011-75`)
+- A tabela `vendas` possui `cnpj_empresa`
+- O código atual usa `controle_pj` + matching por nome de vendedor — abordagem frágil
 
-Resultado: ao filtrar por RECREIO, varias vendas ficam de fora.
+### Nova abordagem
+Parear `vendas.cnpj_empresa` com `unidades.cnpj` diretamente. Sem intermediários.
 
-### Solucao em duas partes
+### Alterações
 
-**Parte 1 -- Atualizar `controle_pj` no banco**
+**1. Atualizar types.ts** — Regenerar tipos para incluir `cnpj` na tabela `unidades` (adicionar `cnpj: string | null` ao Row/Insert/Update)
 
-Corrigir os nomes na `controle_pj` para corresponder exatamente aos nomes usados na tabela `vendas`, e adicionar entradas extras para "CHECK OUT" da unidade:
+**2. Refatorar `src/pages/Gerencial.tsx`**
 
-```sql
--- Corrigir LILIAN XAVIER → LILIAN XAVIER LOJA
-UPDATE controle_pj SET nome_vendas = 'LILIAN XAVIER LOJA' WHERE nome_vendas = 'LILIAN XAVIER' AND unidade = 'RECREIO';
+- **Remover**: query `controle-pj-filial`, `vendedorFilialMap`, `getFilial` (baseado em nomes), `getVendedoresByFilial`
 
--- Adicionar CHECK OUT RECREIO
-INSERT INTO controle_pj (nome, nome_vendas, unidade) VALUES ('CHECK OUT RECREIO', 'CHECK OUT RECREIO', 'RECREIO');
-```
-
-Verificar tambem se os outros nomes (ERISON BIZARELO, LUCAS VILLAR, MARCELLE DE CASTRO) aparecem exatamente assim na tabela `vendas`. Se nao aparecerem, corrigir.
-
-**Parte 2 -- Melhorar o matching no codigo (fallback parcial)**
-
-Em `src/pages/Gerencial.tsx`, alterar o `getFilial` para tentar match parcial quando o exato falhar -- se o `vendedor_nome` da venda **contem** algum `nome_vendas` do `controle_pj`, usa essa filial:
-
+- **Adicionar**: query para `unidades` buscando `nome, cnpj`:
 ```ts
-const getFilial = useCallback((vendedorNome: string | null | undefined): string => {
-  if (!vendedorNome) return 'Sem Filial';
-  const key = vendedorNome.trim().toUpperCase();
-  // Exact match first
-  const exact = vendedorFilialMap.get(key);
-  if (exact) return exact;
-  // Partial match: check if vendedor_nome contains any nome_vendas
-  for (const [nome, unidade] of vendedorFilialMap.entries()) {
-    if (key.includes(nome) || nome.includes(key)) return unidade;
-  }
-  return 'Sem Filial';
-}, [vendedorFilialMap]);
+const { data: unidadesList } = useQuery({
+  queryKey: ['unidades-cnpj'],
+  queryFn: async () => {
+    const { data } = await supabase.from('unidades').select('nome, cnpj');
+    return data ?? [];
+  },
+  staleTime: Infinity,
+});
 ```
+
+- **Novo `cnpjFilialMap`**: `Map<string, string>` onde chave = cnpj normalizado, valor = nome da unidade
+
+- **Novo `getFilial(cnpj_empresa)`**: lookup direto pelo CNPJ da venda:
+```ts
+const getFilial = (cnpj: string | null) => {
+  if (!cnpj) return 'Sem Filial';
+  return cnpjFilialMap.get(cnpj.trim()) ?? 'Sem Filial';
+};
+```
+
+- **`filteredAll`**: trocar `getFilial(row.vendedor_nome)` por `getFilial(row.cnpj_empresa)`
+
+- **`filterOptions.unidades`**: extrair dos dados de `unidadesList` em vez de iterar vendas
+
+- **Filtro server-side (tabela paginada)**: quando `filtroUnidade !== 'all'`, buscar os CNPJs da filial e usar `.in('cnpj_empresa', cnpjs)` — direto, sem mapear por vendedor
+
+- **`mappedRows`** na tabela detalhada: `unidade_nome = getFilial(row.cnpj_empresa)`
+
+### Nenhuma migration necessária
+A coluna `cnpj` já existe no banco. Só precisa atualizar o type no código.
 
 ### Resultado
-- Filtro "RECREIO" captura vendas de LILIAN XAVIER LOJA, CHECK OUT RECREIO, etc.
-- KPIs, grafico e tabela detalhada mostram valores corretos
-- Fallback parcial garante resiliencia para variacoes futuras de nomes
+- Filtro por filial 100% confiável via CNPJ
+- Sem dependência de nomes de vendedores
+- RECREIO e todas as outras filiais funcionam automaticamente
 
