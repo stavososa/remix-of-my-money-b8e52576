@@ -242,7 +242,13 @@ export default function Gerencial() {
 
   // Filter options from allVendas
   const filterOptions = useMemo(() => {
-    if (!allVendas) return { vendedores: [], unidades: [], familias: [], marcas: [] };
+    const unidades = (unidadesList ?? [])
+      .filter(u => u.cnpj)
+      .map(u => u.nome)
+      .sort();
+
+    if (!allVendas) return { vendedores: [], unidades, familias: [], marcas: [] };
+
     const vendedores = new Set<string>();
     const familias = new Set<string>();
     const marcas = new Set<string>();
@@ -251,10 +257,6 @@ export default function Gerencial() {
       if (row.familia_produto && row.familia_produto !== 'Outros') familias.add(row.familia_produto);
       if (row.marca && row.marca !== 'Sem Marca') marcas.add(row.marca);
     }
-    const unidades = (unidadesList ?? [])
-      .filter(u => u.cnpj)
-      .map(u => u.nome)
-      .sort();
     return {
       vendedores: [...vendedores].sort(),
       familias: [...familias].sort(),
