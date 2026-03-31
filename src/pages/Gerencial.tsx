@@ -262,11 +262,15 @@ export default function Gerencial() {
 
   // Get vendedor names for a given filial (for server-side filtering)
   const getVendedoresByFilial = useCallback((filial: string): string[] => {
-    if (!controlePjFilial) return [];
-    return controlePjFilial
-      .filter(row => row.unidade === filial && row.nome_vendas)
-      .map(row => row.nome_vendas!.trim());
-  }, [controlePjFilial]);
+    if (!allVendas) return [];
+    const names = new Set<string>();
+    for (const row of allVendas) {
+      if (row.vendedor_nome && getFilial(row.vendedor_nome) === filial) {
+        names.add(row.vendedor_nome);
+      }
+    }
+    return [...names];
+  }, [allVendas, getFilial]);
 
   // Fetch paginated vendas for table
   const { data: vendasResult, isLoading: loadVendas } = useQuery({
