@@ -221,7 +221,7 @@ export default function Gerencial() {
     return set.size;
   }, [filteredAll]);
 
-  const isBusy = loadAll || fetchingAll || loadPj;
+  const isBusy = loadAll || fetchingAll || loadUnidades;
 
   // ===== Chart: Faturamento por Dia =====
   const chartDiario = useMemo(() => {
