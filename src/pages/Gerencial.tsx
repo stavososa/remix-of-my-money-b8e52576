@@ -244,21 +244,22 @@ export default function Gerencial() {
     const vendedores = new Set<string>();
     const familias = new Set<string>();
     const marcas = new Set<string>();
-    const unidades = new Set<string>();
     for (const row of allVendas) {
       if (row.vendedor_nome) vendedores.add(row.vendedor_nome);
       if (row.familia_produto && row.familia_produto !== 'Outros') familias.add(row.familia_produto);
       if (row.marca && row.marca !== 'Sem Marca') marcas.add(row.marca);
-      const uni = getFilial(row.vendedor_nome);
-      if (uni !== 'Sem Filial') unidades.add(uni);
     }
+    const unidades = (unidadesList ?? [])
+      .filter(u => u.cnpj)
+      .map(u => u.nome)
+      .sort();
     return {
       vendedores: [...vendedores].sort(),
       familias: [...familias].sort(),
       marcas: [...marcas].sort(),
-      unidades: [...unidades].sort(),
+      unidades,
     };
-  }, [allVendas, getFilial]);
+  }, [allVendas, unidadesList]);
 
   // Get vendedor names for a given filial (for server-side filtering)
   const getVendedoresByFilial = useCallback((filial: string): string[] => {
