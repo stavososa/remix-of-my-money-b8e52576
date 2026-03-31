@@ -42,6 +42,8 @@ const fmtPct = (v: number) => `${v.toFixed(1)}%`;
 const normalize = (s: string) =>
   s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
 
+const normalizeCnpj = (cnpj: string) => cnpj.replace(/[.\-\/\s]/g, '');
+
 const TABLE_PAGE_SIZE = 30;
 
 interface TooltipEntry {
@@ -121,14 +123,14 @@ export default function Gerencial() {
     const map = new Map<string, string>();
     if (!unidadesList) return map;
     for (const row of unidadesList) {
-      if (row.cnpj) map.set(row.cnpj.trim(), row.nome);
+      if (row.cnpj) map.set(normalizeCnpj(row.cnpj.trim()), row.nome);
     }
     return map;
   }, [unidadesList]);
 
   const getFilial = useCallback((cnpj: string | null | undefined): string => {
     if (!cnpj) return 'Sem Filial';
-    return cnpjFilialMap.get(cnpj.trim()) ?? 'Sem Filial';
+    return cnpjFilialMap.get(normalizeCnpj(cnpj.trim())) ?? 'Sem Filial';
   }, [cnpjFilialMap]);
 
   // ===== FULL PERIOD DATA (for KPIs & charts) =====
@@ -240,7 +242,13 @@ export default function Gerencial() {
 
   // Filter options from allVendas
   const filterOptions = useMemo(() => {
-    if (!allVendas) return { vendedores: [], unidades: [], familias: [], marcas: [] };
+    const unidades = (unidadesList ?? [])
+      .filter(u => u.cnpj)
+      .map(u => u.nome)
+      .sort();
+
+    if (!allVendas) return { vendedores: [], unidades, familias: [], marcas: [] };
+
     const vendedores = new Set<string>();
     const familias = new Set<string>();
     const marcas = new Set<string>();
@@ -249,10 +257,6 @@ export default function Gerencial() {
       if (row.familia_produto && row.familia_produto !== 'Outros') familias.add(row.familia_produto);
       if (row.marca && row.marca !== 'Sem Marca') marcas.add(row.marca);
     }
-    const unidades = (unidadesList ?? [])
-      .filter(u => u.cnpj)
-      .map(u => u.nome)
-      .sort();
     return {
       vendedores: [...vendedores].sort(),
       familias: [...familias].sort(),
