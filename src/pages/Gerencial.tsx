@@ -42,6 +42,8 @@ const fmtPct = (v: number) => `${v.toFixed(1)}%`;
 const normalize = (s: string) =>
   s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
 
+const normalizeCnpj = (cnpj: string) => cnpj.replace(/[.\-\/\s]/g, '');
+
 const TABLE_PAGE_SIZE = 30;
 
 interface TooltipEntry {
