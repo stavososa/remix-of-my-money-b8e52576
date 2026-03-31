@@ -121,7 +121,7 @@ export default function Gerencial() {
     const map = new Map<string, string>();
     if (!controlePjFilial) return map;
     for (const row of controlePjFilial) {
-      if (row.nome_vendas && row.unidade) map.set(row.nome_vendas.trim(), row.unidade);
+      if (row.nome_vendas && row.unidade) map.set(row.nome_vendas.trim().toUpperCase(), row.unidade);
     }
     return map;
   }, [controlePjFilial]);
