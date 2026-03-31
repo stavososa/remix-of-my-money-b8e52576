@@ -128,7 +128,7 @@ export default function Gerencial() {
 
   const getFilial = useCallback((vendedorNome: string | null | undefined): string => {
     if (!vendedorNome) return 'Sem Filial';
-    return vendedorFilialMap.get(vendedorNome.trim()) ?? 'Sem Filial';
+    return vendedorFilialMap.get(vendedorNome.trim().toUpperCase()) ?? 'Sem Filial';
   }, [vendedorFilialMap]);
 
   // ===== FULL PERIOD DATA (for KPIs & charts) =====
