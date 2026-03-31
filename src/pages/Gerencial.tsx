@@ -104,40 +104,32 @@ export default function Gerencial() {
   const startDate = dataInicio;
   const endDate = dataFim;
 
-  // ===== controle_pj (vendedor_nome → unidade) for filial mapping =====
-  const { data: controlePjFilial, isLoading: loadPj } = useQuery({
-    queryKey: ['controle-pj-filial'],
+  // ===== unidades (cnpj → nome) for filial mapping =====
+  const { data: unidadesList, isLoading: loadUnidades } = useQuery({
+    queryKey: ['unidades-cnpj'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('controle_pj')
-        .select('nome_vendas, unidade');
+        .from('unidades')
+        .select('nome, cnpj');
       if (error) throw error;
-      return (data ?? []) as { nome_vendas: string | null; unidade: string | null }[];
+      return (data ?? []) as { nome: string; cnpj: string | null }[];
     },
     staleTime: Infinity,
   });
 
-  const vendedorFilialMap = useMemo(() => {
+  const cnpjFilialMap = useMemo(() => {
     const map = new Map<string, string>();
-    if (!controlePjFilial) return map;
-    for (const row of controlePjFilial) {
-      if (row.nome_vendas && row.unidade) map.set(row.nome_vendas.trim().toUpperCase(), row.unidade);
+    if (!unidadesList) return map;
+    for (const row of unidadesList) {
+      if (row.cnpj) map.set(row.cnpj.trim(), row.nome);
     }
     return map;
-  }, [controlePjFilial]);
+  }, [unidadesList]);
 
-  const getFilial = useCallback((vendedorNome: string | null | undefined): string => {
-    if (!vendedorNome) return 'Sem Filial';
-    const key = vendedorNome.trim().toUpperCase();
-    // Exact match first
-    const exact = vendedorFilialMap.get(key);
-    if (exact) return exact;
-    // Partial match fallback: check if vendedor_nome contains any nome_vendas or vice-versa
-    for (const [nome, unidade] of vendedorFilialMap.entries()) {
-      if (key.includes(nome) || nome.includes(key)) return unidade;
-    }
-    return 'Sem Filial';
-  }, [vendedorFilialMap]);
+  const getFilial = useCallback((cnpj: string | null | undefined): string => {
+    if (!cnpj) return 'Sem Filial';
+    return cnpjFilialMap.get(cnpj.trim()) ?? 'Sem Filial';
+  }, [cnpjFilialMap]);
 
   // ===== FULL PERIOD DATA (for KPIs & charts) =====
   const { data: allVendas, isLoading: loadAll, isFetching: fetchingAll } = useQuery({
