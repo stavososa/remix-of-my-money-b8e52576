@@ -110,7 +110,7 @@ export default function Gerencial() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('unidades')
-        .select('nome, cnpj');
+        .select('nome, cnpj') as any;
       if (error) throw error;
       return (data ?? []) as { nome: string; cnpj: string | null }[];
     },
