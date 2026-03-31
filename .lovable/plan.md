@@ -1,73 +1,41 @@
 
 
-## Plano: Aba de Bonificação (Admin)
+## Plano: Inserir vendedores do Recreio na tabela controle_pj
 
-### Conceito
-Nova página `/admin/bonificacao` acessível apenas por admins, onde é possível cadastrar prêmios com imagem, descrição e definir quantos vendedores do topo do ranking serão premiados.
+### Dados identificados na planilha (aba Recreio)
 
-### Alterações no Banco (Supabase)
+Os 6 vendedores da unidade Recreio:
 
-**Migration 1 — Tabela `bonificacoes`**
+| nome | nome_vendas (como aparece na planilha) |
+|------|---------------------------------------|
+| ANDERSON RIBEIRO | ANDERSON RIBEIRO |
+| ERISON BIZARELO RIBEIRO CRUZ | ERISON BIZARELO RIBEIRO CRUZ |
+| LILIAN XAVIER | LILIAN XAVIER |
+| LUCAS VILLAR ROSA | LUCAS VILLAR ROSA |
+| MARCELLE DE CASTRO | MARCELLE DE CASTRO |
+| MATHEUS PENEDO LOJA | MATHEUS PENEDO LOJA |
+
+### Ação
+
+Executar um INSERT na tabela `controle_pj` com os 6 vendedores, usando:
+- `nome` = nome completo do vendedor
+- `nome_vendas` = mesmo nome (usado para mapear com a tabela `vendas`)
+- `unidade` = "RECREIO"
+- `setor` e `cnpj` = null (a preencher depois, se necessário)
+
+### SQL a executar
+
 ```sql
-create table public.bonificacoes (
-  id uuid primary key default gen_random_uuid(),
-  titulo text not null,
-  descricao text,
-  imagem_url text,
-  qtd_premiados int not null default 3,
-  ativo boolean not null default true,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
-
-alter table public.bonificacoes enable row level security;
-
--- Apenas admins autenticados podem ler/escrever
-create policy "Admins podem gerenciar bonificacoes"
-  on public.bonificacoes for all to authenticated
-  using (public.has_role(auth.uid(), 'admin'))
-  with check (public.has_role(auth.uid(), 'admin'));
+INSERT INTO controle_pj (nome, nome_vendas, unidade)
+VALUES
+  ('ANDERSON RIBEIRO', 'ANDERSON RIBEIRO', 'RECREIO'),
+  ('ERISON BIZARELO RIBEIRO CRUZ', 'ERISON BIZARELO RIBEIRO CRUZ', 'RECREIO'),
+  ('LILIAN XAVIER', 'LILIAN XAVIER', 'RECREIO'),
+  ('LUCAS VILLAR ROSA', 'LUCAS VILLAR ROSA', 'RECREIO'),
+  ('MARCELLE DE CASTRO', 'MARCELLE DE CASTRO', 'RECREIO'),
+  ('MATHEUS PENEDO LOJA', 'MATHEUS PENEDO LOJA', 'RECREIO');
 ```
 
-**Migration 2 — Bucket de imagens**
-```sql
-insert into storage.buckets (id, name, public) values ('bonificacoes', 'bonificacoes', true);
-
--- Upload só por admins
-create policy "Admin upload bonificacoes"
-  on storage.objects for insert to authenticated
-  with check (bucket_id = 'bonificacoes' and public.has_role(auth.uid(), 'admin'));
-
--- Leitura pública
-create policy "Public read bonificacoes"
-  on storage.objects for select to public
-  using (bucket_id = 'bonificacoes');
-```
-
-### Alterações no Frontend
-
-**`src/pages/AdminBonificacao.tsx`** (novo)
-- Página com formulário para cadastrar/editar bonificações
-- Campos: título, descrição, upload de imagem (para o bucket `bonificacoes`), quantidade de premiados (input numérico)
-- Lista de bonificações existentes em cards com imagem, título, descrição e badge com qtd de premiados
-- Botão ativar/desativar cada bonificação
-- Botão excluir
-
-**`src/App.tsx`**
-- Importar lazy `AdminBonificacao`
-- Adicionar rota `/admin/bonificacao` com `RequireAuth` + `RequireAdmin`
-
-**`src/components/AppShell.tsx`**
-- Adicionar item `{ label: 'Bonificação', to: '/admin/bonificacao', icon: Gift, roles: ['admin'] }` no array `adminItems`
-- Importar `Gift` do lucide-react
-
-**`src/integrations/supabase/types.ts`**
-- Adicionar tipagem da tabela `bonificacoes` (gerada pela migration)
-
-### Fluxo do Admin
-1. Acessa "Bonificação" no menu lateral
-2. Clica "Nova Bonificação"
-3. Preenche título, descrição, faz upload da imagem do prêmio
-4. Define quantas pessoas do topo do ranking serão premiadas
-5. Salva — bonificação aparece na lista com card visual
+### Nenhuma alteração de código
+Apenas inserção de dados no banco.
 
