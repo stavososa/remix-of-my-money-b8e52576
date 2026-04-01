@@ -109,7 +109,7 @@ export default function Gerencial() {
   const endDate = dataFim;
 
   // ===== unidades (nome + cnpj for dropdown and mapping) =====
-  const { data: unidadesList } = useQuery({
+  const { data: unidadesList, isLoading: loadUnidades } = useQuery({
     queryKey: ['unidades-nomes-cnpj'],
     queryFn: async () => {
       const { data, error } = await supabase
