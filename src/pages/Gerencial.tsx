@@ -78,7 +78,7 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
 export default function Gerencial() {
   const isMobile = useIsMobile();
   const { periodoAno, periodoMes, dataInicio, dataFim } = usePeriod();
-  const [filtroUnidade, setFiltroUnidade] = useState<string>('all');
+  const [filtroUnidade, setFiltroUnidade] = useState<string[]>([]);
   const [filtroVendedor, setFiltroVendedor] = useState<string>('all');
   const [filtroFamilia, setFiltroFamilia] = useState<string>('all');
   const [filtroMarca, setFiltroMarca] = useState<string>('all');
@@ -87,7 +87,7 @@ export default function Gerencial() {
   const [tabelaPagina, setTabelaPagina] = useState(1);
 
   useEffect(() => {
-    setFiltroUnidade('all');
+    setFiltroUnidade([]);
     setFiltroVendedor('all');
     setFiltroFamilia('all');
     setFiltroMarca('all');
