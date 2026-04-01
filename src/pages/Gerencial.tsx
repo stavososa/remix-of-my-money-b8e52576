@@ -288,8 +288,8 @@ export default function Gerencial() {
         .order('id', { ascending: false })
         .range(offset, offset + TABLE_PAGE_SIZE - 1);
 
-      if (filtroUnidade !== 'all') {
-        const cnpjs = getCnpjsByFilial(filtroUnidade);
+      if (filtroUnidade.length > 0) {
+        const cnpjs = getCnpjsByFiliais(filtroUnidade);
         if (cnpjs.length > 0) {
           query = query.in('cnpj_empresa', cnpjs);
         } else {
