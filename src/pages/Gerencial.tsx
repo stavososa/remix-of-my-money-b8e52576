@@ -106,27 +106,40 @@ export default function Gerencial() {
   const startDate = dataInicio;
   const endDate = dataFim;
 
-  // ===== unidades (cnpj → nome) for filial mapping =====
-  const { data: unidadesList, isLoading: loadUnidades } = useQuery({
-    queryKey: ['unidades-cnpj'],
+  // ===== unidades (nome list for dropdown) =====
+  const { data: unidadesList } = useQuery({
+    queryKey: ['unidades-nomes'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('unidades')
-        .select('nome, cnpj') as any;
+        .select('nome');
       if (error) throw error;
-      return (data ?? []) as { nome: string; cnpj: string | null }[];
+      return (data ?? []) as { nome: string }[];
+    },
+    staleTime: Infinity,
+  });
+
+  // ===== controle_pj (cnpj → unidade mapping) =====
+  const { data: controlePjList } = useQuery({
+    queryKey: ['controle-pj-cnpj'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('controle_pj')
+        .select('cnpj, unidade');
+      if (error) throw error;
+      return (data ?? []) as { cnpj: string | null; unidade: string | null }[];
     },
     staleTime: Infinity,
   });
 
   const cnpjFilialMap = useMemo(() => {
     const map = new Map<string, string>();
-    if (!unidadesList) return map;
-    for (const row of unidadesList) {
-      if (row.cnpj) map.set(normalizeCnpj(row.cnpj.trim()), row.nome);
+    if (!controlePjList) return map;
+    for (const row of controlePjList) {
+      if (row.cnpj && row.unidade) map.set(normalizeCnpj(row.cnpj.trim()), row.unidade);
     }
     return map;
-  }, [unidadesList]);
+  }, [controlePjList]);
 
   const getFilial = useCallback((cnpj: string | null | undefined): string => {
     if (!cnpj) return 'Sem Filial';
@@ -223,7 +236,7 @@ export default function Gerencial() {
     return set.size;
   }, [filteredAll]);
 
-  const isBusy = loadAll || fetchingAll || loadUnidades;
+  const isBusy = loadAll || fetchingAll;
 
   // ===== Chart: Faturamento por Dia =====
   const chartDiario = useMemo(() => {
@@ -243,7 +256,6 @@ export default function Gerencial() {
   // Filter options from allVendas
   const filterOptions = useMemo(() => {
     const unidades = (unidadesList ?? [])
-      .filter(u => u.cnpj)
       .map(u => u.nome)
       .sort();
 
@@ -265,17 +277,17 @@ export default function Gerencial() {
     };
   }, [allVendas, unidadesList]);
 
-  // Get CNPJs for a given filial (for server-side filtering)
+  // Get CNPJs for a given filial (from controle_pj)
   const getCnpjsByFilial = useCallback((filial: string): string[] => {
-    if (!unidadesList) return [];
-    return unidadesList
-      .filter(u => u.nome === filial && u.cnpj)
+    if (!controlePjList) return [];
+    return controlePjList
+      .filter(u => u.unidade === filial && u.cnpj)
       .map(u => u.cnpj!.trim());
-  }, [unidadesList]);
+  }, [controlePjList]);
 
   // Fetch paginated vendas for table
   const { data: vendasResult, isLoading: loadVendas } = useQuery({
-    queryKey: ['gerencial-vendas', startDate, endDate, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, searchDebounced, tabelaPagina, unidadesList],
+    queryKey: ['gerencial-vendas', startDate, endDate, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, searchDebounced, tabelaPagina, controlePjList],
     queryFn: async () => {
       const offset = (tabelaPagina - 1) * TABLE_PAGE_SIZE;
       let query = supabase
