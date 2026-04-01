@@ -520,3 +520,45 @@ function FilterSelect({ label, value, onChange, options, allLabel }: {
     </select>
   );
 }
+
+function MultiFilterSelect({ label, selected, onChange, options, allLabel }: {
+  label: string;
+  selected: string[];
+  onChange: (v: string[]) => void;
+  options: string[];
+  allLabel: string;
+}) {
+  const toggle = (val: string) => {
+    onChange(selected.includes(val) ? selected.filter(x => x !== val) : [...selected, val]);
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          className="bg-secondary border border-border rounded-md px-2 sm:px-3 py-2 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring w-full sm:w-auto sm:min-w-[140px] sm:max-w-[220px] flex items-center justify-between gap-1"
+          title={label}
+        >
+          <span className="truncate">
+            {selected.length === 0 ? allLabel : selected.length === 1 ? selected[0] : `${selected.length} filiais`}
+          </span>
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-56 p-2 max-h-[300px] overflow-y-auto" align="start">
+        {selected.length > 0 && (
+          <button onClick={() => onChange([])} className="text-xs text-muted-foreground hover:text-foreground w-full text-left px-2 py-1 mb-1 underline">
+            Limpar seleção
+          </button>
+        )}
+        {options.map(opt => (
+          <label key={opt} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer text-xs">
+            <Checkbox checked={selected.includes(opt)} onCheckedChange={() => toggle(opt)} />
+            <span className="truncate">{opt}</span>
+          </label>
+        ))}
+        {options.length === 0 && <p className="text-xs text-muted-foreground px-2 py-2">Nenhuma filial encontrada</p>}
+      </PopoverContent>
+    </Popover>
+  );
+}
