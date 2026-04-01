@@ -1,41 +1,27 @@
 
 
-## Plano: Multi-seleção no filtro de Filiais
+## Plano: Garantir que o dashboard só exiba dados quando tudo estiver carregado
 
-### O que muda
-Transformar o filtro de Filial de single-select (`string`) para multi-select (`string[]`), permitindo selecionar várias unidades simultaneamente.
+### Problema
+Atualmente `isBusy = loadAll || fetchingAll` — não considera se `unidadesList` (filiais) já carregou. Se as unidades ainda não carregaram, o mapeamento CNPJ→Filial fica vazio e os dados podem aparecer incorretos momentaneamente.
 
-### Alterações em `src/pages/Gerencial.tsx`
+### Alteração em `src/pages/Gerencial.tsx`
 
-**1. Estado**: `filtroUnidade` passa de `string` para `string[]`
+**1. Capturar estado de loading das unidades:**
 ```ts
-// De:
-const [filtroUnidade, setFiltroUnidade] = useState<string>('all');
-// Para:
-const [filtroUnidade, setFiltroUnidade] = useState<string[]>([]);
-// [] = todas, array com valores = filtradas
+const { data: unidadesList, isLoading: loadUnidades } = useQuery({ ... });
 ```
 
-**2. Criar componente `MultiFilterSelect`** (inline no mesmo arquivo)
-- Usa um `Popover` + lista de `Checkbox` para cada opção
-- Botão mostra "Todas as Filiais" quando vazio, ou "2 filiais" quando selecionadas
-- Checkbox para marcar/desmarcar cada unidade
-- Botão "Limpar" para resetar
-
-**3. Filtro client-side (`filteredAll`)**: 
+**2. Expandir `isBusy` para incluir unidades:**
 ```ts
-if (filtroUnidade.length > 0 && !filtroUnidade.includes(getFilial(row.cnpj_empresa))) return false;
+const isBusy = loadAll || fetchingAll || loadUnidades || !unidadesList;
 ```
 
-**4. Filtro server-side (query paginada)**:
-- Quando `filtroUnidade.length > 0`, coletar CNPJs de todas as filiais selecionadas e usar `.in('cnpj_empresa', allCnpjs)`
+**3. Proteger o gráfico e a tabela:** Além dos KPIs (que já mostram '—'), garantir que o gráfico e a contagem de registros da tabela também respeitem `isBusy` — já está feito com o overlay de spinner no gráfico. Adicionar proteção na contagem de vendas detalhadas para não mostrar "0 registros" durante carregamento.
 
-**5. Active filters / chips**: Mostrar um chip por filial selecionada, cada um removível individualmente
-
-**6. Reset**: No `useEffect` do período e no `clearAllFilters`, setar `[]`
-
-### Componentes utilizados
-- `Popover` + `PopoverTrigger` + `PopoverContent` (já existe em `src/components/ui/popover.tsx`)
-- `Checkbox` (já existe em `src/components/ui/checkbox.tsx`)
-- Sem dependências novas
+### Resultado
+- KPIs mostram '—' até vendas + unidades carregarem
+- Gráfico mostra spinner até tudo resolver
+- Notas Fiscais só exibe o número final correto (8794 para fev, 6522 para mar)
+- Nenhum "flickering" de dados parciais
 
