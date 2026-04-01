@@ -1,27 +1,41 @@
 
 
-## Plano: Adicionar coluna `cnpj` na tabela `unidades` e corrigir o filtro
+## Plano: Multi-seleção no filtro de Filiais
 
-### Problema raiz
-A API retorna erro **`column unidades.cnpj does not exist`**. A tabela `unidades` no banco tem apenas: `id, nome, tipo, ativo, created_at`. Não existe coluna `cnpj`.
+### O que muda
+Transformar o filtro de Filial de single-select (`string`) para multi-select (`string[]`), permitindo selecionar várias unidades simultaneamente.
 
-A screenshot que você mostrou anteriormente com a coluna `cnpj` pode ter sido de outra tabela ou do Table Editor com dados que ainda não foram salvos como coluna.
+### Alterações em `src/pages/Gerencial.tsx`
 
-### Solução
-
-**1. Migration: Adicionar coluna `cnpj` na tabela `unidades`**
-
-```sql
-ALTER TABLE public.unidades
-ADD COLUMN cnpj text;
+**1. Estado**: `filtroUnidade` passa de `string` para `string[]`
+```ts
+// De:
+const [filtroUnidade, setFiltroUnidade] = useState<string>('all');
+// Para:
+const [filtroUnidade, setFiltroUnidade] = useState<string[]>([]);
+// [] = todas, array com valores = filtradas
 ```
 
-**2. Após a migration**: Você precisará preencher os CNPJs de cada unidade manualmente no Supabase Table Editor (ou me passar os valores para eu inserir via UPDATE).
+**2. Criar componente `MultiFilterSelect`** (inline no mesmo arquivo)
+- Usa um `Popover` + lista de `Checkbox` para cada opção
+- Botão mostra "Todas as Filiais" quando vazio, ou "2 filiais" quando selecionadas
+- Checkbox para marcar/desmarcar cada unidade
+- Botão "Limpar" para resetar
 
-**3. Atualizar `src/integrations/supabase/types.ts`**: Adicionar `cnpj: string | null` no Row/Insert/Update de `unidades`.
+**3. Filtro client-side (`filteredAll`)**: 
+```ts
+if (filtroUnidade.length > 0 && !filtroUnidade.includes(getFilial(row.cnpj_empresa))) return false;
+```
 
-**4. Código em `Gerencial.tsx`**: Já está correto -- busca `nome, cnpj` e monta o mapeamento. Vai funcionar assim que a coluna existir com dados.
+**4. Filtro server-side (query paginada)**:
+- Quando `filtroUnidade.length > 0`, coletar CNPJs de todas as filiais selecionadas e usar `.in('cnpj_empresa', allCnpjs)`
 
-### Alternativa
-Se a coluna `cnpj` já existe no banco mas não aparece nos tipos gerados, basta regenerar os tipos do Supabase. Me confirme se você tem certeza que a coluna existe no banco.
+**5. Active filters / chips**: Mostrar um chip por filial selecionada, cada um removível individualmente
+
+**6. Reset**: No `useEffect` do período e no `clearAllFilters`, setar `[]`
+
+### Componentes utilizados
+- `Popover` + `PopoverTrigger` + `PopoverContent` (já existe em `src/components/ui/popover.tsx`)
+- `Checkbox` (já existe em `src/components/ui/checkbox.tsx`)
+- Sem dependências novas
 
