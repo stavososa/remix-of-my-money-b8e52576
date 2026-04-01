@@ -1,27 +1,31 @@
 
 
-## Plano: Garantir que o dashboard só exiba dados quando tudo estiver carregado
+## Plano: Substituir "BRX" por "HAZAK" com CNPJ fixo
 
-### Problema
-Atualmente `isBusy = loadAll || fetchingAll` — não considera se `unidadesList` (filiais) já carregou. Se as unidades ainda não carregaram, o mapeamento CNPJ→Filial fica vazio e os dados podem aparecer incorretos momentaneamente.
+### Contexto
+"BRX" existe como registro na tabela `unidades` no banco. Precisamos:
+1. Atualizar o registro no banco (renomear BRX → HAZAK e garantir o CNPJ correto)
+2. Garantir que o código funcione sem alterações (já usa `unidades.nome` e `unidades.cnpj` dinamicamente)
 
-### Alteração em `src/pages/Gerencial.tsx`
+### Alterações
 
-**1. Capturar estado de loading das unidades:**
-```ts
-const { data: unidadesList, isLoading: loadUnidades } = useQuery({ ... });
+**1. Migration SQL** — Criar migration para atualizar o registro:
+```sql
+UPDATE unidades 
+SET nome = 'HAZAK', cnpj = '44.578.137/0020-66'
+WHERE nome = 'BRX';
+```
+Se "BRX" não existir no banco, inserir:
+```sql
+INSERT INTO unidades (nome, cnpj, tipo, ativo)
+VALUES ('HAZAK', '44.578.137/0020-66', 'filial', true)
+ON CONFLICT DO NOTHING;
 ```
 
-**2. Expandir `isBusy` para incluir unidades:**
-```ts
-const isBusy = loadAll || fetchingAll || loadUnidades || !unidadesList;
-```
+**2. Nenhuma alteração no código React** — O `Gerencial.tsx` já:
+- Busca `nome` e `cnpj` da tabela `unidades` dinamicamente
+- Usa `cnpjFilialMap` para mapear CNPJ → nome da filial
+- O filtro multi-select mostra os nomes vindos do banco
 
-**3. Proteger o gráfico e a tabela:** Além dos KPIs (que já mostram '—'), garantir que o gráfico e a contagem de registros da tabela também respeitem `isBusy` — já está feito com o overlay de spinner no gráfico. Adicionar proteção na contagem de vendas detalhadas para não mostrar "0 registros" durante carregamento.
-
-### Resultado
-- KPIs mostram '—' até vendas + unidades carregarem
-- Gráfico mostra spinner até tudo resolver
-- Notas Fiscais só exibe o número final correto (8794 para fev, 6522 para mar)
-- Nenhum "flickering" de dados parciais
+Após a migration, "HAZAK" aparecerá automaticamente no dropdown e filtrará vendas com CNPJ `44.578.137/0020-66`.
 
