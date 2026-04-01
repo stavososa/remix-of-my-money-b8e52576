@@ -267,10 +267,10 @@ export default function Gerencial() {
   }, [allVendas, unidadesList]);
 
   // Get CNPJs for a given filial (from unidades)
-  const getCnpjsByFilial = useCallback((filial: string): string[] => {
+  const getCnpjsByFiliais = useCallback((filiais: string[]): string[] => {
     if (!unidadesList) return [];
     return unidadesList
-      .filter(u => u.nome === filial && u.cnpj)
+      .filter(u => filiais.includes(u.nome) && u.cnpj)
       .map(u => u.cnpj!.trim());
   }, [unidadesList]);
 
