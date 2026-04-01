@@ -264,17 +264,17 @@ export default function Gerencial() {
     };
   }, [allVendas, unidadesList]);
 
-  // Get CNPJs for a given filial (from controle_pj)
+  // Get CNPJs for a given filial (from unidades)
   const getCnpjsByFilial = useCallback((filial: string): string[] => {
-    if (!controlePjList) return [];
-    return controlePjList
-      .filter(u => u.unidade === filial && u.cnpj)
+    if (!unidadesList) return [];
+    return unidadesList
+      .filter(u => u.nome === filial && u.cnpj)
       .map(u => u.cnpj!.trim());
-  }, [controlePjList]);
+  }, [unidadesList]);
 
   // Fetch paginated vendas for table
   const { data: vendasResult, isLoading: loadVendas } = useQuery({
-    queryKey: ['gerencial-vendas', startDate, endDate, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, searchDebounced, tabelaPagina, controlePjList],
+    queryKey: ['gerencial-vendas', startDate, endDate, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, searchDebounced, tabelaPagina, unidadesList],
     queryFn: async () => {
       const offset = (tabelaPagina - 1) * TABLE_PAGE_SIZE;
       let query = supabase
