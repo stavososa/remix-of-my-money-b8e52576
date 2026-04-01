@@ -256,7 +256,6 @@ export default function Gerencial() {
   // Filter options from allVendas
   const filterOptions = useMemo(() => {
     const unidades = (unidadesList ?? [])
-      .filter(u => u.cnpj)
       .map(u => u.nome)
       .sort();
 
