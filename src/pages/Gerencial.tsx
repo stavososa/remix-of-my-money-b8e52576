@@ -277,13 +277,13 @@ export default function Gerencial() {
     };
   }, [allVendas, unidadesList]);
 
-  // Get CNPJs for a given filial (for server-side filtering)
+  // Get CNPJs for a given filial (from controle_pj)
   const getCnpjsByFilial = useCallback((filial: string): string[] => {
-    if (!unidadesList) return [];
-    return unidadesList
-      .filter(u => u.nome === filial && u.cnpj)
+    if (!controlePjList) return [];
+    return controlePjList
+      .filter(u => u.unidade === filial && u.cnpj)
       .map(u => u.cnpj!.trim());
-  }, [unidadesList]);
+  }, [controlePjList]);
 
   // Fetch paginated vendas for table
   const { data: vendasResult, isLoading: loadVendas } = useQuery({
