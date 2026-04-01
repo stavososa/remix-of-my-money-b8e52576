@@ -106,27 +106,40 @@ export default function Gerencial() {
   const startDate = dataInicio;
   const endDate = dataFim;
 
-  // ===== unidades (cnpj → nome) for filial mapping =====
-  const { data: unidadesList, isLoading: loadUnidades } = useQuery({
-    queryKey: ['unidades-cnpj'],
+  // ===== unidades (nome list for dropdown) =====
+  const { data: unidadesList } = useQuery({
+    queryKey: ['unidades-nomes'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('unidades')
-        .select('nome, cnpj') as any;
+        .select('nome');
       if (error) throw error;
-      return (data ?? []) as { nome: string; cnpj: string | null }[];
+      return (data ?? []) as { nome: string }[];
+    },
+    staleTime: Infinity,
+  });
+
+  // ===== controle_pj (cnpj → unidade mapping) =====
+  const { data: controlePjList } = useQuery({
+    queryKey: ['controle-pj-cnpj'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('controle_pj')
+        .select('cnpj, unidade');
+      if (error) throw error;
+      return (data ?? []) as { cnpj: string | null; unidade: string | null }[];
     },
     staleTime: Infinity,
   });
 
   const cnpjFilialMap = useMemo(() => {
     const map = new Map<string, string>();
-    if (!unidadesList) return map;
-    for (const row of unidadesList) {
-      if (row.cnpj) map.set(normalizeCnpj(row.cnpj.trim()), row.nome);
+    if (!controlePjList) return map;
+    for (const row of controlePjList) {
+      if (row.cnpj && row.unidade) map.set(normalizeCnpj(row.cnpj.trim()), row.unidade);
     }
     return map;
-  }, [unidadesList]);
+  }, [controlePjList]);
 
   const getFilial = useCallback((cnpj: string | null | undefined): string => {
     if (!cnpj) return 'Sem Filial';
