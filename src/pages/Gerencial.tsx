@@ -5,10 +5,12 @@ import { DataTable } from '@/components/DataTable';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { usePeriod } from '@/contexts/PeriodContext';
-import { X, Search, DollarSign, TrendingUp, Percent, ShoppingCart, FileText } from 'lucide-react';
+import { X, Search, DollarSign, TrendingUp, Percent, ShoppingCart, FileText, ChevronDown, Check } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   ResponsiveContainer, AreaChart, Area,
@@ -76,7 +78,7 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
 export default function Gerencial() {
   const isMobile = useIsMobile();
   const { periodoAno, periodoMes, dataInicio, dataFim } = usePeriod();
-  const [filtroUnidade, setFiltroUnidade] = useState<string>('all');
+  const [filtroUnidade, setFiltroUnidade] = useState<string[]>([]);
   const [filtroVendedor, setFiltroVendedor] = useState<string>('all');
   const [filtroFamilia, setFiltroFamilia] = useState<string>('all');
   const [filtroMarca, setFiltroMarca] = useState<string>('all');
@@ -85,7 +87,7 @@ export default function Gerencial() {
   const [tabelaPagina, setTabelaPagina] = useState(1);
 
   useEffect(() => {
-    setFiltroUnidade('all');
+    setFiltroUnidade([]);
     setFiltroVendedor('all');
     setFiltroFamilia('all');
     setFiltroMarca('all');
@@ -188,7 +190,7 @@ export default function Gerencial() {
   const filteredAll = useMemo(() => {
     if (!allVendas) return [];
     return allVendas.filter(row => {
-      if (filtroUnidade !== 'all' && getFilial(row.cnpj_empresa) !== filtroUnidade) return false;
+      if (filtroUnidade.length > 0 && !filtroUnidade.includes(getFilial(row.cnpj_empresa))) return false;
       if (filtroVendedor !== 'all' && row.vendedor_nome !== filtroVendedor) return false;
       if (filtroFamilia !== 'all' && row.familia_produto !== filtroFamilia) return false;
       if (filtroMarca !== 'all' && row.marca !== filtroMarca) return false;
@@ -265,10 +267,10 @@ export default function Gerencial() {
   }, [allVendas, unidadesList]);
 
   // Get CNPJs for a given filial (from unidades)
-  const getCnpjsByFilial = useCallback((filial: string): string[] => {
+  const getCnpjsByFiliais = useCallback((filiais: string[]): string[] => {
     if (!unidadesList) return [];
     return unidadesList
-      .filter(u => u.nome === filial && u.cnpj)
+      .filter(u => filiais.includes(u.nome) && u.cnpj)
       .map(u => u.cnpj!.trim());
   }, [unidadesList]);
 
@@ -286,8 +288,8 @@ export default function Gerencial() {
         .order('id', { ascending: false })
         .range(offset, offset + TABLE_PAGE_SIZE - 1);
 
-      if (filtroUnidade !== 'all') {
-        const cnpjs = getCnpjsByFilial(filtroUnidade);
+      if (filtroUnidade.length > 0) {
+        const cnpjs = getCnpjsByFiliais(filtroUnidade);
         if (cnpjs.length > 0) {
           query = query.in('cnpj_empresa', cnpjs);
         } else {
@@ -331,14 +333,14 @@ export default function Gerencial() {
   };
 
   const activeFilters = [
-    ...(filtroUnidade !== 'all' ? [{ label: `Filial: ${filtroUnidade}`, clear: () => { setFiltroUnidade('all'); setTabelaPagina(1); } }] : []),
+    ...filtroUnidade.map(u => ({ label: `Filial: ${u}`, clear: () => { setFiltroUnidade(prev => prev.filter(x => x !== u)); setTabelaPagina(1); } })),
     ...(filtroVendedor !== 'all' ? [{ label: `Vendedor: ${filtroVendedor}`, clear: () => { setFiltroVendedor('all'); setTabelaPagina(1); } }] : []),
     ...(filtroFamilia !== 'all' ? [{ label: `Família: ${filtroFamilia}`, clear: () => { setFiltroFamilia('all'); setTabelaPagina(1); } }] : []),
     ...(filtroMarca !== 'all' ? [{ label: `Marca: ${filtroMarca}`, clear: () => { setFiltroMarca('all'); setTabelaPagina(1); } }] : []),
   ];
 
   const clearAllFilters = () => {
-    setFiltroUnidade('all');
+    setFiltroUnidade([]);
     setFiltroVendedor('all');
     setFiltroFamilia('all');
     setFiltroMarca('all');
@@ -376,7 +378,7 @@ export default function Gerencial() {
         </div>
         {/* Filters */}
         <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-3">
-          <FilterSelect label="Filial" value={filtroUnidade} onChange={handleFilterChange(setFiltroUnidade)} options={filtros.unidades.map(u => ({ value: u, label: u }))} allLabel="Todas as Filiais" />
+          <MultiFilterSelect label="Filial" selected={filtroUnidade} onChange={(v) => { setFiltroUnidade(v); setTabelaPagina(1); }} options={filtros.unidades} allLabel="Todas as Filiais" />
           <FilterSelect label="Vendedor" value={filtroVendedor} onChange={handleFilterChange(setFiltroVendedor)} options={filtros.vendedores.map(v => ({ value: v, label: v }))} allLabel="Todos os Vendedores" />
           <FilterSelect label="Família" value={filtroFamilia} onChange={handleFilterChange(setFiltroFamilia)} options={filtros.familias.map(f => ({ value: f, label: f }))} allLabel="Todas as Famílias" />
           <FilterSelect label="Marca" value={filtroMarca} onChange={handleFilterChange(setFiltroMarca)} options={filtros.marcas.map(m => ({ value: m, label: m }))} allLabel="Todas as Marcas" />
@@ -516,5 +518,47 @@ function FilterSelect({ label, value, onChange, options, allLabel }: {
       <option value="all">{allLabel}</option>
       {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>
+  );
+}
+
+function MultiFilterSelect({ label, selected, onChange, options, allLabel }: {
+  label: string;
+  selected: string[];
+  onChange: (v: string[]) => void;
+  options: string[];
+  allLabel: string;
+}) {
+  const toggle = (val: string) => {
+    onChange(selected.includes(val) ? selected.filter(x => x !== val) : [...selected, val]);
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          className="bg-secondary border border-border rounded-md px-2 sm:px-3 py-2 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring w-full sm:w-auto sm:min-w-[140px] sm:max-w-[220px] flex items-center justify-between gap-1"
+          title={label}
+        >
+          <span className="truncate">
+            {selected.length === 0 ? allLabel : selected.length === 1 ? selected[0] : `${selected.length} filiais`}
+          </span>
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-56 p-2 max-h-[300px] overflow-y-auto" align="start">
+        {selected.length > 0 && (
+          <button onClick={() => onChange([])} className="text-xs text-muted-foreground hover:text-foreground w-full text-left px-2 py-1 mb-1 underline">
+            Limpar seleção
+          </button>
+        )}
+        {options.map(opt => (
+          <label key={opt} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer text-xs">
+            <Checkbox checked={selected.includes(opt)} onCheckedChange={() => toggle(opt)} />
+            <span className="truncate">{opt}</span>
+          </label>
+        ))}
+        {options.length === 0 && <p className="text-xs text-muted-foreground px-2 py-2">Nenhuma filial encontrada</p>}
+      </PopoverContent>
+    </Popover>
   );
 }
