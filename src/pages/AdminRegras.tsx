@@ -342,12 +342,22 @@ export default function AdminRegras() {
           <h2 className="text-lg font-bold text-foreground">
             Regras de Comissão — {MESES[periodoMes]}/{periodoAno}
           </h2>
-          <button
-            onClick={() => setModal(empty(periodoAno, periodoMes))}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors"
-          >
-            <Plus className="h-4 w-4" /> Nova Regra
-          </button>
+          <div className="flex gap-2">
+            {regras.length > 0 && (
+              <button
+                onClick={() => { setDupTarget({ ano: periodoAno, mes: periodoMes === 12 ? 1 : periodoMes + 1 }); setShowDuplicateModal(true); }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-secondary-foreground font-semibold text-sm hover:bg-secondary transition-colors"
+              >
+                <Copy className="h-4 w-4" /> Duplicar p/ outro mês
+              </button>
+            )}
+            <button
+              onClick={() => setModal(empty(periodoAno, periodoMes))}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors"
+            >
+              <Plus className="h-4 w-4" /> Nova Regra
+            </button>
+          </div>
         </div>
 
         {/* Table */}
