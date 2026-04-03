@@ -135,7 +135,7 @@ export default function AdminRegras() {
 
   // Fetch distinct values for autocomplete
   const { data: autocompleteData } = useQuery({
-    queryKey: ['regras-autocomplete'],
+    queryKey: ['regras-autocomplete-base'],
     queryFn: async () => {
       const fetchAll = async (column: string) => {
         const allValues = new Set<string>();
@@ -155,13 +155,40 @@ export default function AdminRegras() {
         return [...allValues].sort();
       };
 
-      const [familias, marcas, produtos] = await Promise.all([
+      const [familias, marcas] = await Promise.all([
         fetchAll('familia_produto'),
         fetchAll('marca'),
-        fetchAll('descricao_produto'),
       ]);
-      return { familias, marcas, produtos };
+      return { familias, marcas };
     },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Produtos carregam apenas quando uma família é selecionada
+  const familiaAtual = modal?.familia_produto || null;
+  const { data: produtosOptions = [] } = useQuery({
+    queryKey: ['regras-produtos', familiaAtual],
+    queryFn: async () => {
+      const allValues = new Set<string>();
+      let from = 0;
+      const pageSize = 1000;
+      while (true) {
+        let query = (supabase as any)
+          .from('vendas')
+          .select('descricao_produto')
+          .not('descricao_produto', 'is', null);
+        if (familiaAtual) {
+          query = query.eq('familia_produto', familiaAtual);
+        }
+        const { data, error } = await query.range(from, from + pageSize - 1);
+        if (error || !data || data.length === 0) break;
+        data.forEach((r: any) => { if (r.descricao_produto) allValues.add(r.descricao_produto); });
+        if (data.length < pageSize) break;
+        from += pageSize;
+      }
+      return [...allValues].sort();
+    },
+    enabled: !!familiaAtual,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -447,8 +474,8 @@ export default function AdminRegras() {
                   label="Produto"
                   value={modal.produto || ''}
                   onChange={v => setModal({ ...modal, produto: v })}
-                  options={autocompleteData?.produtos ?? []}
-                  placeholder="Ex: Camiseta Nike Dri-FIT..."
+                  options={produtosOptions}
+                  placeholder={familiaAtual ? "Selecione um produto..." : "Selecione uma família primeiro..."}
                 />
               </div>
 
