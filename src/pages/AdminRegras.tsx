@@ -275,6 +275,7 @@ export default function AdminRegras() {
     },
     onError: (e: Error) => toast.error(`Erro: ${e.message}`),
   });
+  type RegraRow = typeof regras[0];
 
 
   const columns = [
