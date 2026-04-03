@@ -391,7 +391,7 @@ export default function AdminRegras() {
                         {r.ativo ? 'Ativo' : 'Inativo'}
                       </button>
                       <div className="flex gap-2">
-                        <button onClick={() => setModal({ id: r.id, nome: r.nome, regime: r.regime, tipo_unidade: r.tipo_unidade, familia_produto: r.familia_produto ?? null, marca: r.marca ?? null, produto: r.produto ?? null, percentual: r.percentual, periodo_ano: r.periodo_ano, periodo_mes: r.periodo_mes, ativo: r.ativo })} className="p-1.5 text-secondary-foreground hover:text-primary"><Pencil className="h-4 w-4" /></button>
+                        <button onClick={() => setModal({ id: r.id, nome: r.nome, regime: r.regime, tipo_unidade: r.tipo_unidade, familia_produto: r.familia_produto ?? null, marca: r.marca ?? null, produto: r.produto ?? null, min_faturamento: r.min_faturamento ?? null, percentual: r.percentual, periodo_ano: r.periodo_ano, periodo_mes: r.periodo_mes, ativo: r.ativo })} className="p-1.5 text-secondary-foreground hover:text-primary"><Pencil className="h-4 w-4" /></button>
                         <button onClick={() => setConfirmDelete(r.id)} className="p-1.5 text-secondary-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
                       </div>
                     </div>
