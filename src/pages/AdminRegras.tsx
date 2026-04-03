@@ -308,6 +308,7 @@ export default function AdminRegras() {
                 familia_produto: (row as any).familia_produto ?? null,
                 marca: (row as any).marca ?? null,
                 produto: (row as any).produto ?? null,
+                min_faturamento: (row as any).min_faturamento ?? null,
                 periodo_ano: row.periodo_ano, periodo_mes: row.periodo_mes, ativo: row.ativo,
               });
             }}
