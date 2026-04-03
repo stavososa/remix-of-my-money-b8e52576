@@ -205,6 +205,7 @@ export default function AdminRegras() {
         marca: form.marca || null,
         produto: form.produto || null,
         percentual: form.percentual,
+        min_faturamento: form.min_faturamento || null,
         periodo_ano: form.periodo_ano,
         periodo_mes: form.periodo_mes,
         ativo: form.ativo,
