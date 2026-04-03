@@ -36,6 +36,7 @@ interface RegraForm {
   marca: string | null;
   produto: string | null;
   percentual: number;
+  min_faturamento: number | null;
   periodo_ano: number;
   periodo_mes: number;
   ativo: boolean;
@@ -44,7 +45,7 @@ interface RegraForm {
 const empty = (ano: number, mes: number): RegraForm => ({
   nome: '', regime: 'PJ', tipo_unidade: null,
   familia_produto: null, marca: null, produto: null,
-  percentual: 0, periodo_ano: ano, periodo_mes: mes, ativo: true,
+  percentual: 0, min_faturamento: null, periodo_ano: ano, periodo_mes: mes, ativo: true,
 });
 
 /* Autocomplete input component */
