@@ -6,7 +6,7 @@ import { usePeriod } from '@/contexts/PeriodContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, X, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Search, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 
 const MESES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -36,6 +36,7 @@ interface RegraForm {
   marca: string | null;
   produto: string | null;
   percentual: number;
+  min_faturamento: number | null;
   periodo_ano: number;
   periodo_mes: number;
   ativo: boolean;
@@ -44,7 +45,7 @@ interface RegraForm {
 const empty = (ano: number, mes: number): RegraForm => ({
   nome: '', regime: 'PJ', tipo_unidade: null,
   familia_produto: null, marca: null, produto: null,
-  percentual: 0, periodo_ano: ano, periodo_mes: mes, ativo: true,
+  percentual: 0, min_faturamento: null, periodo_ano: ano, periodo_mes: mes, ativo: true,
 });
 
 /* Autocomplete input component */
@@ -117,6 +118,8 @@ export default function AdminRegras() {
   const qc = useQueryClient();
   const [modal, setModal] = useState<RegraForm | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [dupTarget, setDupTarget] = useState({ ano: periodoAno, mes: periodoMes });
 
   const { data: regras = [], isLoading } = useQuery({
     queryKey: ['regras', periodoAno, periodoMes],
@@ -202,6 +205,7 @@ export default function AdminRegras() {
         marca: form.marca || null,
         produto: form.produto || null,
         percentual: form.percentual,
+        min_faturamento: form.min_faturamento || null,
         periodo_ano: form.periodo_ano,
         periodo_mes: form.periodo_mes,
         ativo: form.ativo,
@@ -245,7 +249,34 @@ export default function AdminRegras() {
     onError: (e: Error) => toast.error(`Erro: ${e.message}`),
   });
 
+  const duplicateMutation = useMutation({
+    mutationFn: async ({ targetAno, targetMes }: { targetAno: number; targetMes: number }) => {
+      const inserts = regras.map((r: any) => ({
+        nome: r.nome,
+        regime: r.regime,
+        tipo_unidade: r.tipo_unidade,
+        familia_produto: r.familia_produto,
+        marca: r.marca,
+        produto: r.produto,
+        percentual: r.percentual,
+        min_faturamento: r.min_faturamento ?? null,
+        periodo_ano: targetAno,
+        periodo_mes: targetMes,
+        ativo: r.ativo,
+        criado_por: user?.id,
+      }));
+      const { error } = await supabase.from('regras_comissao').insert(inserts);
+      if (error) throw error;
+    },
+    onSuccess: (_, { targetAno, targetMes }) => {
+      toast.success(`Regras duplicadas para ${MESES[targetMes]}/${targetAno}`);
+      qc.invalidateQueries({ queryKey: ['regras'] });
+      setShowDuplicateModal(false);
+    },
+    onError: (e: Error) => toast.error(`Erro: ${e.message}`),
+  });
   type RegraRow = typeof regras[0];
+
 
   const columns = [
     { key: 'nome' as const, label: 'Nome' },
@@ -268,6 +299,10 @@ export default function AdminRegras() {
     {
       key: 'produto' as const, label: 'Produto',
       render: (v: string | null) => v ? <span className="text-xs text-foreground max-w-[150px] truncate block">{v}</span> : <span className="text-muted-foreground text-xs">—</span>,
+    },
+    {
+      key: 'min_faturamento' as const, label: 'Min. Fat.',
+      render: (v: number | null) => v ? <span className="text-xs text-warning font-medium">R$ {Number(v).toLocaleString('pt-BR')}</span> : <span className="text-muted-foreground text-xs">—</span>,
     },
     {
       key: 'percentual' as const, label: '%', align: 'right' as const,
@@ -304,6 +339,7 @@ export default function AdminRegras() {
                 familia_produto: (row as any).familia_produto ?? null,
                 marca: (row as any).marca ?? null,
                 produto: (row as any).produto ?? null,
+                min_faturamento: (row as any).min_faturamento ?? null,
                 periodo_ano: row.periodo_ano, periodo_mes: row.periodo_mes, ativo: row.ativo,
               });
             }}
@@ -333,12 +369,22 @@ export default function AdminRegras() {
           <h2 className="text-lg font-bold text-foreground">
             Regras de Comissão — {MESES[periodoMes]}/{periodoAno}
           </h2>
-          <button
-            onClick={() => setModal(empty(periodoAno, periodoMes))}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors"
-          >
-            <Plus className="h-4 w-4" /> Nova Regra
-          </button>
+          <div className="flex gap-2">
+            {regras.length > 0 && (
+              <button
+                onClick={() => { setDupTarget({ ano: periodoAno, mes: periodoMes === 12 ? 1 : periodoMes + 1 }); setShowDuplicateModal(true); }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-secondary-foreground font-semibold text-sm hover:bg-secondary transition-colors"
+              >
+                <Copy className="h-4 w-4" /> Duplicar p/ outro mês
+              </button>
+            )}
+            <button
+              onClick={() => setModal(empty(periodoAno, periodoMes))}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors"
+            >
+              <Plus className="h-4 w-4" /> Nova Regra
+            </button>
+          </div>
         </div>
 
         {/* Table */}
@@ -386,7 +432,7 @@ export default function AdminRegras() {
                         {r.ativo ? 'Ativo' : 'Inativo'}
                       </button>
                       <div className="flex gap-2">
-                        <button onClick={() => setModal({ id: r.id, nome: r.nome, regime: r.regime, tipo_unidade: r.tipo_unidade, familia_produto: r.familia_produto ?? null, marca: r.marca ?? null, produto: r.produto ?? null, percentual: r.percentual, periodo_ano: r.periodo_ano, periodo_mes: r.periodo_mes, ativo: r.ativo })} className="p-1.5 text-secondary-foreground hover:text-primary"><Pencil className="h-4 w-4" /></button>
+                        <button onClick={() => setModal({ id: r.id, nome: r.nome, regime: r.regime, tipo_unidade: r.tipo_unidade, familia_produto: r.familia_produto ?? null, marca: r.marca ?? null, produto: r.produto ?? null, min_faturamento: r.min_faturamento ?? null, percentual: r.percentual, periodo_ano: r.periodo_ano, periodo_mes: r.periodo_mes, ativo: r.ativo })} className="p-1.5 text-secondary-foreground hover:text-primary"><Pencil className="h-4 w-4" /></button>
                         <button onClick={() => setConfirmDelete(r.id)} className="p-1.5 text-secondary-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
                       </div>
                     </div>
@@ -479,17 +525,31 @@ export default function AdminRegras() {
                 />
               </div>
 
-              <div>
-                <label className="text-sm text-secondary-foreground">Percentual (%)</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  min="0"
-                  max="100"
-                  value={modal.percentual}
-                  onChange={e => setModal({ ...modal, percentual: parseFloat(e.target.value) || 0 })}
-                  className="w-full mt-1 px-3 py-2 rounded-md bg-secondary border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm text-secondary-foreground">Percentual (%)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max="100"
+                    value={modal.percentual}
+                    onChange={e => setModal({ ...modal, percentual: parseFloat(e.target.value) || 0 })}
+                    className="w-full mt-1 px-3 py-2 rounded-md bg-secondary border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-secondary-foreground">Fat. Mínimo (R$)</label>
+                  <input
+                    type="number"
+                    step="100"
+                    min="0"
+                    value={modal.min_faturamento ?? ''}
+                    onChange={e => setModal({ ...modal, min_faturamento: e.target.value ? parseFloat(e.target.value) : null })}
+                    className="w-full mt-1 px-3 py-2 rounded-md bg-secondary border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                    placeholder="Opcional"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -549,6 +609,50 @@ export default function AdminRegras() {
                 className="px-4 py-2 rounded-lg bg-destructive text-destructive-foreground font-semibold text-sm hover:bg-destructive/90 disabled:opacity-50 transition-colors"
               >
                 {deleteMutation.isPending ? 'Excluindo...' : 'Excluir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Duplicate Modal */}
+      {showDuplicateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowDuplicateModal(false)} />
+          <div className="relative bg-card border border-border rounded-xl p-6 w-full max-w-sm shadow-card space-y-4">
+            <h3 className="text-lg font-bold text-foreground">Duplicar Regras</h3>
+            <p className="text-sm text-secondary-foreground">
+              Copiar <strong>{regras.length} regras</strong> de {MESES[periodoMes]}/{periodoAno} para:
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm text-secondary-foreground">Mês</label>
+                <select
+                  value={dupTarget.mes}
+                  onChange={e => setDupTarget({ ...dupTarget, mes: parseInt(e.target.value) })}
+                  className="w-full mt-1 px-3 py-2 rounded-md bg-secondary border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  {MESES.slice(1).map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-sm text-secondary-foreground">Ano</label>
+                <input
+                  type="number"
+                  value={dupTarget.ano}
+                  onChange={e => setDupTarget({ ...dupTarget, ano: parseInt(e.target.value) || periodoAno })}
+                  className="w-full mt-1 px-3 py-2 rounded-md bg-secondary border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setShowDuplicateModal(false)} className="px-4 py-2 rounded-lg text-sm text-secondary-foreground hover:bg-secondary transition-colors">Cancelar</button>
+              <button
+                onClick={() => duplicateMutation.mutate({ targetAno: dupTarget.ano, targetMes: dupTarget.mes })}
+                disabled={duplicateMutation.isPending}
+                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              >
+                {duplicateMutation.isPending ? 'Duplicando...' : 'Duplicar'}
               </button>
             </div>
           </div>
