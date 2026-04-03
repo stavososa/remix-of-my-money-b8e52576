@@ -614,6 +614,50 @@ export default function AdminRegras() {
           </div>
         </div>
       )}
+
+      {/* Duplicate Modal */}
+      {showDuplicateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowDuplicateModal(false)} />
+          <div className="relative bg-card border border-border rounded-xl p-6 w-full max-w-sm shadow-card space-y-4">
+            <h3 className="text-lg font-bold text-foreground">Duplicar Regras</h3>
+            <p className="text-sm text-secondary-foreground">
+              Copiar <strong>{regras.length} regras</strong> de {MESES[periodoMes]}/{periodoAno} para:
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm text-secondary-foreground">Mês</label>
+                <select
+                  value={dupTarget.mes}
+                  onChange={e => setDupTarget({ ...dupTarget, mes: parseInt(e.target.value) })}
+                  className="w-full mt-1 px-3 py-2 rounded-md bg-secondary border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  {MESES.slice(1).map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-sm text-secondary-foreground">Ano</label>
+                <input
+                  type="number"
+                  value={dupTarget.ano}
+                  onChange={e => setDupTarget({ ...dupTarget, ano: parseInt(e.target.value) || periodoAno })}
+                  className="w-full mt-1 px-3 py-2 rounded-md bg-secondary border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setShowDuplicateModal(false)} className="px-4 py-2 rounded-lg text-sm text-secondary-foreground hover:bg-secondary transition-colors">Cancelar</button>
+              <button
+                onClick={() => duplicateMutation.mutate({ targetAno: dupTarget.ano, targetMes: dupTarget.mes })}
+                disabled={duplicateMutation.isPending}
+                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              >
+                {duplicateMutation.isPending ? 'Duplicando...' : 'Duplicar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }
