@@ -274,6 +274,10 @@ export default function AdminRegras() {
       render: (v: string | null) => v ? <span className="text-xs text-foreground max-w-[150px] truncate block">{v}</span> : <span className="text-muted-foreground text-xs">—</span>,
     },
     {
+      key: 'min_faturamento' as const, label: 'Min. Fat.',
+      render: (v: number | null) => v ? <span className="text-xs text-warning font-medium">R$ {Number(v).toLocaleString('pt-BR')}</span> : <span className="text-muted-foreground text-xs">—</span>,
+    },
+    {
       key: 'percentual' as const, label: '%', align: 'right' as const,
       render: (v: number) => <span className="text-primary font-bold text-lg">{Number(v).toFixed(1)}%</span>,
     },
