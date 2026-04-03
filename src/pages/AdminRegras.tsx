@@ -498,17 +498,31 @@ export default function AdminRegras() {
                 />
               </div>
 
-              <div>
-                <label className="text-sm text-secondary-foreground">Percentual (%)</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  min="0"
-                  max="100"
-                  value={modal.percentual}
-                  onChange={e => setModal({ ...modal, percentual: parseFloat(e.target.value) || 0 })}
-                  className="w-full mt-1 px-3 py-2 rounded-md bg-secondary border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm text-secondary-foreground">Percentual (%)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max="100"
+                    value={modal.percentual}
+                    onChange={e => setModal({ ...modal, percentual: parseFloat(e.target.value) || 0 })}
+                    className="w-full mt-1 px-3 py-2 rounded-md bg-secondary border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-secondary-foreground">Fat. Mínimo (R$)</label>
+                  <input
+                    type="number"
+                    step="100"
+                    min="0"
+                    value={modal.min_faturamento ?? ''}
+                    onChange={e => setModal({ ...modal, min_faturamento: e.target.value ? parseFloat(e.target.value) : null })}
+                    className="w-full mt-1 px-3 py-2 rounded-md bg-secondary border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                    placeholder="Opcional"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
