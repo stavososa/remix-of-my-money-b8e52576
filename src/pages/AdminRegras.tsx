@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { DataTable } from '@/components/DataTable';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -6,16 +6,35 @@ import { usePeriod } from '@/contexts/PeriodContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 const MESES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+const PRIORIDADE_LABELS: Record<number, { label: string; color: string }> = {
+  4: { label: 'Produto', color: 'bg-destructive/20 text-destructive' },
+  3: { label: 'Família+Marca', color: 'bg-primary/20 text-primary' },
+  2: { label: 'Marca', color: 'bg-warning/20 text-warning' },
+  1: { label: 'Família', color: 'bg-success/20 text-success' },
+  0: { label: 'Genérica', color: 'bg-secondary text-muted-foreground' },
+};
+
+function calcPrioridade(form: RegraForm): number {
+  if (form.produto) return 4;
+  if (form.familia_produto && form.marca) return 3;
+  if (form.marca) return 2;
+  if (form.familia_produto) return 1;
+  return 0;
+}
 
 interface RegraForm {
   id?: string;
   nome: string;
   regime: string;
   tipo_unidade: string | null;
+  familia_produto: string | null;
+  marca: string | null;
+  produto: string | null;
   percentual: number;
   periodo_ano: number;
   periodo_mes: number;
@@ -23,9 +42,74 @@ interface RegraForm {
 }
 
 const empty = (ano: number, mes: number): RegraForm => ({
-  nome: '', regime: 'PJ', tipo_unidade: null, percentual: 0,
-  periodo_ano: ano, periodo_mes: mes, ativo: true,
+  nome: '', regime: 'PJ', tipo_unidade: null,
+  familia_produto: null, marca: null, produto: null,
+  percentual: 0, periodo_ano: ano, periodo_mes: mes, ativo: true,
 });
+
+/* Autocomplete input component */
+function AutocompleteInput({
+  value,
+  onChange,
+  options,
+  placeholder,
+  label,
+}: {
+  value: string;
+  onChange: (v: string | null) => void;
+  options: string[];
+  placeholder: string;
+  label: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState(value || '');
+
+  const filtered = useMemo(() => {
+    if (!search) return options.slice(0, 50);
+    const lower = search.toLowerCase();
+    return options.filter(o => o.toLowerCase().includes(lower)).slice(0, 50);
+  }, [search, options]);
+
+  return (
+    <div className="relative">
+      <label className="text-sm text-secondary-foreground">{label}</label>
+      <div className="relative mt-1">
+        <input
+          value={search}
+          onChange={e => { setSearch(e.target.value); onChange(e.target.value || null); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 200)}
+          className="w-full px-3 py-2 pr-8 rounded-md bg-secondary border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          placeholder={placeholder}
+        />
+        {search && (
+          <button
+            type="button"
+            onClick={() => { setSearch(''); onChange(null); }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      {open && filtered.length > 0 && (
+        <div className="absolute z-50 mt-1 w-full max-h-40 overflow-y-auto rounded-md bg-card border border-border shadow-lg">
+          {filtered.map(opt => (
+            <button
+              key={opt}
+              type="button"
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => { setSearch(opt); onChange(opt); setOpen(false); }}
+              className="w-full text-left px-3 py-1.5 text-sm text-foreground hover:bg-secondary truncate"
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminRegras() {
   const { periodoAno, periodoMes } = usePeriod();
@@ -49,12 +133,34 @@ export default function AdminRegras() {
     },
   });
 
+  // Fetch distinct values for autocomplete
+  const { data: autocompleteData } = useQuery({
+    queryKey: ['regras-autocomplete'],
+    queryFn: async () => {
+      const [famRes, marcaRes, prodRes] = await Promise.all([
+        supabase.from('vendas').select('familia_produto').not('familia_produto', 'is', null),
+        supabase.from('vendas').select('marca').not('marca', 'is', null),
+        supabase.from('vendas').select('descricao_produto').not('descricao_produto', 'is', null),
+      ]);
+      const unique = (arr: any[], key: string) => [...new Set((arr || []).map(r => r[key]).filter(Boolean))].sort() as string[];
+      return {
+        familias: unique(famRes.data ?? [], 'familia_produto'),
+        marcas: unique(marcaRes.data ?? [], 'marca'),
+        produtos: unique(prodRes.data ?? [], 'descricao_produto'),
+      };
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
   const saveMutation = useMutation({
     mutationFn: async (form: RegraForm) => {
-      const payload = {
+      const payload: any = {
         nome: form.nome,
         regime: form.regime,
         tipo_unidade: form.tipo_unidade || null,
+        familia_produto: form.familia_produto || null,
+        marca: form.marca || null,
+        produto: form.produto || null,
         percentual: form.percentual,
         periodo_ano: form.periodo_ano,
         periodo_mes: form.periodo_mes,
@@ -108,12 +214,31 @@ export default function AdminRegras() {
       render: (v: string) => <StatusBadge status={v} />,
     },
     {
-      key: 'tipo_unidade' as const, label: 'Tipo Unidade',
+      key: 'tipo_unidade' as const, label: 'Unidade',
       render: (v: string | null) => v ? <StatusBadge status={v} /> : <span className="text-muted-foreground text-xs">Todos</span>,
     },
     {
-      key: 'percentual' as const, label: 'Percentual', align: 'right' as const,
+      key: 'familia_produto' as const, label: 'Família',
+      render: (v: string | null) => v ? <span className="text-xs text-foreground">{v}</span> : <span className="text-muted-foreground text-xs">—</span>,
+    },
+    {
+      key: 'marca' as const, label: 'Marca',
+      render: (v: string | null) => v ? <span className="text-xs text-foreground">{v}</span> : <span className="text-muted-foreground text-xs">—</span>,
+    },
+    {
+      key: 'produto' as const, label: 'Produto',
+      render: (v: string | null) => v ? <span className="text-xs text-foreground max-w-[150px] truncate block">{v}</span> : <span className="text-muted-foreground text-xs">—</span>,
+    },
+    {
+      key: 'percentual' as const, label: '%', align: 'right' as const,
       render: (v: number) => <span className="text-primary font-bold text-lg">{Number(v).toFixed(1)}%</span>,
+    },
+    {
+      key: 'prioridade' as const, label: 'Prioridade',
+      render: (v: number) => {
+        const p = PRIORIDADE_LABELS[v] ?? PRIORIDADE_LABELS[0];
+        return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.color}`}>{p.label}</span>;
+      },
     },
     {
       key: 'ativo' as const, label: 'Status',
@@ -136,6 +261,9 @@ export default function AdminRegras() {
               setModal({
                 id: row.id, nome: row.nome, regime: row.regime,
                 tipo_unidade: row.tipo_unidade, percentual: row.percentual,
+                familia_produto: (row as any).familia_produto ?? null,
+                marca: (row as any).marca ?? null,
+                produto: (row as any).produto ?? null,
                 periodo_ano: row.periodo_ano, periodo_mes: row.periodo_mes, ativo: row.ativo,
               });
             }}
@@ -153,6 +281,9 @@ export default function AdminRegras() {
       ),
     },
   ];
+
+  const prioridadePreview = modal ? calcPrioridade(modal) : 0;
+  const prioLabel = PRIORIDADE_LABELS[prioridadePreview] ?? PRIORIDADE_LABELS[0];
 
   return (
     <AppShell title="Regras de Comissão">
@@ -185,32 +316,43 @@ export default function AdminRegras() {
               <DataTable columns={columns} data={regras} />
             </div>
             <div className="md:hidden space-y-3">
-              {regras.map((r) => (
-                <div key={r.id} className="bg-card border border-border rounded-lg p-4 shadow-card">
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <p className="font-bold text-foreground">{r.nome}</p>
-                      <div className="flex gap-2 mt-1">
-                        <StatusBadge status={r.regime} />
-                        {r.tipo_unidade ? <StatusBadge status={r.tipo_unidade} /> : <span className="text-xs text-muted-foreground">Todos</span>}
+              {regras.map((r: any) => {
+                const prio = PRIORIDADE_LABELS[r.prioridade ?? 0] ?? PRIORIDADE_LABELS[0];
+                return (
+                  <div key={r.id} className="bg-card border border-border rounded-lg p-4 shadow-card">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <p className="font-bold text-foreground">{r.nome}</p>
+                        <div className="flex flex-wrap gap-1.5 mt-1">
+                          <StatusBadge status={r.regime} />
+                          {r.tipo_unidade ? <StatusBadge status={r.tipo_unidade} /> : <span className="text-xs text-muted-foreground">Todos</span>}
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${prio.color}`}>{prio.label}</span>
+                        </div>
+                        {(r.familia_produto || r.marca || r.produto) && (
+                          <div className="flex flex-wrap gap-1 mt-1.5 text-xs text-muted-foreground">
+                            {r.familia_produto && <span>Fam: {r.familia_produto}</span>}
+                            {r.marca && <span>• Marca: {r.marca}</span>}
+                            {r.produto && <span>• Prod: {r.produto}</span>}
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-primary font-bold text-xl">{Number(r.percentual).toFixed(1)}%</span>
+                    </div>
+                    <div className="flex items-center justify-between mt-3">
+                      <button
+                        onClick={() => toggleAtivo.mutate({ id: r.id, ativo: !r.ativo })}
+                        className={`text-xs px-2 py-1 rounded ${r.ativo ? 'bg-success/20 text-success' : 'bg-secondary text-muted-foreground'}`}
+                      >
+                        {r.ativo ? 'Ativo' : 'Inativo'}
+                      </button>
+                      <div className="flex gap-2">
+                        <button onClick={() => setModal({ id: r.id, nome: r.nome, regime: r.regime, tipo_unidade: r.tipo_unidade, familia_produto: r.familia_produto ?? null, marca: r.marca ?? null, produto: r.produto ?? null, percentual: r.percentual, periodo_ano: r.periodo_ano, periodo_mes: r.periodo_mes, ativo: r.ativo })} className="p-1.5 text-secondary-foreground hover:text-primary"><Pencil className="h-4 w-4" /></button>
+                        <button onClick={() => setConfirmDelete(r.id)} className="p-1.5 text-secondary-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
                       </div>
                     </div>
-                    <span className="text-primary font-bold text-xl">{Number(r.percentual).toFixed(1)}%</span>
                   </div>
-                  <div className="flex items-center justify-between mt-3">
-                    <button
-                      onClick={() => toggleAtivo.mutate({ id: r.id, ativo: !r.ativo })}
-                      className={`text-xs px-2 py-1 rounded ${r.ativo ? 'bg-success/20 text-success' : 'bg-secondary text-muted-foreground'}`}
-                    >
-                      {r.ativo ? 'Ativo' : 'Inativo'}
-                    </button>
-                    <div className="flex gap-2">
-                      <button onClick={() => setModal({ id: r.id, nome: r.nome, regime: r.regime, tipo_unidade: r.tipo_unidade, percentual: r.percentual, periodo_ano: r.periodo_ano, periodo_mes: r.periodo_mes, ativo: r.ativo })} className="p-1.5 text-secondary-foreground hover:text-primary"><Pencil className="h-4 w-4" /></button>
-                      <button onClick={() => setConfirmDelete(r.id)} className="p-1.5 text-secondary-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </>
         )}
@@ -220,9 +362,14 @@ export default function AdminRegras() {
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60" onClick={() => setModal(null)} />
-          <div className="relative bg-card border border-border rounded-xl p-6 w-full max-w-md shadow-card space-y-4">
+          <div className="relative bg-card border border-border rounded-xl p-6 w-full max-w-lg shadow-card space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center">
-              <h3 className="text-lg font-bold text-foreground">{modal.id ? 'Editar Regra' : 'Nova Regra'}</h3>
+              <div className="flex items-center gap-3">
+                <h3 className="text-lg font-bold text-foreground">{modal.id ? 'Editar Regra' : 'Nova Regra'}</h3>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${prioLabel.color}`}>
+                  P{prioridadePreview}: {prioLabel.label}
+                </span>
+              </div>
               <button onClick={() => setModal(null)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
             </div>
 
@@ -233,7 +380,7 @@ export default function AdminRegras() {
                   value={modal.nome}
                   onChange={e => setModal({ ...modal, nome: e.target.value })}
                   className="w-full mt-1 px-3 py-2 rounded-md bg-secondary border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                  placeholder="Ex: Comissão PJ Filial"
+                  placeholder="Ex: Comissão PJ Filial Nike"
                 />
               </div>
 
@@ -262,6 +409,34 @@ export default function AdminRegras() {
                     <option value="Franquia">Franquia</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Product classification fields */}
+              <div className="border border-border rounded-lg p-3 space-y-3 bg-secondary/30">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                  <Search className="h-3.5 w-3.5" /> Classificação do Produto
+                </p>
+                <AutocompleteInput
+                  label="Família"
+                  value={modal.familia_produto || ''}
+                  onChange={v => setModal({ ...modal, familia_produto: v })}
+                  options={autocompleteData?.familias ?? []}
+                  placeholder="Ex: Camisetas, Calças..."
+                />
+                <AutocompleteInput
+                  label="Marca"
+                  value={modal.marca || ''}
+                  onChange={v => setModal({ ...modal, marca: v })}
+                  options={autocompleteData?.marcas ?? []}
+                  placeholder="Ex: Nike, Adidas..."
+                />
+                <AutocompleteInput
+                  label="Produto"
+                  value={modal.produto || ''}
+                  onChange={v => setModal({ ...modal, produto: v })}
+                  options={autocompleteData?.produtos ?? []}
+                  placeholder="Ex: Camiseta Nike Dri-FIT..."
+                />
               </div>
 
               <div>
