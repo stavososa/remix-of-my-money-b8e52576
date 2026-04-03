@@ -137,19 +137,17 @@ export default function AdminRegras() {
   const { data: autocompleteData } = useQuery({
     queryKey: ['regras-autocomplete'],
     queryFn: async () => {
-      // Fetch ALL distinct values using pagination to bypass 1000-row limit
-      const fetchAllDistinct = async (table: string, column: string) => {
+      const fetchAll = async (column: string) => {
         const allValues = new Set<string>();
         let from = 0;
         const pageSize = 1000;
         while (true) {
-          const { data, error } = await supabase
-            .from(table)
+          const { data, error } = await (supabase as any)
+            .from('vendas')
             .select(column)
             .not(column, 'is', null)
             .range(from, from + pageSize - 1);
-          if (error) break;
-          if (!data || data.length === 0) break;
+          if (error || !data || data.length === 0) break;
           data.forEach((r: any) => { if (r[column]) allValues.add(r[column]); });
           if (data.length < pageSize) break;
           from += pageSize;
@@ -158,9 +156,9 @@ export default function AdminRegras() {
       };
 
       const [familias, marcas, produtos] = await Promise.all([
-        fetchAllDistinct('vendas', 'familia_produto'),
-        fetchAllDistinct('vendas', 'marca'),
-        fetchAllDistinct('vendas', 'descricao_produto'),
+        fetchAll('familia_produto'),
+        fetchAll('marca'),
+        fetchAll('descricao_produto'),
       ]);
       return { familias, marcas, produtos };
     },
