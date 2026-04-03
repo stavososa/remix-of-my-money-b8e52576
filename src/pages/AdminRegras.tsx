@@ -118,6 +118,8 @@ export default function AdminRegras() {
   const qc = useQueryClient();
   const [modal, setModal] = useState<RegraForm | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [dupTarget, setDupTarget] = useState({ ano: periodoAno, mes: periodoMes });
 
   const { data: regras = [], isLoading } = useQuery({
     queryKey: ['regras', periodoAno, periodoMes],
