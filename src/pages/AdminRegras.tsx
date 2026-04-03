@@ -474,8 +474,8 @@ export default function AdminRegras() {
                   label="Produto"
                   value={modal.produto || ''}
                   onChange={v => setModal({ ...modal, produto: v })}
-                  options={autocompleteData?.produtos ?? []}
-                  placeholder="Ex: Camiseta Nike Dri-FIT..."
+                  options={produtosOptions}
+                  placeholder={familiaAtual ? "Selecione um produto..." : "Selecione uma família primeiro..."}
                 />
               </div>
 
