@@ -137,17 +137,30 @@ export default function AdminRegras() {
   const { data: autocompleteData } = useQuery({
     queryKey: ['regras-autocomplete'],
     queryFn: async () => {
-      const [famRes, marcaRes, prodRes] = await Promise.all([
-        supabase.from('vendas').select('familia_produto').not('familia_produto', 'is', null),
-        supabase.from('vendas').select('marca').not('marca', 'is', null),
-        supabase.from('vendas').select('descricao_produto').not('descricao_produto', 'is', null),
-      ]);
-      const unique = (arr: any[], key: string) => [...new Set((arr || []).map(r => r[key]).filter(Boolean))].sort() as string[];
-      return {
-        familias: unique(famRes.data ?? [], 'familia_produto'),
-        marcas: unique(marcaRes.data ?? [], 'marca'),
-        produtos: unique(prodRes.data ?? [], 'descricao_produto'),
+      const fetchAll = async (column: string) => {
+        const allValues = new Set<string>();
+        let from = 0;
+        const pageSize = 1000;
+        while (true) {
+          const { data, error } = await (supabase as any)
+            .from('vendas')
+            .select(column)
+            .not(column, 'is', null)
+            .range(from, from + pageSize - 1);
+          if (error || !data || data.length === 0) break;
+          data.forEach((r: any) => { if (r[column]) allValues.add(r[column]); });
+          if (data.length < pageSize) break;
+          from += pageSize;
+        }
+        return [...allValues].sort();
       };
+
+      const [familias, marcas, produtos] = await Promise.all([
+        fetchAll('familia_produto'),
+        fetchAll('marca'),
+        fetchAll('descricao_produto'),
+      ]);
+      return { familias, marcas, produtos };
     },
     staleTime: 5 * 60 * 1000,
   });
