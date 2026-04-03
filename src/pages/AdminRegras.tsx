@@ -137,17 +137,32 @@ export default function AdminRegras() {
   const { data: autocompleteData } = useQuery({
     queryKey: ['regras-autocomplete'],
     queryFn: async () => {
-      const [famRes, marcaRes, prodRes] = await Promise.all([
-        supabase.from('vendas').select('familia_produto').not('familia_produto', 'is', null),
-        supabase.from('vendas').select('marca').not('marca', 'is', null),
-        supabase.from('vendas').select('descricao_produto').not('descricao_produto', 'is', null),
-      ]);
-      const unique = (arr: any[], key: string) => [...new Set((arr || []).map(r => r[key]).filter(Boolean))].sort() as string[];
-      return {
-        familias: unique(famRes.data ?? [], 'familia_produto'),
-        marcas: unique(marcaRes.data ?? [], 'marca'),
-        produtos: unique(prodRes.data ?? [], 'descricao_produto'),
+      // Fetch ALL distinct values using pagination to bypass 1000-row limit
+      const fetchAllDistinct = async (table: string, column: string) => {
+        const allValues = new Set<string>();
+        let from = 0;
+        const pageSize = 1000;
+        while (true) {
+          const { data, error } = await supabase
+            .from(table)
+            .select(column)
+            .not(column, 'is', null)
+            .range(from, from + pageSize - 1);
+          if (error) break;
+          if (!data || data.length === 0) break;
+          data.forEach((r: any) => { if (r[column]) allValues.add(r[column]); });
+          if (data.length < pageSize) break;
+          from += pageSize;
+        }
+        return [...allValues].sort();
       };
+
+      const [familias, marcas, produtos] = await Promise.all([
+        fetchAllDistinct('vendas', 'familia_produto'),
+        fetchAllDistinct('vendas', 'marca'),
+        fetchAllDistinct('vendas', 'descricao_produto'),
+      ]);
+      return { familias, marcas, produtos };
     },
     staleTime: 5 * 60 * 1000,
   });
