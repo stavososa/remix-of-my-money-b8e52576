@@ -313,7 +313,7 @@ export default function AdminRegras() {
         ) : (
           <>
             <div className="hidden md:block">
-              <DataTable columns={columns} data={regras} />
+              <DataTable columns={columns as any} data={regras} />
             </div>
             <div className="md:hidden space-y-3">
               {regras.map((r: any) => {
