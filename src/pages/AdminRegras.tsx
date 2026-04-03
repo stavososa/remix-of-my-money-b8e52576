@@ -249,7 +249,33 @@ export default function AdminRegras() {
     onError: (e: Error) => toast.error(`Erro: ${e.message}`),
   });
 
-  type RegraRow = typeof regras[0];
+  const duplicateMutation = useMutation({
+    mutationFn: async ({ targetAno, targetMes }: { targetAno: number; targetMes: number }) => {
+      const inserts = regras.map((r: any) => ({
+        nome: r.nome,
+        regime: r.regime,
+        tipo_unidade: r.tipo_unidade,
+        familia_produto: r.familia_produto,
+        marca: r.marca,
+        produto: r.produto,
+        percentual: r.percentual,
+        min_faturamento: r.min_faturamento ?? null,
+        periodo_ano: targetAno,
+        periodo_mes: targetMes,
+        ativo: r.ativo,
+        criado_por: user?.id,
+      }));
+      const { error } = await supabase.from('regras_comissao').insert(inserts);
+      if (error) throw error;
+    },
+    onSuccess: (_, { targetAno, targetMes }) => {
+      toast.success(`Regras duplicadas para ${MESES[targetMes]}/${targetAno}`);
+      qc.invalidateQueries({ queryKey: ['regras'] });
+      setShowDuplicateModal(false);
+    },
+    onError: (e: Error) => toast.error(`Erro: ${e.message}`),
+  });
+
 
   const columns = [
     { key: 'nome' as const, label: 'Nome' },
