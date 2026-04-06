@@ -311,10 +311,10 @@ export default function AdminRegras() {
         criado_por: user?.id,
       };
       if (form.id) {
-        const { error } = await supabase.from('comissoes').update(payload).eq('id', form.id);
+        const { error } = await (supabase as any).from('comissoes').update(payload).eq('id', form.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('comissoes').insert(payload);
+        const { error } = await (supabase as any).from('comissoes').insert(payload);
         if (error) throw error;
       }
     },
@@ -328,7 +328,7 @@ export default function AdminRegras() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('comissoes').delete().eq('id', id);
+      const { error } = await (supabase as any).from('comissoes').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -341,7 +341,7 @@ export default function AdminRegras() {
 
   const toggleAtivo = useMutation({
     mutationFn: async ({ id, ativo }: { id: string; ativo: boolean }) => {
-      const { error } = await supabase.from('comissoes').update({ ativo }).eq('id', id);
+      const { error } = await (supabase as any).from('comissoes').update({ ativo }).eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['regras'] }),
@@ -364,7 +364,7 @@ export default function AdminRegras() {
         ativo: r.ativo,
         criado_por: user?.id,
       }));
-      const { error } = await supabase.from('comissoes').insert(inserts);
+      const { error } = await (supabase as any).from('comissoes').insert(inserts);
       if (error) throw error;
     },
     onSuccess: (_, { targetAno, targetMes }) => {
