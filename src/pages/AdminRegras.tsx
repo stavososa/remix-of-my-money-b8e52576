@@ -384,8 +384,14 @@ export default function AdminRegras() {
       render: (v: string) => <StatusBadge status={v} />,
     },
     {
-      key: 'tipo_unidade' as const, label: 'Unidade',
-      render: (v: string | null) => v ? <StatusBadge status={v} /> : <span className="text-muted-foreground text-xs">Todos</span>,
+      key: 'tipo_unidade' as const, label: 'Filiais',
+      render: (v: string | null) => v ? (
+        <div className="flex flex-wrap gap-1 max-w-[200px]">
+          {v.split(',').map(f => (
+            <span key={f} className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">{f.trim()}</span>
+          ))}
+        </div>
+      ) : <span className="text-muted-foreground text-xs">Todas</span>,
     },
     {
       key: 'familia_produto' as const, label: 'Família',
