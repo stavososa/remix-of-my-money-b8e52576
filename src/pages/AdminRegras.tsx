@@ -569,7 +569,7 @@ export default function AdminRegras() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-3">
                 <div>
                   <label className="text-sm text-secondary-foreground">Regime</label>
                   <select
@@ -581,19 +581,11 @@ export default function AdminRegras() {
                     <option value="CLT">CLT</option>
                   </select>
                 </div>
-                <div>
-                  <label className="text-sm text-secondary-foreground">Tipo Unidade</label>
-                  <select
-                    value={modal.tipo_unidade ?? ''}
-                    onChange={e => setModal({ ...modal, tipo_unidade: e.target.value || null })}
-                    className="w-full mt-1 px-3 py-2 rounded-md bg-secondary border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                  >
-                    <option value="">Todos</option>
-                    <option value="Matriz">Matriz</option>
-                    <option value="Filial">Filial</option>
-                    <option value="Franquia">Franquia</option>
-                  </select>
-                </div>
+                <FilialMultiSelect
+                  value={modal.tipo_unidade}
+                  onChange={v => setModal({ ...modal, tipo_unidade: v })}
+                  unidades={unidades}
+                />
               </div>
 
               {/* Product classification fields */}
