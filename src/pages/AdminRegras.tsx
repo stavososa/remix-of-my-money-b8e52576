@@ -112,6 +112,90 @@ function AutocompleteInput({
   );
 }
 
+/* Multi-select filial component */
+function FilialMultiSelect({
+  value,
+  onChange,
+  unidades,
+}: {
+  value: string | null;
+  onChange: (v: string | null) => void;
+  unidades: { id: string; nome: string; tipo: string }[];
+}) {
+  const selected = useMemo(() => (value ? value.split(',').map(s => s.trim()) : []), [value]);
+  const allSelected = selected.length === 0;
+  const [open, setOpen] = useState(false);
+
+  const toggle = (nome: string) => {
+    let next: string[];
+    if (selected.includes(nome)) {
+      next = selected.filter(s => s !== nome);
+    } else {
+      next = [...selected, nome];
+    }
+    onChange(next.length === 0 ? null : next.join(','));
+  };
+
+  return (
+    <div className="relative">
+      <label className="text-sm text-secondary-foreground">Filiais</label>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full mt-1 px-3 py-2 rounded-md bg-secondary border border-border text-foreground text-sm text-left focus:outline-none focus:ring-1 focus:ring-ring flex items-center justify-between"
+      >
+        <span className="truncate">
+          {allSelected ? 'Todas as filiais' : selected.length === 1 ? selected[0] : `${selected.length} filiais selecionadas`}
+        </span>
+        <svg className={`h-4 w-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto rounded-md bg-card border border-border shadow-lg">
+          <button
+            type="button"
+            onClick={() => { onChange(null); setOpen(false); }}
+            className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-secondary ${allSelected ? 'text-primary font-semibold' : 'text-foreground'}`}
+          >
+            <span className={`h-4 w-4 rounded border flex items-center justify-center ${allSelected ? 'bg-primary border-primary' : 'border-border'}`}>
+              {allSelected && <svg className="h-3 w-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+            </span>
+            Todas
+          </button>
+          {unidades.map(u => {
+            const checked = selected.includes(u.nome);
+            return (
+              <button
+                key={u.id}
+                type="button"
+                onClick={() => toggle(u.nome)}
+                className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-secondary ${checked ? 'text-primary font-medium' : 'text-foreground'}`}
+              >
+                <span className={`h-4 w-4 rounded border flex items-center justify-center ${checked ? 'bg-primary border-primary' : 'border-border'}`}>
+                  {checked && <svg className="h-3 w-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                </span>
+                {u.nome}
+                <span className="text-xs text-muted-foreground ml-auto">{u.tipo}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {selected.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-1.5">
+          {selected.map(s => (
+            <span key={s} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/20 text-primary text-xs font-medium">
+              {s}
+              <button type="button" onClick={() => toggle(s)} className="hover:text-destructive">
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminRegras() {
   const { periodoAno, periodoMes } = usePeriod();
   const { user } = useAuth();
@@ -121,10 +205,25 @@ export default function AdminRegras() {
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [dupTarget, setDupTarget] = useState({ ano: periodoAno, mes: periodoMes });
 
+  // Fetch unidades for filial multi-select
+  const { data: unidades = [] } = useQuery({
+    queryKey: ['unidades-list'],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('unidades')
+        .select('id, nome, tipo')
+        .eq('ativo', true)
+        .order('nome');
+      if (error) throw error;
+      return (data ?? []) as { id: string; nome: string; tipo: string }[];
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+
   const { data: regras = [], isLoading } = useQuery({
     queryKey: ['regras', periodoAno, periodoMes],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('comissoes')
         .select('*')
         .eq('periodo_ano', periodoAno)
