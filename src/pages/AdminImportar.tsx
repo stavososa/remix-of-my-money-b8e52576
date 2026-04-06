@@ -82,15 +82,39 @@ export default function AdminImportar() {
     const timeout = setTimeout(() => controller.abort(), 180000); // 3 min timeout
 
     try {
+      // Obter token JWT do usuário logado para autenticação
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        throw new Error('Usuário não autenticado. Faça login novamente.');
+      }
+
+      // Validar inputs
+      const anoNum = parseInt(String(ano));
+      const mesNum = parseInt(String(mes));
+      if (isNaN(anoNum) || anoNum < 2020 || anoNum > 2035) {
+        throw new Error('Ano inválido. Informe um valor entre 2020 e 2035.');
+      }
+      if (isNaN(mesNum) || mesNum < 1 || mesNum > 12) {
+        throw new Error('Mês inválido. Informe um valor entre 1 e 12.');
+      }
+      const trimmedId = spreadsheetId.trim();
+      if (!/^[a-zA-Z0-9_-]{20,}$/.test(trimmedId)) {
+        throw new Error('ID da planilha inválido. Verifique o formato.');
+      }
+
       const response = await fetch(
         'https://webhook.atacadaomaromba.com/webhook/importar-vendas',
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+          },
           body: JSON.stringify({
-            periodo_ano: parseInt(String(ano)),
-            periodo_mes: parseInt(String(mes)),
-            spreadsheet_id: spreadsheetId.trim(),
+            periodo_ano: anoNum,
+            periodo_mes: mesNum,
+            spreadsheet_id: trimmedId,
             sheet_name: sheetName.trim() || 'Pasta1'
           }),
           signal: controller.signal
