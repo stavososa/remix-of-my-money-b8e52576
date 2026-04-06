@@ -516,7 +516,7 @@ export default function AdminRegras() {
                         <p className="font-bold text-foreground">{r.nome}</p>
                         <div className="flex flex-wrap gap-1.5 mt-1">
                           <StatusBadge status={r.regime} />
-                          {r.tipo_unidade ? <StatusBadge status={r.tipo_unidade} /> : <span className="text-xs text-muted-foreground">Todos</span>}
+                          {r.tipo_unidade ? r.tipo_unidade.split(',').map((f: string) => <span key={f} className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">{f.trim()}</span>) : <span className="text-xs text-muted-foreground">Todas</span>}
                           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${prio.color}`}>{prio.label}</span>
                         </div>
                         {(r.familia_produto || r.marca || r.produto) && (
