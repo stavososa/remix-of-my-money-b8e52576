@@ -296,6 +296,21 @@ export default function AdminRegras() {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Helper: log audit action
+  const logAudit = async (acao: string, comissao_id: string | null, detalhes: any) => {
+    try {
+      await (supabase as any).from('comissoes_audit').insert({
+        comissao_id,
+        acao,
+        usuario_id: user?.id,
+        usuario_email: user?.email,
+        detalhes,
+      });
+    } catch (e) {
+      console.warn('Audit log failed:', e);
+    }
+  };
+
   const saveMutation = useMutation({
     mutationFn: async (form: RegraForm) => {
       const payload: any = {
@@ -310,19 +325,25 @@ export default function AdminRegras() {
         periodo_ano: form.periodo_ano,
         periodo_mes: form.periodo_mes,
         ativo: form.ativo,
-        criado_por: user?.id,
       };
       if (form.id) {
+        payload.atualizado_por = user?.id;
+        payload.atualizado_em = new Date().toISOString();
         const { error } = await (supabase as any).from('comissoes').update(payload).eq('id', form.id);
         if (error) throw error;
+        await logAudit('editou', form.id, { nome: form.nome, percentual: form.percentual });
       } else {
-        const { error } = await (supabase as any).from('comissoes').insert(payload);
+        payload.criado_por = user?.id;
+        payload.criado_em = new Date().toISOString();
+        const { data, error } = await (supabase as any).from('comissoes').insert(payload).select('id').single();
         if (error) throw error;
+        await logAudit('criou', data?.id, { nome: form.nome, percentual: form.percentual });
       }
     },
     onSuccess: () => {
       toast.success('Regra salva com sucesso');
       qc.invalidateQueries({ queryKey: ['regras'] });
+      qc.invalidateQueries({ queryKey: ['audit-log'] });
       setModal(null);
     },
     onError: (e: Error) => toast.error(`Erro: ${e.message}`),
@@ -330,23 +351,54 @@ export default function AdminRegras() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
+      // Get rule info before deleting
+      const { data: rule } = await (supabase as any).from('comissoes').select('nome, percentual').eq('id', id).single();
       const { error } = await (supabase as any).from('comissoes').delete().eq('id', id);
       if (error) throw error;
+      await logAudit('excluiu', id, { nome: rule?.nome, percentual: rule?.percentual });
     },
     onSuccess: () => {
       toast.success('Regra excluída');
       qc.invalidateQueries({ queryKey: ['regras'] });
+      qc.invalidateQueries({ queryKey: ['audit-log'] });
       setConfirmDelete(null);
+    },
+    onError: (e: Error) => toast.error(`Erro: ${e.message}`),
+  });
+
+  const deleteAllMutation = useMutation({
+    mutationFn: async () => {
+      const count = regras.length;
+      const { error } = await (supabase as any)
+        .from('comissoes')
+        .delete()
+        .eq('periodo_ano', periodoAno)
+        .eq('periodo_mes', periodoMes);
+      if (error) throw error;
+      await logAudit('excluiu_lote', null, {
+        periodo: `${MESES[periodoMes]}/${periodoAno}`,
+        quantidade: count,
+      });
+    },
+    onSuccess: () => {
+      toast.success(`Todas as ${regras.length} regras de ${MESES[periodoMes]}/${periodoAno} foram excluídas`);
+      qc.invalidateQueries({ queryKey: ['regras'] });
+      qc.invalidateQueries({ queryKey: ['audit-log'] });
+      setConfirmDeleteAll(false);
     },
     onError: (e: Error) => toast.error(`Erro: ${e.message}`),
   });
 
   const toggleAtivo = useMutation({
     mutationFn: async ({ id, ativo }: { id: string; ativo: boolean }) => {
-      const { error } = await (supabase as any).from('comissoes').update({ ativo }).eq('id', id);
+      const { error } = await (supabase as any).from('comissoes').update({ ativo, atualizado_por: user?.id, atualizado_em: new Date().toISOString() }).eq('id', id);
       if (error) throw error;
+      await logAudit('editou', id, { acao: ativo ? 'ativou' : 'desativou' });
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['regras'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['regras'] });
+      qc.invalidateQueries({ queryKey: ['audit-log'] });
+    },
     onError: (e: Error) => toast.error(`Erro: ${e.message}`),
   });
 
@@ -365,16 +417,39 @@ export default function AdminRegras() {
         periodo_mes: targetMes,
         ativo: r.ativo,
         criado_por: user?.id,
+        criado_em: new Date().toISOString(),
       }));
       const { error } = await (supabase as any).from('comissoes').insert(inserts);
       if (error) throw error;
+      await logAudit('criou', null, {
+        acao: 'duplicou_lote',
+        de: `${MESES[periodoMes]}/${periodoAno}`,
+        para: `${MESES[targetMes]}/${targetAno}`,
+        quantidade: inserts.length,
+      });
     },
     onSuccess: (_, { targetAno, targetMes }) => {
       toast.success(`Regras duplicadas para ${MESES[targetMes]}/${targetAno}`);
       qc.invalidateQueries({ queryKey: ['regras'] });
+      qc.invalidateQueries({ queryKey: ['audit-log'] });
       setShowDuplicateModal(false);
     },
     onError: (e: Error) => toast.error(`Erro: ${e.message}`),
+  });
+
+  // Fetch audit log
+  const { data: auditLog = [] } = useQuery({
+    queryKey: ['audit-log', periodoAno, periodoMes],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('comissoes_audit')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) { console.warn('Audit table not available:', error.message); return []; }
+      return data ?? [];
+    },
+    enabled: showAuditLog,
   });
   type RegraRow = typeof regras[0];
 
