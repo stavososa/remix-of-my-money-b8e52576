@@ -6,7 +6,7 @@ import { usePeriod } from '@/contexts/PeriodContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, X, Search, Copy } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Search, Copy, AlertTriangle, History } from 'lucide-react';
 import { toast } from 'sonner';
 
 const MESES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -202,7 +202,9 @@ export default function AdminRegras() {
   const qc = useQueryClient();
   const [modal, setModal] = useState<RegraForm | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [showAuditLog, setShowAuditLog] = useState(false);
   const [dupTarget, setDupTarget] = useState({ ano: periodoAno, mes: periodoMes });
 
   // Fetch unidades for filial multi-select
@@ -294,6 +296,21 @@ export default function AdminRegras() {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Helper: log audit action
+  const logAudit = async (acao: string, comissao_id: string | null, detalhes: any) => {
+    try {
+      await (supabase as any).from('comissoes_audit').insert({
+        comissao_id,
+        acao,
+        usuario_id: user?.id,
+        usuario_email: user?.email,
+        detalhes,
+      });
+    } catch (e) {
+      console.warn('Audit log failed:', e);
+    }
+  };
+
   const saveMutation = useMutation({
     mutationFn: async (form: RegraForm) => {
       const payload: any = {
@@ -308,19 +325,25 @@ export default function AdminRegras() {
         periodo_ano: form.periodo_ano,
         periodo_mes: form.periodo_mes,
         ativo: form.ativo,
-        criado_por: user?.id,
       };
       if (form.id) {
+        payload.atualizado_por = user?.id;
+        payload.atualizado_em = new Date().toISOString();
         const { error } = await (supabase as any).from('comissoes').update(payload).eq('id', form.id);
         if (error) throw error;
+        await logAudit('editou', form.id, { nome: form.nome, percentual: form.percentual });
       } else {
-        const { error } = await (supabase as any).from('comissoes').insert(payload);
+        payload.criado_por = user?.id;
+        payload.criado_em = new Date().toISOString();
+        const { data, error } = await (supabase as any).from('comissoes').insert(payload).select('id').single();
         if (error) throw error;
+        await logAudit('criou', data?.id, { nome: form.nome, percentual: form.percentual });
       }
     },
     onSuccess: () => {
       toast.success('Regra salva com sucesso');
       qc.invalidateQueries({ queryKey: ['regras'] });
+      qc.invalidateQueries({ queryKey: ['audit-log'] });
       setModal(null);
     },
     onError: (e: Error) => toast.error(`Erro: ${e.message}`),
@@ -328,23 +351,54 @@ export default function AdminRegras() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
+      // Get rule info before deleting
+      const { data: rule } = await (supabase as any).from('comissoes').select('nome, percentual').eq('id', id).single();
       const { error } = await (supabase as any).from('comissoes').delete().eq('id', id);
       if (error) throw error;
+      await logAudit('excluiu', id, { nome: rule?.nome, percentual: rule?.percentual });
     },
     onSuccess: () => {
       toast.success('Regra excluída');
       qc.invalidateQueries({ queryKey: ['regras'] });
+      qc.invalidateQueries({ queryKey: ['audit-log'] });
       setConfirmDelete(null);
+    },
+    onError: (e: Error) => toast.error(`Erro: ${e.message}`),
+  });
+
+  const deleteAllMutation = useMutation({
+    mutationFn: async () => {
+      const count = regras.length;
+      const { error } = await (supabase as any)
+        .from('comissoes')
+        .delete()
+        .eq('periodo_ano', periodoAno)
+        .eq('periodo_mes', periodoMes);
+      if (error) throw error;
+      await logAudit('excluiu_lote', null, {
+        periodo: `${MESES[periodoMes]}/${periodoAno}`,
+        quantidade: count,
+      });
+    },
+    onSuccess: () => {
+      toast.success(`Todas as ${regras.length} regras de ${MESES[periodoMes]}/${periodoAno} foram excluídas`);
+      qc.invalidateQueries({ queryKey: ['regras'] });
+      qc.invalidateQueries({ queryKey: ['audit-log'] });
+      setConfirmDeleteAll(false);
     },
     onError: (e: Error) => toast.error(`Erro: ${e.message}`),
   });
 
   const toggleAtivo = useMutation({
     mutationFn: async ({ id, ativo }: { id: string; ativo: boolean }) => {
-      const { error } = await (supabase as any).from('comissoes').update({ ativo }).eq('id', id);
+      const { error } = await (supabase as any).from('comissoes').update({ ativo, atualizado_por: user?.id, atualizado_em: new Date().toISOString() }).eq('id', id);
       if (error) throw error;
+      await logAudit('editou', id, { acao: ativo ? 'ativou' : 'desativou' });
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['regras'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['regras'] });
+      qc.invalidateQueries({ queryKey: ['audit-log'] });
+    },
     onError: (e: Error) => toast.error(`Erro: ${e.message}`),
   });
 
@@ -363,16 +417,39 @@ export default function AdminRegras() {
         periodo_mes: targetMes,
         ativo: r.ativo,
         criado_por: user?.id,
+        criado_em: new Date().toISOString(),
       }));
       const { error } = await (supabase as any).from('comissoes').insert(inserts);
       if (error) throw error;
+      await logAudit('criou', null, {
+        acao: 'duplicou_lote',
+        de: `${MESES[periodoMes]}/${periodoAno}`,
+        para: `${MESES[targetMes]}/${targetAno}`,
+        quantidade: inserts.length,
+      });
     },
     onSuccess: (_, { targetAno, targetMes }) => {
       toast.success(`Regras duplicadas para ${MESES[targetMes]}/${targetAno}`);
       qc.invalidateQueries({ queryKey: ['regras'] });
+      qc.invalidateQueries({ queryKey: ['audit-log'] });
       setShowDuplicateModal(false);
     },
     onError: (e: Error) => toast.error(`Erro: ${e.message}`),
+  });
+
+  // Fetch audit log
+  const { data: auditLog = [] } = useQuery({
+    queryKey: ['audit-log', periodoAno, periodoMes],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('comissoes_audit')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) { console.warn('Audit table not available:', error.message); return []; }
+      return data ?? [];
+    },
+    enabled: showAuditLog,
   });
   type RegraRow = typeof regras[0];
 
@@ -474,14 +551,28 @@ export default function AdminRegras() {
           <h2 className="text-lg font-bold text-foreground">
             Regras de Comissão — {MESES[periodoMes]}/{periodoAno}
           </h2>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setShowAuditLog(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-secondary-foreground font-semibold text-sm hover:bg-secondary transition-colors"
+            >
+              <History className="h-4 w-4" /> Auditoria
+            </button>
             {regras.length > 0 && (
-              <button
-                onClick={() => { setDupTarget({ ano: periodoAno, mes: periodoMes === 12 ? 1 : periodoMes + 1 }); setShowDuplicateModal(true); }}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-secondary-foreground font-semibold text-sm hover:bg-secondary transition-colors"
-              >
-                <Copy className="h-4 w-4" /> Duplicar p/ outro mês
-              </button>
+              <>
+                <button
+                  onClick={() => setConfirmDeleteAll(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg border border-destructive/50 text-destructive font-semibold text-sm hover:bg-destructive/10 transition-colors"
+                >
+                  <Trash2 className="h-4 w-4" /> Excluir Mês
+                </button>
+                <button
+                  onClick={() => { setDupTarget({ ano: periodoAno, mes: periodoMes === 12 ? 1 : periodoMes + 1 }); setShowDuplicateModal(true); }}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-secondary-foreground font-semibold text-sm hover:bg-secondary transition-colors"
+                >
+                  <Copy className="h-4 w-4" /> Duplicar p/ outro mês
+                </button>
+              </>
             )}
             <button
               onClick={() => setModal(empty(periodoAno, periodoMes))}
@@ -751,6 +842,96 @@ export default function AdminRegras() {
               >
                 {duplicateMutation.isPending ? 'Duplicando...' : 'Duplicar'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete All Month Confirmation */}
+      {confirmDeleteAll && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setConfirmDeleteAll(false)} />
+          <div className="relative bg-card border border-destructive/30 rounded-xl p-6 w-full max-w-md shadow-card space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-destructive/20 flex items-center justify-center">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+              </div>
+              <h3 className="text-lg font-bold text-foreground">Excluir Todas as Regras</h3>
+            </div>
+            <p className="text-sm text-secondary-foreground">
+              Você está prestes a excluir <strong className="text-destructive">{regras.length} regras</strong> de <strong>{MESES[periodoMes]}/{periodoAno}</strong>. Esta ação será registrada na auditoria e <strong>não pode ser desfeita</strong>.
+            </p>
+            <div className="flex justify-end gap-3 pt-2">
+              <button onClick={() => setConfirmDeleteAll(false)} className="px-4 py-2 rounded-lg text-sm text-secondary-foreground hover:bg-secondary transition-colors">Cancelar</button>
+              <button
+                onClick={() => deleteAllMutation.mutate()}
+                disabled={deleteAllMutation.isPending}
+                className="px-4 py-2 rounded-lg bg-destructive text-destructive-foreground font-semibold text-sm hover:bg-destructive/90 disabled:opacity-50 transition-colors"
+              >
+                {deleteAllMutation.isPending ? 'Excluindo...' : `Excluir ${regras.length} regras`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Audit Log Modal */}
+      {showAuditLog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowAuditLog(false)} />
+          <div className="relative bg-card border border-border rounded-xl p-6 w-full max-w-2xl shadow-card space-y-4 max-h-[85vh] overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <History className="h-5 w-5 text-primary" />
+                <h3 className="text-lg font-bold text-foreground">Auditoria de Comissões</h3>
+              </div>
+              <button onClick={() => setShowAuditLog(false)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 space-y-2">
+              {auditLog.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">Nenhum registro de auditoria encontrado. Execute o SQL de migração para habilitar a auditoria.</p>
+              ) : (
+                auditLog.map((log: any) => {
+                  const acaoColors: Record<string, string> = {
+                    criou: 'bg-success/20 text-success',
+                    editou: 'bg-primary/20 text-primary',
+                    excluiu: 'bg-destructive/20 text-destructive',
+                    excluiu_lote: 'bg-destructive/20 text-destructive',
+                  };
+                  const acaoLabels: Record<string, string> = {
+                    criou: 'Criou',
+                    editou: 'Editou',
+                    excluiu: 'Excluiu',
+                    excluiu_lote: 'Excluiu em Lote',
+                  };
+                  return (
+                    <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg bg-secondary/50 border border-border">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 mt-0.5 ${acaoColors[log.acao] ?? 'bg-secondary text-muted-foreground'}`}>
+                        {acaoLabels[log.acao] ?? log.acao}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-foreground">
+                          <span className="font-medium">{log.usuario_email ?? 'Desconhecido'}</span>
+                        </p>
+                        {log.detalhes && (
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {log.detalhes.nome && `Regra: ${log.detalhes.nome}`}
+                            {log.detalhes.percentual != null && ` (${log.detalhes.percentual}%)`}
+                            {log.detalhes.acao && log.detalhes.acao}
+                            {log.detalhes.periodo && `Período: ${log.detalhes.periodo}`}
+                            {log.detalhes.quantidade && ` — ${log.detalhes.quantidade} regras`}
+                            {log.detalhes.de && ` De: ${log.detalhes.de} → ${log.detalhes.para}`}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {new Date(log.created_at).toLocaleString('pt-BR')}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>
