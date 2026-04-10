@@ -846,6 +846,96 @@ export default function AdminRegras() {
           </div>
         </div>
       )}
+
+      {/* Delete All Month Confirmation */}
+      {confirmDeleteAll && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setConfirmDeleteAll(false)} />
+          <div className="relative bg-card border border-destructive/30 rounded-xl p-6 w-full max-w-md shadow-card space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-destructive/20 flex items-center justify-center">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+              </div>
+              <h3 className="text-lg font-bold text-foreground">Excluir Todas as Regras</h3>
+            </div>
+            <p className="text-sm text-secondary-foreground">
+              Você está prestes a excluir <strong className="text-destructive">{regras.length} regras</strong> de <strong>{MESES[periodoMes]}/{periodoAno}</strong>. Esta ação será registrada na auditoria e <strong>não pode ser desfeita</strong>.
+            </p>
+            <div className="flex justify-end gap-3 pt-2">
+              <button onClick={() => setConfirmDeleteAll(false)} className="px-4 py-2 rounded-lg text-sm text-secondary-foreground hover:bg-secondary transition-colors">Cancelar</button>
+              <button
+                onClick={() => deleteAllMutation.mutate()}
+                disabled={deleteAllMutation.isPending}
+                className="px-4 py-2 rounded-lg bg-destructive text-destructive-foreground font-semibold text-sm hover:bg-destructive/90 disabled:opacity-50 transition-colors"
+              >
+                {deleteAllMutation.isPending ? 'Excluindo...' : `Excluir ${regras.length} regras`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Audit Log Modal */}
+      {showAuditLog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowAuditLog(false)} />
+          <div className="relative bg-card border border-border rounded-xl p-6 w-full max-w-2xl shadow-card space-y-4 max-h-[85vh] overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <History className="h-5 w-5 text-primary" />
+                <h3 className="text-lg font-bold text-foreground">Auditoria de Comissões</h3>
+              </div>
+              <button onClick={() => setShowAuditLog(false)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 space-y-2">
+              {auditLog.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">Nenhum registro de auditoria encontrado. Execute o SQL de migração para habilitar a auditoria.</p>
+              ) : (
+                auditLog.map((log: any) => {
+                  const acaoColors: Record<string, string> = {
+                    criou: 'bg-success/20 text-success',
+                    editou: 'bg-primary/20 text-primary',
+                    excluiu: 'bg-destructive/20 text-destructive',
+                    excluiu_lote: 'bg-destructive/20 text-destructive',
+                  };
+                  const acaoLabels: Record<string, string> = {
+                    criou: 'Criou',
+                    editou: 'Editou',
+                    excluiu: 'Excluiu',
+                    excluiu_lote: 'Excluiu em Lote',
+                  };
+                  return (
+                    <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg bg-secondary/50 border border-border">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 mt-0.5 ${acaoColors[log.acao] ?? 'bg-secondary text-muted-foreground'}`}>
+                        {acaoLabels[log.acao] ?? log.acao}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-foreground">
+                          <span className="font-medium">{log.usuario_email ?? 'Desconhecido'}</span>
+                        </p>
+                        {log.detalhes && (
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {log.detalhes.nome && `Regra: ${log.detalhes.nome}`}
+                            {log.detalhes.percentual != null && ` (${log.detalhes.percentual}%)`}
+                            {log.detalhes.acao && log.detalhes.acao}
+                            {log.detalhes.periodo && `Período: ${log.detalhes.periodo}`}
+                            {log.detalhes.quantidade && ` — ${log.detalhes.quantidade} regras`}
+                            {log.detalhes.de && ` De: ${log.detalhes.de} → ${log.detalhes.para}`}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {new Date(log.created_at).toLocaleString('pt-BR')}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }
