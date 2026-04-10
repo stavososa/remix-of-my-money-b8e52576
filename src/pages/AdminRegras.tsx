@@ -551,14 +551,28 @@ export default function AdminRegras() {
           <h2 className="text-lg font-bold text-foreground">
             Regras de Comissão — {MESES[periodoMes]}/{periodoAno}
           </h2>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setShowAuditLog(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-secondary-foreground font-semibold text-sm hover:bg-secondary transition-colors"
+            >
+              <History className="h-4 w-4" /> Auditoria
+            </button>
             {regras.length > 0 && (
-              <button
-                onClick={() => { setDupTarget({ ano: periodoAno, mes: periodoMes === 12 ? 1 : periodoMes + 1 }); setShowDuplicateModal(true); }}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-secondary-foreground font-semibold text-sm hover:bg-secondary transition-colors"
-              >
-                <Copy className="h-4 w-4" /> Duplicar p/ outro mês
-              </button>
+              <>
+                <button
+                  onClick={() => setConfirmDeleteAll(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg border border-destructive/50 text-destructive font-semibold text-sm hover:bg-destructive/10 transition-colors"
+                >
+                  <Trash2 className="h-4 w-4" /> Excluir Mês
+                </button>
+                <button
+                  onClick={() => { setDupTarget({ ano: periodoAno, mes: periodoMes === 12 ? 1 : periodoMes + 1 }); setShowDuplicateModal(true); }}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-secondary-foreground font-semibold text-sm hover:bg-secondary transition-colors"
+                >
+                  <Copy className="h-4 w-4" /> Duplicar p/ outro mês
+                </button>
+              </>
             )}
             <button
               onClick={() => setModal(empty(periodoAno, periodoMes))}
