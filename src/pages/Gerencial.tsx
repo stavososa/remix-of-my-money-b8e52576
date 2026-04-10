@@ -199,13 +199,15 @@ export default function Gerencial() {
     });
   }, [allVendas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, getFilial]);
 
-  // ===== KPIs =====
+  // ===== KPIs (with sanity filter: skip rows with absurd margin > 1000%) =====
   const kpis = useMemo(() => {
     let totalFat = 0, totalLucro = 0, somaMargemPond = 0, count = 0;
     for (const row of filteredAll) {
       const fat = parseMoneyBR(row.total_com_desconto);
       const lucro = parseMoneyBR(row.lucros_reais);
       const margem = parsePctBR(row.margem_percentual);
+      // Skip corrupted rows: absurd margin (|margin| > 1000%) or lucro wildly disproportionate to faturamento
+      if (Math.abs(margem) > 1000 || (fat > 0 && Math.abs(lucro) > fat * 100)) continue;
       totalFat += fat;
       totalLucro += lucro;
       somaMargemPond += margem * fat;
