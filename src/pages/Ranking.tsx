@@ -143,6 +143,7 @@ export default function Ranking() {
             .select('descricao_produto, familia_produto, marca, total_com_desconto, quantidade, vendedor_nome, lucros_reais')
             .gte('data_emissao', inicioMes)
             .lte('data_emissao', fimMes)
+            .order('id', { ascending: true })
             .range(from, from + PAGE - 1)
         );
       }
