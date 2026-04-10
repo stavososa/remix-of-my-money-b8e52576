@@ -68,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (vendedor) {
           setNomeCompleto(vendedor.nome_completo);
           setRegime(vendedor.regime);
-          const unidade = vendedor.unidades as { nome: string; tipo: string } | null;
+          const unidade = vendedor.unidades as unknown as { nome: string; tipo: string } | null;
           if (unidade) {
             setUnidadeNome(unidade.nome);
             setUnidadeTipo(unidade.tipo);
