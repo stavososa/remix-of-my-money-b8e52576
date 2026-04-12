@@ -164,6 +164,18 @@ export default function RankingComissoes() {
     setFiltroVendedor('all');
   }, [periodoAno, periodoMes]);
 
+  // Reset vendedor when filial changes (vendor might not exist in new filial)
+  useEffect(() => {
+    if (filtroFilial.length > 0 && filtroVendedor !== 'all') {
+      const vendedoresNaFilial = new Set(
+        comissoesCalculadas.filter(c => filtroFilial.includes(c.filial)).map(c => c.vendedor)
+      );
+      if (!vendedoresNaFilial.has(filtroVendedor)) {
+        setFiltroVendedor('all');
+      }
+    }
+  }, [filtroFilial]);
+
   // Fetch unidades for CNPJ -> Filial mapping
   const { data: unidadesList = [] } = useQuery({
     queryKey: ['unidades-nomes-cnpj'],
