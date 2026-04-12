@@ -298,7 +298,7 @@ export default function RankingComissoes() {
         familia_produto: v.familia_produto ?? 'Sem Família',
         marca: v.marca ?? 'Sem Marca',
         vendedor,
-        filial: getFilial(v.cnpj_empresa),
+        filial: isDelivery ? 'DELIVERY' : getFilial(v.cnpj_empresa),
         valor_venda: valorVenda,
         percentual: regra.percentual,
         valor_comissao: valorVenda * regra.percentual / 100,
