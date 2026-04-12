@@ -401,9 +401,9 @@ export default function RankingComissoes() {
 
           {/* KPIs */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <KPICard title="Total Comissão" value={fmt(totalComissao)} icon={DollarSign} />
-            <KPICard title="Total Faturamento" value={fmtCompact(totalVendas)} icon={Package} />
-            <KPICard title="Vendas com Comissão" value={totalQtd.toLocaleString('pt-BR')} icon={Tag} />
+            <KPICard label="Total Comissão" value={fmt(totalComissao)} icon={DollarSign} />
+            <KPICard label="Total Faturamento" value={fmtCompact(totalVendas)} icon={Package} />
+            <KPICard label="Vendas com Comissão" value={totalQtd.toLocaleString('pt-BR')} icon={Tag} />
           </div>
 
           {/* Resumo por Filial e Vendedor */}
