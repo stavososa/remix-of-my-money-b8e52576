@@ -330,7 +330,12 @@ export default function RankingComissoes() {
 
   // Filter options
   const filiais = useMemo(() => [...new Set(comissoesCalculadas.map(c => c.filial))].sort(), [comissoesCalculadas]);
-  const vendedores = useMemo(() => [...new Set(comissoesCalculadas.map(c => c.vendedor))].sort(), [comissoesCalculadas]);
+  const vendedores = useMemo(() => {
+    const source = filtroFilial.length > 0
+      ? comissoesCalculadas.filter(c => filtroFilial.includes(c.filial))
+      : comissoesCalculadas;
+    return [...new Set(source.map(c => c.vendedor))].sort();
+  }, [comissoesCalculadas, filtroFilial]);
 
   const isLoading = loadingPeriodo || loadVendas || loadRegras;
 
