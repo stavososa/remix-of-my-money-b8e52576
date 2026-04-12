@@ -164,6 +164,18 @@ export default function RankingComissoes() {
     setFiltroVendedor('all');
   }, [periodoAno, periodoMes]);
 
+  // Reset vendedor when filial changes (vendor might not exist in new filial)
+  useEffect(() => {
+    if (filtroFilial.length > 0 && filtroVendedor !== 'all') {
+      const vendedoresNaFilial = new Set(
+        comissoesCalculadas.filter(c => filtroFilial.includes(c.filial)).map(c => c.vendedor)
+      );
+      if (!vendedoresNaFilial.has(filtroVendedor)) {
+        setFiltroVendedor('all');
+      }
+    }
+  }, [filtroFilial]);
+
   // Fetch unidades for CNPJ -> Filial mapping
   const { data: unidadesList = [] } = useQuery({
     queryKey: ['unidades-nomes-cnpj'],
@@ -298,7 +310,7 @@ export default function RankingComissoes() {
         familia_produto: v.familia_produto ?? 'Sem Família',
         marca: v.marca ?? 'Sem Marca',
         vendedor,
-        filial: getFilial(v.cnpj_empresa),
+        filial: isDelivery ? 'DELIVERY' : getFilial(v.cnpj_empresa),
         valor_venda: valorVenda,
         percentual: regra.percentual,
         valor_comissao: valorVenda * regra.percentual / 100,
@@ -330,7 +342,12 @@ export default function RankingComissoes() {
 
   // Filter options
   const filiais = useMemo(() => [...new Set(comissoesCalculadas.map(c => c.filial))].sort(), [comissoesCalculadas]);
-  const vendedores = useMemo(() => [...new Set(comissoesCalculadas.map(c => c.vendedor))].sort(), [comissoesCalculadas]);
+  const vendedores = useMemo(() => {
+    const source = filtroFilial.length > 0
+      ? comissoesCalculadas.filter(c => filtroFilial.includes(c.filial))
+      : comissoesCalculadas;
+    return [...new Set(source.map(c => c.vendedor))].sort();
+  }, [comissoesCalculadas, filtroFilial]);
 
   const isLoading = loadingPeriodo || loadVendas || loadRegras;
 
