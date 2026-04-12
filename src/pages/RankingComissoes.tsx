@@ -263,7 +263,9 @@ export default function RankingComissoes() {
       if (valorVenda <= 0) continue;
 
       const vendedor = v.vendedor_nome ?? 'Sem Vendedor';
+      const isDelivery = /DELIVERY/i.test(vendedor);
       const vendaParaRegra: VendaParaRegra = {
+        tipo_unidade: isDelivery ? 'DELIVERY' : undefined,
         familia_produto: v.familia_produto ?? undefined,
         marca: v.marca ?? undefined,
         descricao_produto: v.descricao_produto ?? undefined,
