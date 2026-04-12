@@ -55,6 +55,18 @@ export function resolverRegra(
 
   if (compativeis.length === 0) return null;
 
-  compativeis.sort((a, b) => (b.prioridade ?? calcularPrioridade(b)) - (a.prioridade ?? calcularPrioridade(a)));
+  compativeis.sort((a, b) => {
+    const prioA = a.prioridade ?? calcularPrioridade(a);
+    const prioB = b.prioridade ?? calcularPrioridade(b);
+    if (prioB !== prioA) return prioB - prioA;
+    // Prefer rules with specific tipo_unidade over generic ones
+    const specA = a.tipo_unidade ? 1 : 0;
+    const specB = b.tipo_unidade ? 1 : 0;
+    if (specB !== specA) return specB - specA;
+    // Prefer rules with higher min_faturamento (more specific)
+    const minA = a.min_faturamento ?? 0;
+    const minB = b.min_faturamento ?? 0;
+    return minB - minA;
+  });
   return compativeis[0];
 }
