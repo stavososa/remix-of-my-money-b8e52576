@@ -247,13 +247,30 @@ export default function RankingComissoes() {
   });
 
   // Calculate commissions
+  // Non-commissionable vendors/channels
+  const EXCLUIR_VENDEDORES = new Set([
+    'LUCIANE ATHANASIO SITE', 'JULIO CESAR EDRONE', 'AVARIA', 'AVARIA CG', 'AVARIA DE VALIDADE',
+    'BONIFICAÇÃO LOJA', 'COMPRA VENDEDOR', 'COMPRA VENDEDOR BOTAFOGO', 'COMPRA VENDEDOR CG', 'COMPRA VENDEDOR RECREIO',
+    'DESENHO LOJA', 'VENDA OPERADOR LOGISTICA', 'N/D',
+    'IFOOD BARRA', 'IFOOD BOTAFOGO', 'IFOOD CAMPO GRANDE', 'IFOOD FREGUESIA', 'IFOOD RECREIO', 'IFOOD VALQUEIRE', 'IFOOD VISTA ALEGRE',
+    'Shopee', 'Mercado Livre', 'MERCADO LIVRE 2', 'Magazine Luiza', 'Loja Integrada', 'TIKTOK SHOP', 'SITE ATACADÃO',
+    'BRINDES/AÇÕES BARRA DA TIJUCA', 'BRINDES/AÇÕES CAMPO GRANDE', 'BRINDES/AÇÕES VALQUEIRE',
+    'PARCERIA/COLLAB BARRA DA TIJUCA', 'PARCERIA/COLLAB BOTAFOGO', 'PARCERIA/COLLAB RECREIO', 'PARCERIA/COLLAB VALQUEIRE',
+    'PARCERIA/INFLUENCER', 'PROMOTOR/DEGUSTAÇÃO VALQUEIRE',
+    'DEGUSTAÇÃO LOJA BOTAFOGO', 'DEGUSTAÇÃO LOJA CAMPO GRANDE', 'DEGUSTAÇÃO LOJA VALQUEIRE', 'DEGUSTAÇÃO NOVA IGUAÇU',
+    'RESGATE BARRA DA TIJUCA',
+    'CHECK OUT', 'CHECK OUT CG', 'CHECK OUT RECREIO', 'CHECK OUT VISTA ALEGRE', 'CHECKOUT BOTAFOGO', 'CHECKOUT DELIVERY', 'CHECKOUT FREGUESIA', 'CHECKOUT NOVA IGUAÇU',
+    'OmieApp_01', 'Devi PDV_01', 'Devi PDV_02', 'Devi PDV_03', 'Devi PDV_04', 'Devi PDV_06',
+  ]);
+
   const comissoesCalculadas = useMemo<ComissaoCalculada[]>(() => {
     if (!vendasRaw.length || !regras.length) return [];
 
-    // Pre-compute vendor revenue for min_faturamento rules
+    // Pre-compute vendor revenue for min_faturamento rules (only commissionable vendors)
     const vendorRevenue = new Map<string, number>();
     for (const v of vendasRaw) {
       const vendedor = v.vendedor_nome ?? 'Sem Vendedor';
+      if (EXCLUIR_VENDEDORES.has(vendedor)) continue;
       vendorRevenue.set(vendedor, (vendorRevenue.get(vendedor) ?? 0) + parseMoneyBR(v.total_com_desconto));
     }
 
@@ -263,7 +280,10 @@ export default function RankingComissoes() {
       if (valorVenda <= 0) continue;
 
       const vendedor = v.vendedor_nome ?? 'Sem Vendedor';
+      if (EXCLUIR_VENDEDORES.has(vendedor)) continue;
+      const isDelivery = /DELIVERY/i.test(vendedor);
       const vendaParaRegra: VendaParaRegra = {
+        tipo_unidade: isDelivery ? 'DELIVERY' : undefined,
         familia_produto: v.familia_produto ?? undefined,
         marca: v.marca ?? undefined,
         descricao_produto: v.descricao_produto ?? undefined,
