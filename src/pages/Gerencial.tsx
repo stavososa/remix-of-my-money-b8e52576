@@ -89,14 +89,6 @@ export default function Gerencial() {
   const [searchDebounced, setSearchDebounced] = useState('');
   const [tabelaPagina, setTabelaPagina] = useState(1);
 
-  // Force filial for gerente
-  useEffect(() => {
-    if (isGerente && filial_gerente && unidadesList?.length) {
-      // Use the exact name from DB to avoid case mismatch
-      const match = unidadesList.find(u => u.nome.toUpperCase() === filial_gerente.toUpperCase());
-      setFiltroUnidade([match ? match.nome : filial_gerente]);
-    }
-  }, [isGerente, filial_gerente, unidadesList]);
 
   useEffect(() => {
     if (!isGerente) {
