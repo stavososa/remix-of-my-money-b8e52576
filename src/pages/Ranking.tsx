@@ -101,7 +101,11 @@ export default function Ranking() {
   const { role, filial_gerente } = useAuth();
   const isGerente = role === 'gerente';
   const canSee = (unidadeNome: string | null) => !isGerente || (unidadeNome ?? '').toUpperCase() === (filial_gerente ?? '').toUpperCase();
-  const censorVal = (_v: number, _unidade: string | null) => isGerente ? '—' : fmtCompact(_v);
+  const censorVal = (v: number, unidadeNome: string | null) => {
+    if (!isGerente) return fmtCompact(v);
+    if ((unidadeNome ?? '').toUpperCase() === (filial_gerente ?? '').toUpperCase()) return fmtCompact(v);
+    return '—';
+  };
   const [selectedBonificacao, setSelectedBonificacao] = useState<Bonificacao | null>(null);
   const { periodoAno, periodoMes, dataInicio, dataFim, loading: loadingPeriodo } = usePeriod();
 
