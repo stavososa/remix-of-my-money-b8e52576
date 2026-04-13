@@ -484,10 +484,12 @@ export default function RankingComissoes() {
           </div>
 
           {/* Resumo por Filial e Vendedor */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <RankingSection data={byFilial} title="Comissão por Filial" nameLabel="Filial" icon={Building2} visibleFinancialName={isGerente ? filial_gerente ?? undefined : undefined} />
-            <RankingSection data={byVendedor} title="Comissão por Vendedor" nameLabel="Vendedor" icon={Users} hideFinancials={isGerente} />
-          </div>
+          {!isGerente && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <RankingSection data={byFilial} title="Comissão por Filial" nameLabel="Filial" icon={Building2} />
+              <RankingSection data={byVendedor} title="Comissão por Vendedor" nameLabel="Vendedor" icon={Users} />
+            </div>
+          )}
 
           {/* Top 10 Rankings */}
           <Tabs defaultValue="produtos" className="space-y-4">
@@ -495,8 +497,8 @@ export default function RankingComissoes() {
               <TabsTrigger value="produtos" className="text-xs sm:text-sm">Top 10 Produtos</TabsTrigger>
               <TabsTrigger value="familias" className="text-xs sm:text-sm">Top 10 Famílias</TabsTrigger>
               <TabsTrigger value="marcas" className="text-xs sm:text-sm">Top 10 Marcas</TabsTrigger>
-              <TabsTrigger value="vendedores" className="text-xs sm:text-sm">Top 10 Vendedores</TabsTrigger>
-              <TabsTrigger value="filiais" className="text-xs sm:text-sm">Top 10 Filiais</TabsTrigger>
+              {!isGerente && <TabsTrigger value="vendedores" className="text-xs sm:text-sm">Top 10 Vendedores</TabsTrigger>}
+              {!isGerente && <TabsTrigger value="filiais" className="text-xs sm:text-sm">Top 10 Filiais</TabsTrigger>}
             </TabsList>
 
             <TabsContent value="produtos">
@@ -508,12 +510,16 @@ export default function RankingComissoes() {
             <TabsContent value="marcas">
               <RankingSection data={byMarca} title="Top 10 Marcas por Comissão" nameLabel="Marca" limit={10} icon={Tag} hideFinancials={isGerente} />
             </TabsContent>
-            <TabsContent value="vendedores">
-              <RankingSection data={byVendedor} title="Top 10 Vendedores por Comissão" nameLabel="Vendedor" limit={10} icon={Users} hideFinancials={isGerente} />
-            </TabsContent>
-            <TabsContent value="filiais">
-              <RankingSection data={byFilial} title="Top 10 Filiais por Comissão" nameLabel="Filial" limit={10} icon={Building2} visibleFinancialName={isGerente ? filial_gerente ?? undefined : undefined} />
-            </TabsContent>
+            {!isGerente && (
+              <TabsContent value="vendedores">
+                <RankingSection data={byVendedor} title="Top 10 Vendedores por Comissão" nameLabel="Vendedor" limit={10} icon={Users} />
+              </TabsContent>
+            )}
+            {!isGerente && (
+              <TabsContent value="filiais">
+                <RankingSection data={byFilial} title="Top 10 Filiais por Comissão" nameLabel="Filial" limit={10} icon={Building2} />
+              </TabsContent>
+            )}
           </Tabs>
 
           {/* Rankings Completos */}
