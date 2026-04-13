@@ -267,8 +267,12 @@ export default function Gerencial() {
 
     // For gerente, only show options from their branch's CNPJs
     const gerenteCnpjs = isGerente && filial_gerente && unidadesList
-      ? new Set(unidadesList.filter(u => u.nome === filial_gerente && u.cnpj).map(u => normalizeCnpj(u.cnpj!.trim())))
+      ? new Set(unidadesList.filter(u => u.nome.toUpperCase() === filial_gerente.toUpperCase() && u.cnpj).map(u => normalizeCnpj(u.cnpj!.trim())))
       : null;
+
+    if (gerenteCnpjs && gerenteCnpjs.size === 0) {
+      console.warn('[Gerencial] Nenhum CNPJ encontrado para filial_gerente:', filial_gerente, '| unidades disponíveis:', unidadesList?.map(u => u.nome));
+    }
 
     const vendedores = new Set<string>();
     const familias = new Set<string>();
