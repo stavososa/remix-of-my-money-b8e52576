@@ -156,12 +156,23 @@ function RankingSection({ data, title, nameLabel, limit, icon: Icon }: {
 }
 
 export default function RankingComissoes() {
+  const { role, filial_gerente } = useAuth();
+  const isGerente = role === 'gerente';
   const { periodoAno, periodoMes, dataInicio, dataFim, loading: loadingPeriodo } = usePeriod();
   const [filtroFilial, setFiltroFilial] = useState<string[]>([]);
   const [filtroVendedor, setFiltroVendedor] = useState('all');
 
+  // Force filial filter for gerente
   useEffect(() => {
-    setFiltroFilial([]);
+    if (isGerente && filial_gerente) {
+      setFiltroFilial([filial_gerente]);
+    }
+  }, [isGerente, filial_gerente]);
+
+  useEffect(() => {
+    if (!isGerente) {
+      setFiltroFilial([]);
+    }
     setFiltroVendedor('all');
   }, [periodoAno, periodoMes]);
 
