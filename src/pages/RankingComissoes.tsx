@@ -412,12 +412,7 @@ export default function RankingComissoes() {
                   {MESES[periodoMes]}/{periodoAno}
                 </div>
                 {/* Filial filter */}
-                {isGerente ? (
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-secondary/50 text-sm opacity-70">
-                    <Building2 className="h-4 w-4 text-muted-foreground" />
-                    {filial_gerente ?? 'Filial'}
-                  </div>
-                ) : (
+                {isGerente ? null : (
                 <Popover>
                   <PopoverTrigger asChild>
                     <button className="flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-secondary text-sm hover:bg-secondary/80 transition-colors">
@@ -467,8 +462,8 @@ export default function RankingComissoes() {
                 </Popover>
 
                 {/* Active filter badges */}
-                {(filtroFilial.length > 0 || filtroVendedor !== 'all') && (
-                  <button onClick={() => { setFiltroFilial([]); setFiltroVendedor('all'); }} className="text-xs text-destructive hover:underline flex items-center gap-1">
+                {(isGerente ? filtroVendedor !== 'all' : (filtroFilial.length > 0 || filtroVendedor !== 'all')) && (
+                  <button onClick={() => { if (!isGerente) setFiltroFilial([]); setFiltroVendedor('all'); }} className="text-xs text-destructive hover:underline flex items-center gap-1">
                     <X className="h-3 w-3" /> Limpar filtros
                   </button>
                 )}
