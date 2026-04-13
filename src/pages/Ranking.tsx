@@ -101,7 +101,7 @@ export default function Ranking() {
   const { role, filial_gerente } = useAuth();
   const isGerente = role === 'gerente';
   const canSee = (unidadeNome: string | null) => !isGerente || (unidadeNome ?? '').toUpperCase() === (filial_gerente ?? '').toUpperCase();
-  const censorVal = (v: number, unidade: string | null) => canSee(unidade) ? fmtCompact(v) : '—';
+  const censorVal = (_v: number, _unidade: string | null) => isGerente ? '—' : fmtCompact(_v);
   const [selectedBonificacao, setSelectedBonificacao] = useState<Bonificacao | null>(null);
   const { periodoAno, periodoMes, dataInicio, dataFim, loading: loadingPeriodo } = usePeriod();
 
