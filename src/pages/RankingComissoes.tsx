@@ -96,25 +96,36 @@ function aggregate(items: ComissaoCalculada[], keyFn: (item: ComissaoCalculada) 
     }));
 }
 
-function RankingSection({ data, title, nameLabel, limit, icon: Icon, hideFinancials }: {
+function RankingSection({ data, title, nameLabel, limit, icon: Icon, hideFinancials, visibleFinancialName }: {
   data: AggRow[];
   title: string;
   nameLabel: string;
   limit?: number;
   icon: React.ElementType;
   hideFinancials?: boolean;
+  visibleFinancialName?: string;
 }) {
   const display = limit ? data.slice(0, limit) : data;
+
+  const shouldHideRow = (row: AggRow) => {
+    if (hideFinancials) return true;
+    if (visibleFinancialName && row.name !== visibleFinancialName) return true;
+    return false;
+  };
+
   const columns = [
     { key: 'posicao' as const, label: '#', render: (v: number) => <div className="flex justify-center">{v <= 3 ? <MedalhaIcone pos={v} /> : v}</div> },
     { key: 'name' as const, label: nameLabel },
-    ...(!hideFinancials ? [
-      { key: 'valor_comissao' as const, label: 'Comissão', align: 'right' as const, render: (v: number) => <span className="font-semibold text-primary">{fmt(v)}</span> },
-      { key: 'valor_vendas' as const, label: 'Faturamento', align: 'right' as const, render: (v: number) => fmtCompact(v) },
-    ] : []),
+    { key: 'valor_comissao' as const, label: 'Comissão', align: 'right' as const, render: (v: number, row: AggRow) => shouldHideRow(row) ? <span className="text-muted-foreground">—</span> : <span className="font-semibold text-primary">{fmt(v)}</span> },
+    { key: 'valor_vendas' as const, label: 'Faturamento', align: 'right' as const, render: (v: number, row: AggRow) => shouldHideRow(row) ? <span className="text-muted-foreground">—</span> : fmtCompact(v) },
     { key: 'percentual_medio' as const, label: '% Médio', align: 'right' as const, render: (v: number) => `${v.toFixed(2)}%` },
     { key: 'quantidade' as const, label: 'Qtd Vendas', align: 'right' as const, render: (v: number) => Math.round(v).toLocaleString('pt-BR') },
   ];
+
+  // If fully hidden, remove financial columns entirely
+  const finalColumns = hideFinancials
+    ? columns.filter(c => c.key !== 'valor_comissao' && c.key !== 'valor_vendas')
+    : columns;
 
   return (
     <Card>
@@ -132,28 +143,31 @@ function RankingSection({ data, title, nameLabel, limit, icon: Icon, hideFinanci
           <>
             {/* Desktop */}
             <div className="hidden md:block">
-              <DataTable columns={columns} data={display} rowClassName={(row: AggRow) => row.posicao <= 3 ? 'bg-primary/5' : ''} pageSize={limit ? undefined : 20} />
+              <DataTable columns={finalColumns} data={display} rowClassName={(row: AggRow) => row.posicao <= 3 ? 'bg-primary/5' : ''} pageSize={limit ? undefined : 20} />
             </div>
             {/* Mobile */}
             <div className="md:hidden space-y-2">
-              {display.map((item) => (
-                <div key={item.name} className={`border border-border rounded-lg p-3 ${item.posicao <= 3 ? 'border-primary/20 bg-primary/[0.02]' : ''}`}>
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <MedalhaIcone pos={item.posicao} />
-                    <span className="font-bold text-sm text-foreground truncate">{item.name}</span>
+              {display.map((item) => {
+                const hidden = shouldHideRow(item);
+                return (
+                  <div key={item.name} className={`border border-border rounded-lg p-3 ${item.posicao <= 3 ? 'border-primary/20 bg-primary/[0.02]' : ''}`}>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <MedalhaIcone pos={item.posicao} />
+                      <span className="font-bold text-sm text-foreground truncate">{item.name}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1 text-xs">
+                      {!hideFinancials && (
+                        <>
+                          <div><span className="text-muted-foreground">Comissão: </span><span className="font-semibold text-primary">{hidden ? '—' : fmtCompact(item.valor_comissao)}</span></div>
+                          <div><span className="text-muted-foreground">Faturamento: </span><span className="font-semibold">{hidden ? '—' : fmtCompact(item.valor_vendas)}</span></div>
+                        </>
+                      )}
+                      <div><span className="text-muted-foreground">% Médio: </span><span>{item.percentual_medio.toFixed(2)}%</span></div>
+                      <div><span className="text-muted-foreground">Qtd: </span><span>{Math.round(item.quantidade).toLocaleString('pt-BR')}</span></div>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-1 text-xs">
-                    {!hideFinancials && (
-                      <>
-                        <div><span className="text-muted-foreground">Comissão: </span><span className="font-semibold text-primary">{fmtCompact(item.valor_comissao)}</span></div>
-                        <div><span className="text-muted-foreground">Faturamento: </span><span className="font-semibold">{fmtCompact(item.valor_vendas)}</span></div>
-                      </>
-                    )}
-                    <div><span className="text-muted-foreground">% Médio: </span><span>{item.percentual_medio.toFixed(2)}%</span></div>
-                    <div><span className="text-muted-foreground">Qtd: </span><span>{Math.round(item.quantidade).toLocaleString('pt-BR')}</span></div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </>
         )}
