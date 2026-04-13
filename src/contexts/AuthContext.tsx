@@ -2,34 +2,42 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { User } from '@supabase/supabase-js';
 
+// Mapeamento fixo de email → nome da filial (deve coincidir com unidades.nome)
+const GERENTE_FILIAL_MAP: Record<string, string> = {
+  'matrizatacadao@proton.me': 'MATRIZ',
+  'recreioatacadao@proton.me': 'RECREIO',
+};
+
 interface UserProfile {
   user: User | null;
-  role: 'admin' | 'vendedor' | null;
+  role: 'admin' | 'vendedor' | 'gerente' | null;
   vendedor_id: string | null;
   nome_completo: string | null;
   unidade_nome: string | null;
   unidade_tipo: string | null;
   regime: string | null;
+  filial_gerente: string | null; // nome da filial para gerentes
   loading: boolean;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<UserProfile>({
   user: null, role: null, vendedor_id: null, nome_completo: null,
-  unidade_nome: null, unidade_tipo: null, regime: null, loading: true,
-  signOut: async () => {},
+  unidade_nome: null, unidade_tipo: null, regime: null, filial_gerente: null,
+  loading: true, signOut: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<'admin' | 'vendedor' | null>(null);
+  const [role, setRole] = useState<'admin' | 'vendedor' | 'gerente' | null>(null);
   const [vendedorId, setVendedorId] = useState<string | null>(null);
   const [nomeCompleto, setNomeCompleto] = useState<string | null>(null);
   const [unidadeNome, setUnidadeNome] = useState<string | null>(null);
   const [unidadeTipo, setUnidadeTipo] = useState<string | null>(null);
   const [regime, setRegime] = useState<string | null>(null);
+  const [filialGerente, setFilialGerente] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadProfile = async (u: User) => {
@@ -42,7 +50,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (perfilError) {
         console.error('Erro ao buscar perfil (RLS?):', perfilError.message);
-        // Fallback: assume admin if profile fetch fails due to RLS recursion
         setRole('admin');
         setNomeCompleto(u.email ?? null);
         setLoading(false);
@@ -50,12 +57,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (!perfil) {
-        setRole(null);
+        // Auto-detect gerente by email even without perfis record
+        const email = u.email?.toLowerCase() ?? '';
+        if (GERENTE_FILIAL_MAP[email]) {
+          setRole('gerente');
+          setFilialGerente(GERENTE_FILIAL_MAP[email]);
+          setNomeCompleto(u.email ?? null);
+        } else {
+          setRole(null);
+        }
         setLoading(false);
         return;
       }
 
-      setRole(perfil.role as 'admin' | 'vendedor');
+      const detectedRole = perfil.role as string;
+      if (detectedRole === 'gerente') {
+        setRole('gerente');
+        const email = u.email?.toLowerCase() ?? '';
+        setFilialGerente(GERENTE_FILIAL_MAP[email] ?? null);
+        setNomeCompleto(u.email ?? null);
+      } else {
+        setRole(detectedRole as 'admin' | 'vendedor');
+      }
+
       setVendedorId(perfil.vendedor_id);
 
       if (perfil.vendedor_id) {
@@ -74,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUnidadeTipo(unidade.tipo);
           }
         }
-      } else {
+      } else if (detectedRole !== 'gerente') {
         setNomeCompleto(u.email ?? null);
       }
     } catch (err) {
@@ -86,7 +110,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const clearState = () => {
     setUser(null); setRole(null); setVendedorId(null);
-    setNomeCompleto(null); setUnidadeNome(null); setUnidadeTipo(null); setRegime(null);
+    setNomeCompleto(null); setUnidadeNome(null); setUnidadeTipo(null);
+    setRegime(null); setFilialGerente(null);
   };
 
   useEffect(() => {
@@ -120,7 +145,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider value={{
       user, role, vendedor_id: vendedorId, nome_completo: nomeCompleto,
-      unidade_nome: unidadeNome, unidade_tipo: unidadeTipo, regime, loading, signOut,
+      unidade_nome: unidadeNome, unidade_tipo: unidadeTipo, regime,
+      filial_gerente: filialGerente, loading, signOut,
     }}>
       {children}
     </AuthContext.Provider>
