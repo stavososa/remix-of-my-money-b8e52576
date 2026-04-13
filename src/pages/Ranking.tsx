@@ -62,12 +62,14 @@ interface ProductRank {
 }
 
 
-function RankingTable({ data, nameLabel }: { data: RankedItem[]; nameLabel: string }) {
+function RankingTable({ data, nameLabel, hideFinancials = false }: { data: RankedItem[]; nameLabel: string; hideFinancials?: boolean }) {
   const columns = [
     { key: 'posicao' as const, label: '#', render: (v: number) => <div className="flex justify-center">{medalha(v)}</div> },
     { key: 'name' as const, label: nameLabel },
-    { key: 'total_vendido' as const, label: 'Faturamento', align: 'right' as const, render: (v: number) => fmtCompact(v) },
-    { key: 'lucro' as const, label: 'Lucro Real', align: 'right' as const, render: (v: number) => fmtCompact(v) },
+    ...(!hideFinancials ? [
+      { key: 'total_vendido' as const, label: 'Faturamento', align: 'right' as const, render: (v: number) => fmtCompact(v) },
+      { key: 'lucro' as const, label: 'Lucro Real', align: 'right' as const, render: (v: number) => fmtCompact(v) },
+    ] : []),
     { key: 'quantidade' as const, label: 'Quantidade', align: 'right' as const, render: (v: number) => Math.round(v).toLocaleString('pt-BR') },
   ];
 
