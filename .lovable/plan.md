@@ -1,16 +1,29 @@
 
 
-## Plano: Ocultar seções de Filial e Vendedor no Ranking Comissões para gerentes
+## Plano: Tornar filtro de filial fixo e oculto para gerentes no Ranking Comissões
 
-### O que muda
-No arquivo `src/pages/RankingComissoes.tsx`, para perfis de gerente (`isGerente`):
+### Contexto
+No `RankingComissoes.tsx`, o filtro de filial para gerentes já é exibido como um badge estático (linha 415-419). O problema é o botão "Limpar filtros" (linha 470-474) que aparece quando `filtroFilial.length > 0`, permitindo que o gerente remova o filtro de filial. Além disso, o vendedor pode ser limpo normalmente.
 
-1. **Remover o bloco "Resumo por Filial e Vendedor"** (linhas 487-490) — o grid com as seções "Comissão por Filial" e "Comissão por Vendedor" será envolvido em `{!isGerente && ...}`.
+### Alterações em `src/pages/RankingComissoes.tsx`
 
-2. **Remover as abas "Top 10 Vendedores" e "Top 10 Filiais"** (linhas 498-499 e 511-516) — os `TabsTrigger` e `TabsContent` correspondentes serão condicionalmente ocultados com `{!isGerente && ...}`.
+1. **Ocultar o badge estático da filial para gerentes** (linhas 415-419): Remover o bloco que mostra o nome da filial como badge visual. O gerente não precisa ver essa informação no filtro, ela é implícita.
 
-### Resultado
-Gerentes verão apenas rankings de Produtos, Famílias e Marcas. As seções de Filial e Vendedor deixam de existir na interface para esse perfil.
+2. **Ajustar o botão "Limpar filtros"** (linhas 470-474): Para gerentes, o botão só deve aparecer quando `filtroVendedor !== 'all'` (já que a filial é fixa e não pode ser limpa). Ao clicar, deve limpar apenas o vendedor, mantendo a filial intacta.
+
+Alterar a condição e o handler:
+```typescript
+{(isGerente ? filtroVendedor !== 'all' : (filtroFilial.length > 0 || filtroVendedor !== 'all')) && (
+  <button onClick={() => { 
+    if (!isGerente) setFiltroFilial([]); 
+    setFiltroVendedor('all'); 
+  }} ...>
+    <X className="h-3 w-3" /> Limpar filtros
+  </button>
+)}
+```
+
+3. **Proteger o useEffect de reset por período** (linha 193-198): Garantir que ao mudar de período, o gerente não perca o filtro de filial (já está correto pois o `setFiltroFilial([])` está dentro de `if (!isGerente)`).
 
 ### Arquivo alterado
 - `src/pages/RankingComissoes.tsx`
