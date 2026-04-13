@@ -318,10 +318,10 @@ export default function Ranking() {
     { key: 'vendedor_nome' as const, label: 'Vendedor' },
     { key: 'unidade_nome' as const, label: 'Unidade' },
     { key: 'regime' as const, label: 'Regime', render: (v: string | null) => v ? <StatusBadge status={v} /> : '—' },
-    { key: 'total_vendido' as const, label: 'Faturamento', align: 'right' as const, render: (v: number | null) => fmtCompact(v ?? 0) },
-    { key: 'lucro_total' as const, label: 'Lucro Real', align: 'right' as const, render: (v: number | null) => fmtCompact(v ?? 0) },
-    { key: 'total_comissao' as const, label: 'Comissão', align: 'right' as const, render: (v: number | null) => fmtCompact(v ?? 0) },
-    { key: 'percentual_aplicado' as const, label: '% Comissão', align: 'right' as const, render: (v: number | null) => formatPct(v) },
+    { key: 'total_vendido' as const, label: 'Faturamento', align: 'right' as const, render: (v: number | null, row: any) => censorVal(v ?? 0, row.unidade_nome) },
+    { key: 'lucro_total' as const, label: 'Lucro Real', align: 'right' as const, render: (v: number | null, row: any) => censorVal(v ?? 0, row.unidade_nome) },
+    { key: 'total_comissao' as const, label: 'Comissão', align: 'right' as const, render: (v: number | null, row: any) => censorVal(v ?? 0, row.unidade_nome) },
+    { key: 'percentual_aplicado' as const, label: '% Comissão', align: 'right' as const, render: (v: number | null, row: any) => canSee(row.unidade_nome) ? formatPct(v) : '—' },
     { key: 'qtd_notas' as const, label: 'Notas', align: 'right' as const },
   ];
 
