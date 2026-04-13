@@ -322,7 +322,7 @@ export default function Ranking() {
     { key: 'lucro_total' as const, label: 'Lucro Real', align: 'right' as const, render: (v: number | null, row: any) => censorVal(v ?? 0, row.unidade_nome) },
     { key: 'total_comissao' as const, label: 'Comissão', align: 'right' as const, render: (v: number | null, row: any) => censorVal(v ?? 0, row.unidade_nome) },
     { key: 'percentual_aplicado' as const, label: '% Comissão', align: 'right' as const, render: (v: number | null, row: any) => canSee(row.unidade_nome) ? formatPct(v) : '—' },
-    { key: 'qtd_notas' as const, label: 'Notas', align: 'right' as const },
+    ...(!isGerente ? [{ key: 'qtd_notas' as const, label: 'Notas', align: 'right' as const }] : []),
   ];
 
   const produtoColumns = [
@@ -488,7 +488,7 @@ export default function Ranking() {
                       <div><span className="text-muted-foreground">Faturamento: </span><span className="font-semibold text-foreground">{censorVal(r.total_vendido ?? 0, r.unidade_nome)}</span></div>
                       <div><span className="text-muted-foreground">Lucro: </span><span className="font-semibold text-foreground">{censorVal(r.lucro_total ?? 0, r.unidade_nome)}</span></div>
                       <div><span className="text-muted-foreground">Comissão: </span><span className="font-semibold text-foreground">{censorVal(r.total_comissao ?? 0, r.unidade_nome)}</span></div>
-                      <div><span className="text-muted-foreground">Notas: </span><span className="text-foreground">{r.qtd_notas ?? 0}</span></div>
+                      {!isGerente && <div><span className="text-muted-foreground">Notas: </span><span className="text-foreground">{r.qtd_notas ?? 0}</span></div>}
                     </div>
                   </div>
                 ))}
