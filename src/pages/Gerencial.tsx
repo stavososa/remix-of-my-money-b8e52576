@@ -150,8 +150,20 @@ export default function Gerencial() {
   }, [cnpjFilialMap]);
 
   // ===== FULL PERIOD DATA (for KPIs & charts) =====
+  const gerenteCnpjs = useMemo(() => {
+    if (!isGerente || !filial_gerente || !unidadesList) return [];
+    const cnpjs = unidadesList
+      .filter(u => u.nome.toUpperCase() === filial_gerente.toUpperCase() && u.cnpj)
+      .map(u => u.cnpj!.trim());
+    if (cnpjs.length === 0) {
+      console.warn('[Gerencial] Nenhum CNPJ encontrado para filial_gerente:', filial_gerente, '| unidades disponíveis:', unidadesList?.map(u => u.nome));
+    }
+    return cnpjs;
+  }, [isGerente, filial_gerente, unidadesList]);
+
   const { data: allVendas, isLoading: loadAll, isFetching: fetchingAll } = useQuery({
-    queryKey: ['gerencial-all-vendas', startDate, endDate],
+    queryKey: ['gerencial-all-vendas', startDate, endDate, gerenteCnpjs],
+    enabled: !isGerente || gerenteCnpjs.length > 0,
     queryFn: async () => {
       type VendaRow = {
         data_emissao: string | null;
@@ -164,11 +176,15 @@ export default function Gerencial() {
         nota_fiscal: string | null;
         cnpj_empresa: string | null;
       };
-      const { count, error: countErr } = await supabase
+      let countQuery = supabase
         .from('vendas')
         .select('*', { count: 'exact', head: true })
         .gte('data_emissao', startDate)
         .lte('data_emissao', endDate);
+      if (isGerente && gerenteCnpjs.length > 0) {
+        countQuery = countQuery.in('cnpj_empresa', gerenteCnpjs);
+      }
+      const { count, error: countErr } = await countQuery;
 
       if (countErr) throw countErr;
       if (!count || count === 0) return [];
@@ -179,15 +195,17 @@ export default function Gerencial() {
 
       for (let i = 0; i < totalPages; i++) {
         const from = i * step;
-        promises.push(
-          supabase
-            .from('vendas')
-            .select('data_emissao, vendedor_nome, total_com_desconto, lucros_reais, margem_percentual, familia_produto, marca, nota_fiscal, cnpj_empresa')
-            .gte('data_emissao', startDate)
-            .lte('data_emissao', endDate)
-            .order('id', { ascending: true })
-            .range(from, from + step - 1)
-        );
+        let q = supabase
+          .from('vendas')
+          .select('data_emissao, vendedor_nome, total_com_desconto, lucros_reais, margem_percentual, familia_produto, marca, nota_fiscal, cnpj_empresa')
+          .gte('data_emissao', startDate)
+          .lte('data_emissao', endDate)
+          .order('id', { ascending: true })
+          .range(from, from + step - 1);
+        if (isGerente && gerenteCnpjs.length > 0) {
+          q = q.in('cnpj_empresa', gerenteCnpjs);
+        }
+        promises.push(q);
       }
 
       const results = await Promise.all(promises);
@@ -297,14 +315,16 @@ export default function Gerencial() {
   // Get CNPJs for a given filial (from unidades)
   const getCnpjsByFiliais = useCallback((filiais: string[]): string[] => {
     if (!unidadesList) return [];
+    const upper = filiais.map(f => f.toUpperCase());
     return unidadesList
-      .filter(u => filiais.includes(u.nome) && u.cnpj)
+      .filter(u => upper.includes(u.nome.toUpperCase()) && u.cnpj)
       .map(u => u.cnpj!.trim());
   }, [unidadesList]);
 
   // Fetch paginated vendas for table
   const { data: vendasResult, isLoading: loadVendas } = useQuery({
     queryKey: ['gerencial-vendas', startDate, endDate, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, searchDebounced, tabelaPagina, unidadesList],
+    enabled: !isGerente || filtroUnidade.length > 0,
     queryFn: async () => {
       const offset = (tabelaPagina - 1) * TABLE_PAGE_SIZE;
       let query = supabase
