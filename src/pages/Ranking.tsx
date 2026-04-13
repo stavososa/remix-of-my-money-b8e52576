@@ -3,6 +3,7 @@ import { AppShell } from '@/components/AppShell';
 import { KPICard } from '@/components/KPICard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { usePeriod } from '@/contexts/PeriodContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { Trophy, DollarSign, Users, Receipt, Crown, Package, ShoppingCart, Tag, Layers, Gift } from 'lucide-react';
