@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { PeriodProvider } from "@/contexts/PeriodContext";
-import { RequireAuth, RequireAdmin, RedirectByRole } from "@/components/auth/RouteGuards";
+import { RequireAuth, RequireAdmin, RequireAdminOrGerente, RedirectByRole } from "@/components/auth/RouteGuards";
 
 // Lazy loaded pages — code splitting para reduzir bundle inicial
 const Login = lazy(() => import("./pages/Login"));
