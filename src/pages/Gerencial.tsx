@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { usePeriod } from '@/contexts/PeriodContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { X, Search, DollarSign, TrendingUp, Percent, ShoppingCart, FileText, ChevronDown, Check } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
