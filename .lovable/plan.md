@@ -1,26 +1,27 @@
 
 
-## Plano: Corrigir isolamento de dados por filial para gerentes
+## Plano: Filtros de vendedor/familia/marca independentes de data para gerentes
 
-### Problema real (confirmado via rede)
-A query de vendas (tabela e allVendas) dispara **antes** do `useEffect` setar `filtroUnidade` para o gerente, porque `unidadesList` ainda está carregando. Resultado: `filtroUnidade = []`, nenhum filtro de CNPJ é aplicado, e dados de todas as filiais são retornados.
+### Problema
+Atualmente, as opções dos dropdowns "Todos os Vendedores", "Todas as Famílias" e "Todas as Marcas" vêm do dataset `allVendas`, que é filtrado pelo período selecionado (mês/ano). Quando o gerente troca de mês, as opções mudam conforme os dados daquele mês. O usuário quer que essas opções mostrem **todos** os vendedores/famílias/marcas que já venderam na Matriz, independente da data.
 
-A resposta da API mostra CNPJs de múltiplas filiais (`/0016-80`, `/0015-07`, `/0011-75`) para o gerente da Matriz.
+### Solução
 
-### Correções no arquivo `src/pages/Gerencial.tsx`
+#### Arquivo: `src/pages/Gerencial.tsx`
 
-1. **Bloquear queries até filtro do gerente estar pronto**: Adicionar `enabled` nas queries de `allVendas` e `vendasResult` para que não executem enquanto o gerente não tiver `filtroUnidade` populado:
-   ```
-   enabled: !isGerente || filtroUnidade.length > 0
-   ```
+1. **Nova query dedicada para opções de filtro do gerente**: Criar uma query separada (`gerente-filter-options`) que busca vendedores, famílias e marcas **sem filtro de data**, apenas filtrando por `cnpj_empresa` da Matriz. Essa query terá `staleTime: Infinity` e será executada apenas para gerentes.
 
-2. **Filtrar `allVendas` no nível do fetch para gerentes**: Na query `allVendas` (que busca todos os dados do período), adicionar filtro `.in('cnpj_empresa', gerenteCnpjs)` diretamente na query SQL quando `isGerente`, em vez de baixar tudo e filtrar no cliente. Isso reduz transferência de dados e garante isolamento mesmo se o filtro client-side falhar.
+2. **Consulta eficiente**: Em vez de baixar todas as vendas históricas, a query fará 3 `SELECT DISTINCT` separados:
+   - `SELECT DISTINCT vendedor_nome FROM vendas WHERE cnpj_empresa IN (...)`
+   - `SELECT DISTINCT familia_produto FROM vendas WHERE cnpj_empresa IN (...)`
+   - `SELECT DISTINCT marca FROM vendas WHERE cnpj_empresa IN (...)`
 
-3. **Garantir `getCnpjsByFiliais` case-insensitive**: A comparação `filiais.includes(u.nome)` na linha 301 é case-sensitive. Trocar por comparação `.toUpperCase()`.
+3. **Usar as opções fixas no `filterOptions`**: Quando `isGerente`, o `filterOptions` usará os dados dessa nova query em vez de derivar de `allVendas`.
 
-### Resultado esperado
-- Queries só disparam após `filtroUnidade` estar definido para gerentes
-- Os dropdowns de Vendedor, Família e Marca mostram apenas dados da Matriz
-- A tabela mostra apenas vendas com CNPJs da Matriz
-- Nenhuma dado de outras filiais é visível
+### Detalhes Tecnico
+
+- A nova query só executa quando `isGerente && gerenteCnpjs.length > 0`
+- As 3 consultas `DISTINCT` rodam em paralelo via `Promise.all`
+- O `filterOptions` memo condiciona: se gerente, usa dados da nova query; se admin, mantém lógica atual derivada de `allVendas`
+- Sem alterações em banco de dados ou outros arquivos
 
