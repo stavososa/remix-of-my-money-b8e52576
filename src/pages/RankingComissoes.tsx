@@ -512,7 +512,7 @@ export default function RankingComissoes() {
               <RankingSection data={byVendedor} title="Top 10 Vendedores por Comissão" nameLabel="Vendedor" limit={10} icon={Users} hideFinancials={isGerente} />
             </TabsContent>
             <TabsContent value="filiais">
-              <RankingSection data={byFilial} title="Top 10 Filiais por Comissão" nameLabel="Filial" limit={10} icon={Building2} hideFinancials={isGerente} />
+              <RankingSection data={byFilial} title="Top 10 Filiais por Comissão" nameLabel="Filial" limit={10} icon={Building2} visibleFinancialName={isGerente ? filial_gerente ?? undefined : undefined} />
             </TabsContent>
           </Tabs>
 
