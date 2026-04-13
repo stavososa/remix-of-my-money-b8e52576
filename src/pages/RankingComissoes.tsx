@@ -391,6 +391,12 @@ export default function RankingComissoes() {
                   {MESES[periodoMes]}/{periodoAno}
                 </div>
                 {/* Filial filter */}
+                {isGerente ? (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-secondary/50 text-sm opacity-70">
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                    {filial_gerente ?? 'Filial'}
+                  </div>
+                ) : (
                 <Popover>
                   <PopoverTrigger asChild>
                     <button className="flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-secondary text-sm hover:bg-secondary/80 transition-colors">
@@ -416,6 +422,7 @@ export default function RankingComissoes() {
                     ))}
                   </PopoverContent>
                 </Popover>
+                )}
 
                 {/* Vendedor filter */}
                 <Popover>
