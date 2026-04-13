@@ -486,19 +486,19 @@ export default function RankingComissoes() {
             </TabsList>
 
             <TabsContent value="produtos">
-              <RankingSection data={byProduto} title="Top 10 Produtos por Comissão" nameLabel="Produto" limit={10} icon={Package} />
+              <RankingSection data={byProduto} title="Top 10 Produtos por Comissão" nameLabel="Produto" limit={10} icon={Package} hideFinancials={isGerente} />
             </TabsContent>
             <TabsContent value="familias">
-              <RankingSection data={byFamilia} title="Top 10 Famílias por Comissão" nameLabel="Família" limit={10} icon={Layers} />
+              <RankingSection data={byFamilia} title="Top 10 Famílias por Comissão" nameLabel="Família" limit={10} icon={Layers} hideFinancials={isGerente} />
             </TabsContent>
             <TabsContent value="marcas">
-              <RankingSection data={byMarca} title="Top 10 Marcas por Comissão" nameLabel="Marca" limit={10} icon={Tag} />
+              <RankingSection data={byMarca} title="Top 10 Marcas por Comissão" nameLabel="Marca" limit={10} icon={Tag} hideFinancials={isGerente} />
             </TabsContent>
             <TabsContent value="vendedores">
-              <RankingSection data={byVendedor} title="Top 10 Vendedores por Comissão" nameLabel="Vendedor" limit={10} icon={Users} />
+              <RankingSection data={byVendedor} title="Top 10 Vendedores por Comissão" nameLabel="Vendedor" limit={10} icon={Users} hideFinancials={isGerente} />
             </TabsContent>
             <TabsContent value="filiais">
-              <RankingSection data={byFilial} title="Top 10 Filiais por Comissão" nameLabel="Filial" limit={10} icon={Building2} />
+              <RankingSection data={byFilial} title="Top 10 Filiais por Comissão" nameLabel="Filial" limit={10} icon={Building2} hideFinancials={isGerente} />
             </TabsContent>
           </Tabs>
 
@@ -511,13 +511,13 @@ export default function RankingComissoes() {
             </TabsList>
 
             <TabsContent value="produtos-full">
-              <RankingSection data={byProduto} title="Ranking Completo — Produtos" nameLabel="Produto" icon={Package} />
+              <RankingSection data={byProduto} title="Ranking Completo — Produtos" nameLabel="Produto" icon={Package} hideFinancials={isGerente} />
             </TabsContent>
             <TabsContent value="familias-full">
-              <RankingSection data={byFamilia} title="Ranking Completo — Famílias" nameLabel="Família" icon={Layers} />
+              <RankingSection data={byFamilia} title="Ranking Completo — Famílias" nameLabel="Família" icon={Layers} hideFinancials={isGerente} />
             </TabsContent>
             <TabsContent value="marcas-full">
-              <RankingSection data={byMarca} title="Ranking Completo — Marcas" nameLabel="Marca" icon={Tag} />
+              <RankingSection data={byMarca} title="Ranking Completo — Marcas" nameLabel="Marca" icon={Tag} hideFinancials={isGerente} />
             </TabsContent>
           </Tabs>
         </div>
