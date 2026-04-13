@@ -393,7 +393,13 @@ export default function Gerencial() {
         </div>
         {/* Filters */}
         <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-3">
-          <MultiFilterSelect label="Filial" selected={filtroUnidade} onChange={(v) => { setFiltroUnidade(v); setTabelaPagina(1); }} options={filtros.unidades} allLabel="Todas as Filiais" />
+          {isGerente ? (
+            <div className="bg-secondary/50 border border-border rounded-md px-2 sm:px-3 py-2 text-xs sm:text-sm text-foreground opacity-70">
+              Filial: {filial_gerente}
+            </div>
+          ) : (
+            <MultiFilterSelect label="Filial" selected={filtroUnidade} onChange={(v) => { setFiltroUnidade(v); setTabelaPagina(1); }} options={filtros.unidades} allLabel="Todas as Filiais" />
+          )}
           <FilterSelect label="Vendedor" value={filtroVendedor} onChange={handleFilterChange(setFiltroVendedor)} options={filtros.vendedores.map(v => ({ value: v, label: v }))} allLabel="Todos os Vendedores" />
           <FilterSelect label="Família" value={filtroFamilia} onChange={handleFilterChange(setFiltroFamilia)} options={filtros.familias.map(f => ({ value: f, label: f }))} allLabel="Todas as Famílias" />
           <FilterSelect label="Marca" value={filtroMarca} onChange={handleFilterChange(setFiltroMarca)} options={filtros.marcas.map(m => ({ value: m, label: m }))} allLabel="Todas as Marcas" />
