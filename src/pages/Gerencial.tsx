@@ -317,11 +317,11 @@ export default function Gerencial() {
       .map(u => u.nome)
       .sort();
 
-    if (isGerente && gerenteFilterOpts) {
+    if (isGerente) {
       return {
-        vendedores: gerenteFilterOpts.vendedores,
-        familias: gerenteFilterOpts.familias,
-        marcas: gerenteFilterOpts.marcas,
+        vendedores: gerenteFilterOpts?.vendedores ?? [],
+        familias: gerenteFilterOpts?.familias ?? [],
+        marcas: gerenteFilterOpts?.marcas ?? [],
         unidades,
       };
     }
