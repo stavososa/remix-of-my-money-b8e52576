@@ -1,27 +1,44 @@
 
 
-## Plano: Filtros de vendedor/familia/marca independentes de data para gerentes
+## Plano: Corrigir dropdowns de famílias, marcas e vendedores para gerentes
 
 ### Problema
-Atualmente, as opções dos dropdowns "Todos os Vendedores", "Todas as Famílias" e "Todas as Marcas" vêm do dataset `allVendas`, que é filtrado pelo período selecionado (mês/ano). Quando o gerente troca de mês, as opções mudam conforme os dados daquele mês. O usuário quer que essas opções mostrem **todos** os vendedores/famílias/marcas que já venderam na Matriz, independente da data.
+1. **Limite de 1000 linhas**: As queries `supabase.from('vendas').select('marca')` etc. retornam no máximo 1000 registros (limite padrão do Supabase). Como não fazem `DISTINCT` no servidor, muitas famílias/marcas/vendedores são perdidos após a deduplicação no cliente.
+2. **Filtros removendo valores**: Linhas 179-180 filtram `'Outros'` e `'Sem Marca'`, removendo opções válidas do dropdown.
 
 ### Solução
 
 #### Arquivo: `src/pages/Gerencial.tsx`
 
-1. **Nova query dedicada para opções de filtro do gerente**: Criar uma query separada (`gerente-filter-options`) que busca vendedores, famílias e marcas **sem filtro de data**, apenas filtrando por `cnpj_empresa` da Matriz. Essa query terá `staleTime: Infinity` e será executada apenas para gerentes.
+1. **Paginação para buscar TODOS os valores**: Substituir as 3 queries simples por uma função que pagina automaticamente (loop de 1000 em 1000) até esgotar os dados, garantindo que todos os vendedores, famílias e marcas da filial sejam retornados.
 
-2. **Consulta eficiente**: Em vez de baixar todas as vendas históricas, a query fará 3 `SELECT DISTINCT` separados:
-   - `SELECT DISTINCT vendedor_nome FROM vendas WHERE cnpj_empresa IN (...)`
-   - `SELECT DISTINCT familia_produto FROM vendas WHERE cnpj_empresa IN (...)`
-   - `SELECT DISTINCT marca FROM vendas WHERE cnpj_empresa IN (...)`
+2. **Remover filtros de exclusão**: Retirar `.filter(f => f !== 'Outros')` e `.filter(m => m !== 'Sem Marca')` das linhas 179-180 para que todas as opções apareçam nos dropdowns.
 
-3. **Usar as opções fixas no `filterOptions`**: Quando `isGerente`, o `filterOptions` usará os dados dessa nova query em vez de derivar de `allVendas`.
+3. **Manter lógica existente intacta**: Vendedores, famílias e marcas continuam filtrados por `gerenteCnpjs` (filial Matriz). Apenas vendedores são independentes de data (já implementado). Famílias e marcas também já são independentes de data.
 
-### Detalhes Tecnico
+### Detalhe técnico
 
-- A nova query só executa quando `isGerente && gerenteCnpjs.length > 0`
-- As 3 consultas `DISTINCT` rodam em paralelo via `Promise.all`
-- O `filterOptions` memo condiciona: se gerente, usa dados da nova query; se admin, mantém lógica atual derivada de `allVendas`
-- Sem alterações em banco de dados ou outros arquivos
+A função de paginação:
+```typescript
+async function fetchAllDistinct(column: string, cnpjs: string[]) {
+  const pageSize = 1000;
+  const all = new Set<string>();
+  let offset = 0;
+  while (true) {
+    const { data } = await supabase
+      .from('vendas')
+      .select(column)
+      .in('cnpj_empresa', cnpjs)
+      .not(column, 'is', null)
+      .range(offset, offset + pageSize - 1);
+    if (!data || data.length === 0) break;
+    data.forEach(r => all.add(r[column]));
+    if (data.length < pageSize) break;
+    offset += pageSize;
+  }
+  return [...all].sort();
+}
+```
+
+Apenas 1 arquivo modificado, sem alterações no banco.
 
