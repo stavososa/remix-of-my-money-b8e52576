@@ -77,6 +77,8 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
 };
 
 export default function Gerencial() {
+  const { role, filial_gerente } = useAuth();
+  const isGerente = role === 'gerente';
   const isMobile = useIsMobile();
   const { periodoAno, periodoMes, dataInicio, dataFim } = usePeriod();
   const [filtroUnidade, setFiltroUnidade] = useState<string[]>([]);
@@ -87,8 +89,17 @@ export default function Gerencial() {
   const [searchDebounced, setSearchDebounced] = useState('');
   const [tabelaPagina, setTabelaPagina] = useState(1);
 
+  // Force filial for gerente
   useEffect(() => {
-    setFiltroUnidade([]);
+    if (isGerente && filial_gerente) {
+      setFiltroUnidade([filial_gerente]);
+    }
+  }, [isGerente, filial_gerente]);
+
+  useEffect(() => {
+    if (!isGerente) {
+      setFiltroUnidade([]);
+    }
     setFiltroVendedor('all');
     setFiltroFamilia('all');
     setFiltroMarca('all');
