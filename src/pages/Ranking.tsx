@@ -85,9 +85,9 @@ function RankingTable({ data, nameLabel, hideFinancials = false }: { data: Ranke
               <MedalhaIcone pos={item.posicao} />
               <span className="font-bold text-foreground text-sm">{item.name}</span>
             </div>
-            <div className="grid grid-cols-3 gap-2 text-sm">
-              <div><span className="text-muted-foreground">Faturamento: </span><span className="font-semibold text-foreground">{fmtCompact(item.total_vendido)}</span></div>
-              <div><span className="text-muted-foreground">Lucro: </span><span className="font-semibold text-foreground">{fmtCompact(item.lucro)}</span></div>
+            <div className={`grid ${hideFinancials ? 'grid-cols-1' : 'grid-cols-3'} gap-2 text-sm`}>
+              {!hideFinancials && <div><span className="text-muted-foreground">Faturamento: </span><span className="font-semibold text-foreground">{fmtCompact(item.total_vendido)}</span></div>}
+              {!hideFinancials && <div><span className="text-muted-foreground">Lucro: </span><span className="font-semibold text-foreground">{fmtCompact(item.lucro)}</span></div>}
               <div><span className="text-muted-foreground">Qtd: </span><span className="text-foreground">{Math.round(item.quantidade).toLocaleString('pt-BR')}</span></div>
             </div>
           </div>
