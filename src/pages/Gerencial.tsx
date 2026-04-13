@@ -161,6 +161,27 @@ export default function Gerencial() {
     return cnpjs;
   }, [isGerente, filial_gerente, unidadesList]);
 
+  // ===== Gerente: filter options independent of date =====
+  const { data: gerenteFilterOpts } = useQuery({
+    queryKey: ['gerente-filter-options', gerenteCnpjs],
+    enabled: isGerente && gerenteCnpjs.length > 0,
+    staleTime: Infinity,
+    queryFn: async () => {
+      const [vendRes, famRes, marcRes] = await Promise.all([
+        supabase.from('vendas').select('vendedor_nome').in('cnpj_empresa', gerenteCnpjs).not('vendedor_nome', 'is', null),
+        supabase.from('vendas').select('familia_produto').in('cnpj_empresa', gerenteCnpjs).not('familia_produto', 'is', null),
+        supabase.from('vendas').select('marca').in('cnpj_empresa', gerenteCnpjs).not('marca', 'is', null),
+      ]);
+      if (vendRes.error) throw vendRes.error;
+      if (famRes.error) throw famRes.error;
+      if (marcRes.error) throw marcRes.error;
+      const vendedores = [...new Set((vendRes.data ?? []).map((r: any) => r.vendedor_nome as string))].sort();
+      const familias = [...new Set((famRes.data ?? []).map((r: any) => r.familia_produto as string).filter(f => f !== 'Outros'))].sort();
+      const marcas = [...new Set((marcRes.data ?? []).map((r: any) => r.marca as string).filter(m => m !== 'Sem Marca'))].sort();
+      return { vendedores, familias, marcas };
+    },
+  });
+
   const { data: allVendas, isLoading: loadAll, isFetching: fetchingAll } = useQuery({
     queryKey: ['gerencial-all-vendas', startDate, endDate, gerenteCnpjs],
     enabled: !isGerente || gerenteCnpjs.length > 0,
