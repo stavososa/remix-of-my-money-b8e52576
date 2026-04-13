@@ -1,24 +1,17 @@
 
 
-## Plano: Garantir que dropdown de vendedores mostre apenas quem vendeu na Matriz
+## Plano: Ocultar seções de Filial e Vendedor no Ranking Comissões para gerentes
 
-### Diagnóstico
-O código atual tem um fallback problemático: enquanto a query `gerente-filter-options` (atemporal) carrega, o `filterOptions` cai na lógica da linha 329 que deriva vendedores do `allVendas` (filtrado por data). Isso pode momentaneamente mostrar dados inconsistentes. Além disso, não há garantia explícita de que o dropdown fique vazio durante o carregamento.
+### O que muda
+No arquivo `src/pages/RankingComissoes.tsx`, para perfis de gerente (`isGerente`):
 
-### Correção no arquivo `src/pages/Gerencial.tsx`
+1. **Remover o bloco "Resumo por Filial e Vendedor"** (linhas 487-490) — o grid com as seções "Comissão por Filial" e "Comissão por Vendedor" será envolvido em `{!isGerente && ...}`.
 
-1. **Bloquear fallback para gerente**: No `filterOptions` memo, quando `isGerente` for true mas `gerenteFilterOpts` ainda não carregou, retornar listas vazias em vez de derivar de `allVendas`. Isso garante que o dropdown nunca mostre vendedores de fora da Matriz:
+2. **Remover as abas "Top 10 Vendedores" e "Top 10 Filiais"** (linhas 498-499 e 511-516) — os `TabsTrigger` e `TabsContent` correspondentes serão condicionalmente ocultados com `{!isGerente && ...}`.
 
-```typescript
-if (isGerente) {
-  return {
-    vendedores: gerenteFilterOpts?.vendedores ?? [],
-    familias: gerenteFilterOpts?.familias ?? [],
-    marcas: gerenteFilterOpts?.marcas ?? [],
-    unidades,
-  };
-}
-```
+### Resultado
+Gerentes verão apenas rankings de Produtos, Famílias e Marcas. As seções de Filial e Vendedor deixam de existir na interface para esse perfil.
 
-2. **Sem outras alterações**: A query `fetchAllDistinct('vendedor_nome', gerenteCnpjs)` já busca apenas vendedores com registros na tabela `vendas` filtrados pelo CNPJ da Matriz, de forma independente da data. Apenas o fallback precisa ser corrigido.
+### Arquivo alterado
+- `src/pages/RankingComissoes.tsx`
 
