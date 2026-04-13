@@ -89,12 +89,6 @@ export default function Gerencial() {
   const [searchDebounced, setSearchDebounced] = useState('');
   const [tabelaPagina, setTabelaPagina] = useState(1);
 
-  // Force filial for gerente
-  useEffect(() => {
-    if (isGerente && filial_gerente) {
-      setFiltroUnidade([filial_gerente]);
-    }
-  }, [isGerente, filial_gerente]);
 
   useEffect(() => {
     if (!isGerente) {
@@ -141,6 +135,14 @@ export default function Gerencial() {
     }
     return map;
   }, [unidadesList]);
+
+  // Force filial for gerente
+  useEffect(() => {
+    if (isGerente && filial_gerente && unidadesList?.length) {
+      const match = unidadesList.find(u => u.nome.toUpperCase() === filial_gerente.toUpperCase());
+      setFiltroUnidade([match ? match.nome : filial_gerente]);
+    }
+  }, [isGerente, filial_gerente, unidadesList]);
 
   const getFilial = useCallback((cnpj: string | null | undefined): string => {
     if (!cnpj) return 'Sem Filial';
@@ -267,8 +269,12 @@ export default function Gerencial() {
 
     // For gerente, only show options from their branch's CNPJs
     const gerenteCnpjs = isGerente && filial_gerente && unidadesList
-      ? new Set(unidadesList.filter(u => u.nome === filial_gerente && u.cnpj).map(u => normalizeCnpj(u.cnpj!.trim())))
+      ? new Set(unidadesList.filter(u => u.nome.toUpperCase() === filial_gerente.toUpperCase() && u.cnpj).map(u => normalizeCnpj(u.cnpj!.trim())))
       : null;
+
+    if (gerenteCnpjs && gerenteCnpjs.size === 0) {
+      console.warn('[Gerencial] Nenhum CNPJ encontrado para filial_gerente:', filial_gerente, '| unidades disponíveis:', unidadesList?.map(u => u.nome));
+    }
 
     const vendedores = new Set<string>();
     const familias = new Set<string>();
