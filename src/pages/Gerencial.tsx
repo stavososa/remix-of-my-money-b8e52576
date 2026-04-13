@@ -333,8 +333,8 @@ export default function Gerencial() {
     const marcas = new Set<string>();
     for (const row of allVendas) {
       if (row.vendedor_nome) vendedores.add(row.vendedor_nome);
-      if (row.familia_produto && row.familia_produto !== 'Outros') familias.add(row.familia_produto);
-      if (row.marca && row.marca !== 'Sem Marca') marcas.add(row.marca);
+      if (row.familia_produto) familias.add(row.familia_produto);
+      if (row.marca) marcas.add(row.marca);
     }
     return {
       vendedores: [...vendedores].sort(),
