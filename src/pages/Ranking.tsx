@@ -62,12 +62,14 @@ interface ProductRank {
 }
 
 
-function RankingTable({ data, nameLabel }: { data: RankedItem[]; nameLabel: string }) {
+function RankingTable({ data, nameLabel, hideFinancials = false }: { data: RankedItem[]; nameLabel: string; hideFinancials?: boolean }) {
   const columns = [
     { key: 'posicao' as const, label: '#', render: (v: number) => <div className="flex justify-center">{medalha(v)}</div> },
     { key: 'name' as const, label: nameLabel },
-    { key: 'total_vendido' as const, label: 'Faturamento', align: 'right' as const, render: (v: number) => fmtCompact(v) },
-    { key: 'lucro' as const, label: 'Lucro Real', align: 'right' as const, render: (v: number) => fmtCompact(v) },
+    ...(!hideFinancials ? [
+      { key: 'total_vendido' as const, label: 'Faturamento', align: 'right' as const, render: (v: number) => fmtCompact(v) },
+      { key: 'lucro' as const, label: 'Lucro Real', align: 'right' as const, render: (v: number) => fmtCompact(v) },
+    ] : []),
     { key: 'quantidade' as const, label: 'Quantidade', align: 'right' as const, render: (v: number) => Math.round(v).toLocaleString('pt-BR') },
   ];
 
@@ -83,9 +85,9 @@ function RankingTable({ data, nameLabel }: { data: RankedItem[]; nameLabel: stri
               <MedalhaIcone pos={item.posicao} />
               <span className="font-bold text-foreground text-sm">{item.name}</span>
             </div>
-            <div className="grid grid-cols-3 gap-2 text-sm">
-              <div><span className="text-muted-foreground">Faturamento: </span><span className="font-semibold text-foreground">{fmtCompact(item.total_vendido)}</span></div>
-              <div><span className="text-muted-foreground">Lucro: </span><span className="font-semibold text-foreground">{fmtCompact(item.lucro)}</span></div>
+            <div className={`grid ${hideFinancials ? 'grid-cols-1' : 'grid-cols-3'} gap-2 text-sm`}>
+              {!hideFinancials && <div><span className="text-muted-foreground">Faturamento: </span><span className="font-semibold text-foreground">{fmtCompact(item.total_vendido)}</span></div>}
+              {!hideFinancials && <div><span className="text-muted-foreground">Lucro: </span><span className="font-semibold text-foreground">{fmtCompact(item.lucro)}</span></div>}
               <div><span className="text-muted-foreground">Qtd: </span><span className="text-foreground">{Math.round(item.quantidade).toLocaleString('pt-BR')}</span></div>
             </div>
           </div>
@@ -99,7 +101,7 @@ export default function Ranking() {
   const { role, filial_gerente } = useAuth();
   const isGerente = role === 'gerente';
   const canSee = (unidadeNome: string | null) => !isGerente || (unidadeNome ?? '').toUpperCase() === (filial_gerente ?? '').toUpperCase();
-  const censorVal = (v: number, unidade: string | null) => canSee(unidade) ? fmtCompact(v) : '—';
+  const censorVal = (_v: number, _unidade: string | null) => isGerente ? '—' : fmtCompact(_v);
   const [selectedBonificacao, setSelectedBonificacao] = useState<Bonificacao | null>(null);
   const { periodoAno, periodoMes, dataInicio, dataFim, loading: loadingPeriodo } = usePeriod();
 
@@ -330,8 +332,10 @@ export default function Ranking() {
     { key: 'descricao_produto' as const, label: 'Produto' },
     { key: 'familia_produto' as const, label: 'Família' },
     { key: 'marca' as const, label: 'Marca' },
-    { key: 'total_vendido' as const, label: 'Faturamento', align: 'right' as const, render: (v: number) => fmtCompact(v) },
-    { key: 'lucro' as const, label: 'Lucro Real', align: 'right' as const, render: (v: number) => fmtCompact(v) },
+    ...(!isGerente ? [
+      { key: 'total_vendido' as const, label: 'Faturamento', align: 'right' as const, render: (v: number) => fmtCompact(v) },
+      { key: 'lucro' as const, label: 'Lucro Real', align: 'right' as const, render: (v: number) => fmtCompact(v) },
+    ] : []),
     { key: 'quantidade' as const, label: 'Quantidade', align: 'right' as const, render: (v: number) => Math.round(v).toLocaleString('pt-BR') },
   ];
 
@@ -359,10 +363,12 @@ export default function Ranking() {
                   <h3 className="text-2xl font-extrabold text-foreground">{top1.vendedor_nome}</h3>
                   <p className="text-secondary-foreground text-sm">{top1.unidade_nome}</p>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs text-secondary-foreground">Total Vendido</p>
-                  <p className="text-2xl font-extrabold text-foreground">{canSee(top1.unidade_nome) ? formatBRL(top1.total_vendido) : '—'}</p>
-                </div>
+                {!isGerente && (
+                  <div className="text-right">
+                    <p className="text-xs text-secondary-foreground">Total Vendido</p>
+                    <p className="text-2xl font-extrabold text-foreground">{formatBRL(top1.total_vendido)}</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -463,10 +469,10 @@ export default function Ranking() {
             {/* Tab Vendedores */}
             <TabsContent value="vendedores" className="space-y-6">
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <KPICard icon={DollarSign} label="Total Vendido (Time)" value={formatBRL(kpis.totalVendido)} />
-                <KPICard icon={Trophy} label="Comissão Total" value={formatBRL(kpis.totalComissao)} />
+                {!isGerente && <KPICard icon={DollarSign} label="Total Vendido (Time)" value={formatBRL(kpis.totalVendido)} />}
+                {!isGerente && <KPICard icon={Trophy} label="Comissão Total" value={formatBRL(kpis.totalComissao)} />}
                 <KPICard icon={Users} label="Vendedores Ativos" value={String(kpis.vendedores)} />
-                <KPICard icon={Receipt} label="Ticket Médio" value={formatBRL(kpis.ticketMedio)} />
+                {!isGerente && <KPICard icon={Receipt} label="Ticket Médio" value={formatBRL(kpis.ticketMedio)} />}
               </div>
 
               <div className="hidden md:block">
@@ -499,7 +505,7 @@ export default function Ranking() {
             {/* Tab Produtos */}
             <TabsContent value="produtos" className="space-y-6">
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                <KPICard icon={DollarSign} label="Total Vendido" value={formatBRL(prodKpis.totalVendido)} />
+                {!isGerente && <KPICard icon={DollarSign} label="Total Vendido" value={formatBRL(prodKpis.totalVendido)} />}
                 <KPICard icon={ShoppingCart} label="Qtd Total Vendida" value={Math.round(prodKpis.totalQtd).toLocaleString('pt-BR')} />
                 <KPICard icon={Package} label="Produtos Únicos" value={String(prodKpis.totalProdutos)} />
               </div>
@@ -516,9 +522,9 @@ export default function Ranking() {
                       <span className="font-bold text-foreground text-sm">{p.descricao_produto}</span>
                     </div>
                     <p className="text-xs text-secondary-foreground mb-2">{p.familia_produto} · {p.marca}</p>
-                    <div className="grid grid-cols-3 gap-2 text-sm">
-                      <div><span className="text-muted-foreground">Faturamento: </span><span className="font-semibold text-foreground">{fmtCompact(p.total_vendido)}</span></div>
-                      <div><span className="text-muted-foreground">Lucro: </span><span className="font-semibold text-foreground">{fmtCompact(p.lucro)}</span></div>
+                    <div className={`grid ${isGerente ? 'grid-cols-1' : 'grid-cols-3'} gap-2 text-sm`}>
+                      {!isGerente && <div><span className="text-muted-foreground">Faturamento: </span><span className="font-semibold text-foreground">{fmtCompact(p.total_vendido)}</span></div>}
+                      {!isGerente && <div><span className="text-muted-foreground">Lucro: </span><span className="font-semibold text-foreground">{fmtCompact(p.lucro)}</span></div>}
                       <div><span className="text-muted-foreground">Qtd: </span><span className="text-foreground">{Math.round(p.quantidade).toLocaleString('pt-BR')}</span></div>
                     </div>
                   </div>
@@ -529,21 +535,21 @@ export default function Ranking() {
             {/* Tab Marcas */}
             <TabsContent value="marcas" className="space-y-6">
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                <KPICard icon={DollarSign} label="Total Vendido" value={formatBRL(marcaKpis.totalVendido)} />
+                {!isGerente && <KPICard icon={DollarSign} label="Total Vendido" value={formatBRL(marcaKpis.totalVendido)} />}
                 <KPICard icon={ShoppingCart} label="Qtd Total Vendida" value={Math.round(marcaKpis.totalQtd).toLocaleString('pt-BR')} />
                 <KPICard icon={Tag} label="Marcas Únicas" value={String(marcaKpis.totalMarcas)} />
               </div>
-              <RankingTable data={marcaRanking} nameLabel="Marca" />
+              <RankingTable data={marcaRanking} nameLabel="Marca" hideFinancials={isGerente} />
             </TabsContent>
 
             {/* Tab Famílias */}
             <TabsContent value="familias" className="space-y-6">
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                <KPICard icon={DollarSign} label="Total Vendido" value={formatBRL(familiaKpis.totalVendido)} />
+                {!isGerente && <KPICard icon={DollarSign} label="Total Vendido" value={formatBRL(familiaKpis.totalVendido)} />}
                 <KPICard icon={ShoppingCart} label="Qtd Total Vendida" value={Math.round(familiaKpis.totalQtd).toLocaleString('pt-BR')} />
                 <KPICard icon={Layers} label="Famílias Únicas" value={String(familiaKpis.totalFamilias)} />
               </div>
-              <RankingTable data={familiaRanking} nameLabel="Família" />
+              <RankingTable data={familiaRanking} nameLabel="Família" hideFinancials={isGerente} />
             </TabsContent>
           </Tabs>
         </div>
