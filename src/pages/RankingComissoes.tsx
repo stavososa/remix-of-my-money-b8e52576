@@ -463,16 +463,16 @@ export default function RankingComissoes() {
           </Card>
 
           {/* KPIs */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <KPICard label="Total Comissão" value={fmt(totalComissao)} icon={DollarSign} />
-            <KPICard label="Total Faturamento" value={fmtCompact(totalVendas)} icon={Package} />
+          <div className={`grid grid-cols-1 ${isGerente ? 'sm:grid-cols-1' : 'sm:grid-cols-3'} gap-4`}>
+            {!isGerente && <KPICard label="Total Comissão" value={fmt(totalComissao)} icon={DollarSign} />}
+            {!isGerente && <KPICard label="Total Faturamento" value={fmtCompact(totalVendas)} icon={Package} />}
             <KPICard label="Vendas com Comissão" value={totalQtd.toLocaleString('pt-BR')} icon={Tag} />
           </div>
 
           {/* Resumo por Filial e Vendedor */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <RankingSection data={byFilial} title="Comissão por Filial" nameLabel="Filial" icon={Building2} />
-            <RankingSection data={byVendedor} title="Comissão por Vendedor" nameLabel="Vendedor" icon={Users} />
+            <RankingSection data={byFilial} title="Comissão por Filial" nameLabel="Filial" icon={Building2} hideFinancials={isGerente} />
+            <RankingSection data={byVendedor} title="Comissão por Vendedor" nameLabel="Vendedor" icon={Users} hideFinancials={isGerente} />
           </div>
 
           {/* Top 10 Rankings */}
