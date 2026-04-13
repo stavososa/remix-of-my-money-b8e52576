@@ -485,7 +485,7 @@ export default function RankingComissoes() {
 
           {/* Resumo por Filial e Vendedor */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <RankingSection data={byFilial} title="Comissão por Filial" nameLabel="Filial" icon={Building2} hideFinancials={isGerente} />
+            <RankingSection data={byFilial} title="Comissão por Filial" nameLabel="Filial" icon={Building2} visibleFinancialName={isGerente ? filial_gerente ?? undefined : undefined} />
             <RankingSection data={byVendedor} title="Comissão por Vendedor" nameLabel="Vendedor" icon={Users} hideFinancials={isGerente} />
           </div>
 
