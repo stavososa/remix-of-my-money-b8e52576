@@ -96,19 +96,22 @@ function aggregate(items: ComissaoCalculada[], keyFn: (item: ComissaoCalculada) 
     }));
 }
 
-function RankingSection({ data, title, nameLabel, limit, icon: Icon }: {
+function RankingSection({ data, title, nameLabel, limit, icon: Icon, hideFinancials }: {
   data: AggRow[];
   title: string;
   nameLabel: string;
   limit?: number;
   icon: React.ElementType;
+  hideFinancials?: boolean;
 }) {
   const display = limit ? data.slice(0, limit) : data;
   const columns = [
     { key: 'posicao' as const, label: '#', render: (v: number) => <div className="flex justify-center">{v <= 3 ? <MedalhaIcone pos={v} /> : v}</div> },
     { key: 'name' as const, label: nameLabel },
-    { key: 'valor_comissao' as const, label: 'Comissão', align: 'right' as const, render: (v: number) => <span className="font-semibold text-primary">{fmt(v)}</span> },
-    { key: 'valor_vendas' as const, label: 'Faturamento', align: 'right' as const, render: (v: number) => fmtCompact(v) },
+    ...(!hideFinancials ? [
+      { key: 'valor_comissao' as const, label: 'Comissão', align: 'right' as const, render: (v: number) => <span className="font-semibold text-primary">{fmt(v)}</span> },
+      { key: 'valor_vendas' as const, label: 'Faturamento', align: 'right' as const, render: (v: number) => fmtCompact(v) },
+    ] : []),
     { key: 'percentual_medio' as const, label: '% Médio', align: 'right' as const, render: (v: number) => `${v.toFixed(2)}%` },
     { key: 'quantidade' as const, label: 'Qtd Vendas', align: 'right' as const, render: (v: number) => Math.round(v).toLocaleString('pt-BR') },
   ];
@@ -140,8 +143,12 @@ function RankingSection({ data, title, nameLabel, limit, icon: Icon }: {
                     <span className="font-bold text-sm text-foreground truncate">{item.name}</span>
                   </div>
                   <div className="grid grid-cols-2 gap-1 text-xs">
-                    <div><span className="text-muted-foreground">Comissão: </span><span className="font-semibold text-primary">{fmtCompact(item.valor_comissao)}</span></div>
-                    <div><span className="text-muted-foreground">Faturamento: </span><span className="font-semibold">{fmtCompact(item.valor_vendas)}</span></div>
+                    {!hideFinancials && (
+                      <>
+                        <div><span className="text-muted-foreground">Comissão: </span><span className="font-semibold text-primary">{fmtCompact(item.valor_comissao)}</span></div>
+                        <div><span className="text-muted-foreground">Faturamento: </span><span className="font-semibold">{fmtCompact(item.valor_vendas)}</span></div>
+                      </>
+                    )}
                     <div><span className="text-muted-foreground">% Médio: </span><span>{item.percentual_medio.toFixed(2)}%</span></div>
                     <div><span className="text-muted-foreground">Qtd: </span><span>{Math.round(item.quantidade).toLocaleString('pt-BR')}</span></div>
                   </div>
@@ -456,16 +463,16 @@ export default function RankingComissoes() {
           </Card>
 
           {/* KPIs */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <KPICard label="Total Comissão" value={fmt(totalComissao)} icon={DollarSign} />
-            <KPICard label="Total Faturamento" value={fmtCompact(totalVendas)} icon={Package} />
+          <div className={`grid grid-cols-1 ${isGerente ? 'sm:grid-cols-1' : 'sm:grid-cols-3'} gap-4`}>
+            {!isGerente && <KPICard label="Total Comissão" value={fmt(totalComissao)} icon={DollarSign} />}
+            {!isGerente && <KPICard label="Total Faturamento" value={fmtCompact(totalVendas)} icon={Package} />}
             <KPICard label="Vendas com Comissão" value={totalQtd.toLocaleString('pt-BR')} icon={Tag} />
           </div>
 
           {/* Resumo por Filial e Vendedor */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <RankingSection data={byFilial} title="Comissão por Filial" nameLabel="Filial" icon={Building2} />
-            <RankingSection data={byVendedor} title="Comissão por Vendedor" nameLabel="Vendedor" icon={Users} />
+            <RankingSection data={byFilial} title="Comissão por Filial" nameLabel="Filial" icon={Building2} hideFinancials={isGerente} />
+            <RankingSection data={byVendedor} title="Comissão por Vendedor" nameLabel="Vendedor" icon={Users} hideFinancials={isGerente} />
           </div>
 
           {/* Top 10 Rankings */}
@@ -479,19 +486,19 @@ export default function RankingComissoes() {
             </TabsList>
 
             <TabsContent value="produtos">
-              <RankingSection data={byProduto} title="Top 10 Produtos por Comissão" nameLabel="Produto" limit={10} icon={Package} />
+              <RankingSection data={byProduto} title="Top 10 Produtos por Comissão" nameLabel="Produto" limit={10} icon={Package} hideFinancials={isGerente} />
             </TabsContent>
             <TabsContent value="familias">
-              <RankingSection data={byFamilia} title="Top 10 Famílias por Comissão" nameLabel="Família" limit={10} icon={Layers} />
+              <RankingSection data={byFamilia} title="Top 10 Famílias por Comissão" nameLabel="Família" limit={10} icon={Layers} hideFinancials={isGerente} />
             </TabsContent>
             <TabsContent value="marcas">
-              <RankingSection data={byMarca} title="Top 10 Marcas por Comissão" nameLabel="Marca" limit={10} icon={Tag} />
+              <RankingSection data={byMarca} title="Top 10 Marcas por Comissão" nameLabel="Marca" limit={10} icon={Tag} hideFinancials={isGerente} />
             </TabsContent>
             <TabsContent value="vendedores">
-              <RankingSection data={byVendedor} title="Top 10 Vendedores por Comissão" nameLabel="Vendedor" limit={10} icon={Users} />
+              <RankingSection data={byVendedor} title="Top 10 Vendedores por Comissão" nameLabel="Vendedor" limit={10} icon={Users} hideFinancials={isGerente} />
             </TabsContent>
             <TabsContent value="filiais">
-              <RankingSection data={byFilial} title="Top 10 Filiais por Comissão" nameLabel="Filial" limit={10} icon={Building2} />
+              <RankingSection data={byFilial} title="Top 10 Filiais por Comissão" nameLabel="Filial" limit={10} icon={Building2} hideFinancials={isGerente} />
             </TabsContent>
           </Tabs>
 
@@ -504,13 +511,13 @@ export default function RankingComissoes() {
             </TabsList>
 
             <TabsContent value="produtos-full">
-              <RankingSection data={byProduto} title="Ranking Completo — Produtos" nameLabel="Produto" icon={Package} />
+              <RankingSection data={byProduto} title="Ranking Completo — Produtos" nameLabel="Produto" icon={Package} hideFinancials={isGerente} />
             </TabsContent>
             <TabsContent value="familias-full">
-              <RankingSection data={byFamilia} title="Ranking Completo — Famílias" nameLabel="Família" icon={Layers} />
+              <RankingSection data={byFamilia} title="Ranking Completo — Famílias" nameLabel="Família" icon={Layers} hideFinancials={isGerente} />
             </TabsContent>
             <TabsContent value="marcas-full">
-              <RankingSection data={byMarca} title="Ranking Completo — Marcas" nameLabel="Marca" icon={Tag} />
+              <RankingSection data={byMarca} title="Ranking Completo — Marcas" nameLabel="Marca" icon={Tag} hideFinancials={isGerente} />
             </TabsContent>
           </Tabs>
         </div>
