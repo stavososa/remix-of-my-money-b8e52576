@@ -1,20 +1,26 @@
 
 
-## Plano: Garantir filtro de vendedores/famílias/marcas somente da filial do gerente
+## Plano: Corrigir isolamento de dados por filial para gerentes
 
-### Problema provável
-A comparação `u.nome === filial_gerente` na linha 270 é case-sensitive. Se `unidades.nome` no banco for "Matriz" e `filial_gerente` for "MATRIZ", o filtro falha silenciosamente e mostra vendedores de todas as filiais.
+### Problema real (confirmado via rede)
+A query de vendas (tabela e allVendas) dispara **antes** do `useEffect` setar `filtroUnidade` para o gerente, porque `unidadesList` ainda está carregando. Resultado: `filtroUnidade = []`, nenhum filtro de CNPJ é aplicado, e dados de todas as filiais são retornados.
 
-### Correção
+A resposta da API mostra CNPJs de múltiplas filiais (`/0016-80`, `/0015-07`, `/0011-75`) para o gerente da Matriz.
 
-#### Arquivo: `src/pages/Gerencial.tsx`
+### Correções no arquivo `src/pages/Gerencial.tsx`
 
-1. **Tornar a comparação case-insensitive** no `filterOptions` (linha 270):
-   - Trocar `u.nome === filial_gerente` por `u.nome.toUpperCase() === filial_gerente?.toUpperCase()`
+1. **Bloquear queries até filtro do gerente estar pronto**: Adicionar `enabled` nas queries de `allVendas` e `vendasResult` para que não executem enquanto o gerente não tiver `filtroUnidade` populado:
+   ```
+   enabled: !isGerente || filtroUnidade.length > 0
+   ```
 
-2. **Mesma correção no `filteredAll`** — o `getFilial()` já normaliza via `cnpjFilialMap`, mas o `filtroUnidade` usa o nome exato. Garantir que o `useEffect` que seta `filtroUnidade` para gerente (linha 93-97) use o nome correto da tabela `unidades` em vez do valor hardcoded do mapa.
+2. **Filtrar `allVendas` no nível do fetch para gerentes**: Na query `allVendas` (que busca todos os dados do período), adicionar filtro `.in('cnpj_empresa', gerenteCnpjs)` diretamente na query SQL quando `isGerente`, em vez de baixar tudo e filtrar no cliente. Isso reduz transferência de dados e garante isolamento mesmo se o filtro client-side falhar.
 
-3. **Adicionar fallback**: se `gerenteCnpjs` ficar vazio (nenhum CNPJ encontrado para a filial), logar um warning no console para facilitar debug futuro.
+3. **Garantir `getCnpjsByFiliais` case-insensitive**: A comparação `filiais.includes(u.nome)` na linha 301 é case-sensitive. Trocar por comparação `.toUpperCase()`.
 
-São ajustes pontuais de robustez no mesmo arquivo.
+### Resultado esperado
+- Queries só disparam após `filtroUnidade` estar definido para gerentes
+- Os dropdowns de Vendedor, Família e Marca mostram apenas dados da Matriz
+- A tabela mostra apenas vendas com CNPJs da Matriz
+- Nenhuma dado de outras filiais é visível
 
