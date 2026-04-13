@@ -359,10 +359,12 @@ export default function Ranking() {
                   <h3 className="text-2xl font-extrabold text-foreground">{top1.vendedor_nome}</h3>
                   <p className="text-secondary-foreground text-sm">{top1.unidade_nome}</p>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs text-secondary-foreground">Total Vendido</p>
-                  <p className="text-2xl font-extrabold text-foreground">{canSee(top1.unidade_nome) ? formatBRL(top1.total_vendido) : '—'}</p>
-                </div>
+                {!isGerente && (
+                  <div className="text-right">
+                    <p className="text-xs text-secondary-foreground">Total Vendido</p>
+                    <p className="text-2xl font-extrabold text-foreground">{formatBRL(top1.total_vendido)}</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -463,10 +465,10 @@ export default function Ranking() {
             {/* Tab Vendedores */}
             <TabsContent value="vendedores" className="space-y-6">
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <KPICard icon={DollarSign} label="Total Vendido (Time)" value={formatBRL(kpis.totalVendido)} />
-                <KPICard icon={Trophy} label="Comissão Total" value={formatBRL(kpis.totalComissao)} />
+                {!isGerente && <KPICard icon={DollarSign} label="Total Vendido (Time)" value={formatBRL(kpis.totalVendido)} />}
+                {!isGerente && <KPICard icon={Trophy} label="Comissão Total" value={formatBRL(kpis.totalComissao)} />}
                 <KPICard icon={Users} label="Vendedores Ativos" value={String(kpis.vendedores)} />
-                <KPICard icon={Receipt} label="Ticket Médio" value={formatBRL(kpis.ticketMedio)} />
+                {!isGerente && <KPICard icon={Receipt} label="Ticket Médio" value={formatBRL(kpis.ticketMedio)} />}
               </div>
 
               <div className="hidden md:block">
@@ -499,7 +501,7 @@ export default function Ranking() {
             {/* Tab Produtos */}
             <TabsContent value="produtos" className="space-y-6">
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                <KPICard icon={DollarSign} label="Total Vendido" value={formatBRL(prodKpis.totalVendido)} />
+                {!isGerente && <KPICard icon={DollarSign} label="Total Vendido" value={formatBRL(prodKpis.totalVendido)} />}
                 <KPICard icon={ShoppingCart} label="Qtd Total Vendida" value={Math.round(prodKpis.totalQtd).toLocaleString('pt-BR')} />
                 <KPICard icon={Package} label="Produtos Únicos" value={String(prodKpis.totalProdutos)} />
               </div>
@@ -529,7 +531,7 @@ export default function Ranking() {
             {/* Tab Marcas */}
             <TabsContent value="marcas" className="space-y-6">
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                <KPICard icon={DollarSign} label="Total Vendido" value={formatBRL(marcaKpis.totalVendido)} />
+                {!isGerente && <KPICard icon={DollarSign} label="Total Vendido" value={formatBRL(marcaKpis.totalVendido)} />}
                 <KPICard icon={ShoppingCart} label="Qtd Total Vendida" value={Math.round(marcaKpis.totalQtd).toLocaleString('pt-BR')} />
                 <KPICard icon={Tag} label="Marcas Únicas" value={String(marcaKpis.totalMarcas)} />
               </div>
@@ -539,7 +541,7 @@ export default function Ranking() {
             {/* Tab Famílias */}
             <TabsContent value="familias" className="space-y-6">
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                <KPICard icon={DollarSign} label="Total Vendido" value={formatBRL(familiaKpis.totalVendido)} />
+                {!isGerente && <KPICard icon={DollarSign} label="Total Vendido" value={formatBRL(familiaKpis.totalVendido)} />}
                 <KPICard icon={ShoppingCart} label="Qtd Total Vendida" value={Math.round(familiaKpis.totalQtd).toLocaleString('pt-BR')} />
                 <KPICard icon={Layers} label="Famílias Únicas" value={String(familiaKpis.totalFamilias)} />
               </div>
