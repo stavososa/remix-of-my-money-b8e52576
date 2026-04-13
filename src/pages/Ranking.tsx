@@ -332,8 +332,10 @@ export default function Ranking() {
     { key: 'descricao_produto' as const, label: 'Produto' },
     { key: 'familia_produto' as const, label: 'Família' },
     { key: 'marca' as const, label: 'Marca' },
-    { key: 'total_vendido' as const, label: 'Faturamento', align: 'right' as const, render: (v: number) => fmtCompact(v) },
-    { key: 'lucro' as const, label: 'Lucro Real', align: 'right' as const, render: (v: number) => fmtCompact(v) },
+    ...(!isGerente ? [
+      { key: 'total_vendido' as const, label: 'Faturamento', align: 'right' as const, render: (v: number) => fmtCompact(v) },
+      { key: 'lucro' as const, label: 'Lucro Real', align: 'right' as const, render: (v: number) => fmtCompact(v) },
+    ] : []),
     { key: 'quantidade' as const, label: 'Quantidade', align: 'right' as const, render: (v: number) => Math.round(v).toLocaleString('pt-BR') },
   ];
 
@@ -520,9 +522,9 @@ export default function Ranking() {
                       <span className="font-bold text-foreground text-sm">{p.descricao_produto}</span>
                     </div>
                     <p className="text-xs text-secondary-foreground mb-2">{p.familia_produto} · {p.marca}</p>
-                    <div className="grid grid-cols-3 gap-2 text-sm">
-                      <div><span className="text-muted-foreground">Faturamento: </span><span className="font-semibold text-foreground">{fmtCompact(p.total_vendido)}</span></div>
-                      <div><span className="text-muted-foreground">Lucro: </span><span className="font-semibold text-foreground">{fmtCompact(p.lucro)}</span></div>
+                    <div className={`grid ${isGerente ? 'grid-cols-1' : 'grid-cols-3'} gap-2 text-sm`}>
+                      {!isGerente && <div><span className="text-muted-foreground">Faturamento: </span><span className="font-semibold text-foreground">{fmtCompact(p.total_vendido)}</span></div>}
+                      {!isGerente && <div><span className="text-muted-foreground">Lucro: </span><span className="font-semibold text-foreground">{fmtCompact(p.lucro)}</span></div>}
                       <div><span className="text-muted-foreground">Qtd: </span><span className="text-foreground">{Math.round(p.quantidade).toLocaleString('pt-BR')}</span></div>
                     </div>
                   </div>
@@ -537,7 +539,7 @@ export default function Ranking() {
                 <KPICard icon={ShoppingCart} label="Qtd Total Vendida" value={Math.round(marcaKpis.totalQtd).toLocaleString('pt-BR')} />
                 <KPICard icon={Tag} label="Marcas Únicas" value={String(marcaKpis.totalMarcas)} />
               </div>
-              <RankingTable data={marcaRanking} nameLabel="Marca" />
+              <RankingTable data={marcaRanking} nameLabel="Marca" hideFinancials={isGerente} />
             </TabsContent>
 
             {/* Tab Famílias */}
@@ -547,7 +549,7 @@ export default function Ranking() {
                 <KPICard icon={ShoppingCart} label="Qtd Total Vendida" value={Math.round(familiaKpis.totalQtd).toLocaleString('pt-BR')} />
                 <KPICard icon={Layers} label="Famílias Únicas" value={String(familiaKpis.totalFamilias)} />
               </div>
-              <RankingTable data={familiaRanking} nameLabel="Família" />
+              <RankingTable data={familiaRanking} nameLabel="Família" hideFinancials={isGerente} />
             </TabsContent>
           </Tabs>
         </div>
