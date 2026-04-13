@@ -144,7 +144,7 @@ export default function Gerencial() {
     }
   }, [isGerente, filial_gerente, unidadesList]);
 
-
+  const getFilial = useCallback((cnpj: string | null | undefined): string => {
     if (!cnpj) return 'Sem Filial';
     return cnpjFilialMap.get(normalizeCnpj(cnpj.trim())) ?? 'Sem Filial';
   }, [cnpjFilialMap]);
