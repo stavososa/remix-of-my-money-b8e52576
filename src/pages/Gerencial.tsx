@@ -176,11 +176,15 @@ export default function Gerencial() {
         nota_fiscal: string | null;
         cnpj_empresa: string | null;
       };
-      const { count, error: countErr } = await supabase
+      let countQuery = supabase
         .from('vendas')
         .select('*', { count: 'exact', head: true })
         .gte('data_emissao', startDate)
         .lte('data_emissao', endDate);
+      if (isGerente && gerenteCnpjs.length > 0) {
+        countQuery = countQuery.in('cnpj_empresa', gerenteCnpjs);
+      }
+      const { count, error: countErr } = await countQuery;
 
       if (countErr) throw countErr;
       if (!count || count === 0) return [];
