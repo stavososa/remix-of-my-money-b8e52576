@@ -136,7 +136,15 @@ export default function Gerencial() {
     return map;
   }, [unidadesList]);
 
-  const getFilial = useCallback((cnpj: string | null | undefined): string => {
+  // Force filial for gerente
+  useEffect(() => {
+    if (isGerente && filial_gerente && unidadesList?.length) {
+      const match = unidadesList.find(u => u.nome.toUpperCase() === filial_gerente.toUpperCase());
+      setFiltroUnidade([match ? match.nome : filial_gerente]);
+    }
+  }, [isGerente, filial_gerente, unidadesList]);
+
+
     if (!cnpj) return 'Sem Filial';
     return cnpjFilialMap.get(normalizeCnpj(cnpj.trim())) ?? 'Sem Filial';
   }, [cnpjFilialMap]);
