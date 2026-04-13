@@ -265,10 +265,17 @@ export default function Gerencial() {
 
     if (!allVendas) return { vendedores: [], unidades, familias: [], marcas: [] };
 
+    // For gerente, only show options from their branch's CNPJs
+    const gerenteCnpjs = isGerente && filial_gerente && unidadesList
+      ? new Set(unidadesList.filter(u => u.nome === filial_gerente && u.cnpj).map(u => normalizeCnpj(u.cnpj!.trim())))
+      : null;
+
     const vendedores = new Set<string>();
     const familias = new Set<string>();
     const marcas = new Set<string>();
     for (const row of allVendas) {
+      // Skip rows not matching gerente's branch
+      if (gerenteCnpjs && (!row.cnpj_empresa || !gerenteCnpjs.has(normalizeCnpj(row.cnpj_empresa.trim())))) continue;
       if (row.vendedor_nome) vendedores.add(row.vendedor_nome);
       if (row.familia_produto && row.familia_produto !== 'Outros') familias.add(row.familia_produto);
       if (row.marca && row.marca !== 'Sem Marca') marcas.add(row.marca);
@@ -279,7 +286,7 @@ export default function Gerencial() {
       marcas: [...marcas].sort(),
       unidades,
     };
-  }, [allVendas, unidadesList]);
+  }, [allVendas, unidadesList, isGerente, filial_gerente]);
 
   // Get CNPJs for a given filial (from unidades)
   const getCnpjsByFiliais = useCallback((filiais: string[]): string[] => {
