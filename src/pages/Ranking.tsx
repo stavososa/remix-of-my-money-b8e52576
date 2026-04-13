@@ -361,7 +361,7 @@ export default function Ranking() {
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-secondary-foreground">Total Vendido</p>
-                  <p className="text-2xl font-extrabold text-foreground">{formatBRL(top1.total_vendido)}</p>
+                  <p className="text-2xl font-extrabold text-foreground">{canSee(top1.unidade_nome) ? formatBRL(top1.total_vendido) : '—'}</p>
                 </div>
               </div>
             </div>
@@ -485,9 +485,9 @@ export default function Ranking() {
                     </div>
                     <p className="text-xs text-secondary-foreground mb-2">{r.unidade_nome}</p>
                     <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div><span className="text-muted-foreground">Faturamento: </span><span className="font-semibold text-foreground">{fmtCompact(r.total_vendido ?? 0)}</span></div>
-                      <div><span className="text-muted-foreground">Lucro: </span><span className="font-semibold text-foreground">{fmtCompact(r.lucro_total ?? 0)}</span></div>
-                      <div><span className="text-muted-foreground">Comissão: </span><span className="font-semibold text-foreground">{fmtCompact(r.total_comissao ?? 0)}</span></div>
+                      <div><span className="text-muted-foreground">Faturamento: </span><span className="font-semibold text-foreground">{censorVal(r.total_vendido ?? 0, r.unidade_nome)}</span></div>
+                      <div><span className="text-muted-foreground">Lucro: </span><span className="font-semibold text-foreground">{censorVal(r.lucro_total ?? 0, r.unidade_nome)}</span></div>
+                      <div><span className="text-muted-foreground">Comissão: </span><span className="font-semibold text-foreground">{censorVal(r.total_comissao ?? 0, r.unidade_nome)}</span></div>
                       <div><span className="text-muted-foreground">Notas: </span><span className="text-foreground">{r.qtd_notas ?? 0}</span></div>
                     </div>
                   </div>
