@@ -161,23 +161,36 @@ export default function Gerencial() {
     return cnpjs;
   }, [isGerente, filial_gerente, unidadesList]);
 
-  // ===== Gerente: filter options independent of date =====
+  // ===== Gerente: filter options independent of date (paginated) =====
   const { data: gerenteFilterOpts } = useQuery({
     queryKey: ['gerente-filter-options', gerenteCnpjs],
     enabled: isGerente && gerenteCnpjs.length > 0,
     staleTime: Infinity,
     queryFn: async () => {
-      const [vendRes, famRes, marcRes] = await Promise.all([
-        supabase.from('vendas').select('vendedor_nome').in('cnpj_empresa', gerenteCnpjs).not('vendedor_nome', 'is', null),
-        supabase.from('vendas').select('familia_produto').in('cnpj_empresa', gerenteCnpjs).not('familia_produto', 'is', null),
-        supabase.from('vendas').select('marca').in('cnpj_empresa', gerenteCnpjs).not('marca', 'is', null),
+      async function fetchAllDistinct(column: string, cnpjs: string[]) {
+        const pageSize = 1000;
+        const all = new Set<string>();
+        let offset = 0;
+        while (true) {
+          const { data, error } = await supabase
+            .from('vendas')
+            .select(column)
+            .in('cnpj_empresa', cnpjs)
+            .not(column, 'is', null)
+            .range(offset, offset + pageSize - 1);
+          if (error) throw error;
+          if (!data || data.length === 0) break;
+          data.forEach((r: any) => { if (r[column]) all.add(r[column] as string); });
+          if (data.length < pageSize) break;
+          offset += pageSize;
+        }
+        return [...all].sort();
+      }
+      const [vendedores, familias, marcas] = await Promise.all([
+        fetchAllDistinct('vendedor_nome', gerenteCnpjs),
+        fetchAllDistinct('familia_produto', gerenteCnpjs),
+        fetchAllDistinct('marca', gerenteCnpjs),
       ]);
-      if (vendRes.error) throw vendRes.error;
-      if (famRes.error) throw famRes.error;
-      if (marcRes.error) throw marcRes.error;
-      const vendedores = [...new Set((vendRes.data ?? []).map((r: any) => r.vendedor_nome as string))].sort();
-      const familias = [...new Set((famRes.data ?? []).map((r: any) => r.familia_produto as string).filter(f => f !== 'Outros'))].sort();
-      const marcas = [...new Set((marcRes.data ?? []).map((r: any) => r.marca as string).filter(m => m !== 'Sem Marca'))].sort();
       return { vendedores, familias, marcas };
     },
   });
