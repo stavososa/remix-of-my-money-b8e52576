@@ -492,35 +492,33 @@ export default function RankingComissoes() {
           )}
 
           {/* Top 10 Rankings */}
-          <Tabs defaultValue="produtos" className="space-y-4">
-            <TabsList className="flex flex-wrap h-auto gap-1">
-              <TabsTrigger value="produtos" className="text-xs sm:text-sm">Top 10 Produtos</TabsTrigger>
-              <TabsTrigger value="familias" className="text-xs sm:text-sm">Top 10 Famílias</TabsTrigger>
-              <TabsTrigger value="marcas" className="text-xs sm:text-sm">Top 10 Marcas</TabsTrigger>
-              {!isGerente && <TabsTrigger value="vendedores" className="text-xs sm:text-sm">Top 10 Vendedores</TabsTrigger>}
-              {!isGerente && <TabsTrigger value="filiais" className="text-xs sm:text-sm">Top 10 Filiais</TabsTrigger>}
-            </TabsList>
+          {!isGerente && (
+            <Tabs defaultValue="produtos" className="space-y-4">
+              <TabsList className="flex flex-wrap h-auto gap-1">
+                <TabsTrigger value="produtos" className="text-xs sm:text-sm">Top 10 Produtos</TabsTrigger>
+                <TabsTrigger value="familias" className="text-xs sm:text-sm">Top 10 Famílias</TabsTrigger>
+                <TabsTrigger value="marcas" className="text-xs sm:text-sm">Top 10 Marcas</TabsTrigger>
+                <TabsTrigger value="vendedores" className="text-xs sm:text-sm">Top 10 Vendedores</TabsTrigger>
+                <TabsTrigger value="filiais" className="text-xs sm:text-sm">Top 10 Filiais</TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="produtos">
-              <RankingSection data={byProduto} title="Top 10 Produtos por Comissão" nameLabel="Produto" limit={10} icon={Package} hideFinancials={isGerente} />
-            </TabsContent>
-            <TabsContent value="familias">
-              <RankingSection data={byFamilia} title="Top 10 Famílias por Comissão" nameLabel="Família" limit={10} icon={Layers} hideFinancials={isGerente} />
-            </TabsContent>
-            <TabsContent value="marcas">
-              <RankingSection data={byMarca} title="Top 10 Marcas por Comissão" nameLabel="Marca" limit={10} icon={Tag} hideFinancials={isGerente} />
-            </TabsContent>
-            {!isGerente && (
+              <TabsContent value="produtos">
+                <RankingSection data={byProduto} title="Top 10 Produtos por Comissão" nameLabel="Produto" limit={10} icon={Package} />
+              </TabsContent>
+              <TabsContent value="familias">
+                <RankingSection data={byFamilia} title="Top 10 Famílias por Comissão" nameLabel="Família" limit={10} icon={Layers} />
+              </TabsContent>
+              <TabsContent value="marcas">
+                <RankingSection data={byMarca} title="Top 10 Marcas por Comissão" nameLabel="Marca" limit={10} icon={Tag} />
+              </TabsContent>
               <TabsContent value="vendedores">
                 <RankingSection data={byVendedor} title="Top 10 Vendedores por Comissão" nameLabel="Vendedor" limit={10} icon={Users} />
               </TabsContent>
-            )}
-            {!isGerente && (
               <TabsContent value="filiais">
                 <RankingSection data={byFilial} title="Top 10 Filiais por Comissão" nameLabel="Filial" limit={10} icon={Building2} />
               </TabsContent>
-            )}
-          </Tabs>
+            </Tabs>
+          )}
 
           {/* Rankings Completos */}
           <Tabs defaultValue="produtos-full" className="space-y-4">
