@@ -5,6 +5,7 @@ import { DataTable } from '@/components/DataTable';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { usePeriod } from '@/contexts/PeriodContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { X, Search, DollarSign, TrendingUp, Percent, ShoppingCart, FileText, ChevronDown, Check } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Input } from '@/components/ui/input';
@@ -76,6 +77,8 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
 };
 
 export default function Gerencial() {
+  const { role, filial_gerente } = useAuth();
+  const isGerente = role === 'gerente';
   const isMobile = useIsMobile();
   const { periodoAno, periodoMes, dataInicio, dataFim } = usePeriod();
   const [filtroUnidade, setFiltroUnidade] = useState<string[]>([]);
@@ -86,8 +89,17 @@ export default function Gerencial() {
   const [searchDebounced, setSearchDebounced] = useState('');
   const [tabelaPagina, setTabelaPagina] = useState(1);
 
+  // Force filial for gerente
   useEffect(() => {
-    setFiltroUnidade([]);
+    if (isGerente && filial_gerente) {
+      setFiltroUnidade([filial_gerente]);
+    }
+  }, [isGerente, filial_gerente]);
+
+  useEffect(() => {
+    if (!isGerente) {
+      setFiltroUnidade([]);
+    }
     setFiltroVendedor('all');
     setFiltroFamilia('all');
     setFiltroMarca('all');
@@ -381,7 +393,13 @@ export default function Gerencial() {
         </div>
         {/* Filters */}
         <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-3">
-          <MultiFilterSelect label="Filial" selected={filtroUnidade} onChange={(v) => { setFiltroUnidade(v); setTabelaPagina(1); }} options={filtros.unidades} allLabel="Todas as Filiais" />
+          {isGerente ? (
+            <div className="bg-secondary/50 border border-border rounded-md px-2 sm:px-3 py-2 text-xs sm:text-sm text-foreground opacity-70">
+              Filial: {filial_gerente}
+            </div>
+          ) : (
+            <MultiFilterSelect label="Filial" selected={filtroUnidade} onChange={(v) => { setFiltroUnidade(v); setTabelaPagina(1); }} options={filtros.unidades} allLabel="Todas as Filiais" />
+          )}
           <FilterSelect label="Vendedor" value={filtroVendedor} onChange={handleFilterChange(setFiltroVendedor)} options={filtros.vendedores.map(v => ({ value: v, label: v }))} allLabel="Todos os Vendedores" />
           <FilterSelect label="Família" value={filtroFamilia} onChange={handleFilterChange(setFiltroFamilia)} options={filtros.familias.map(f => ({ value: f, label: f }))} allLabel="Todas as Famílias" />
           <FilterSelect label="Marca" value={filtroMarca} onChange={handleFilterChange(setFiltroMarca)} options={filtros.marcas.map(m => ({ value: m, label: m }))} allLabel="Todas as Marcas" />

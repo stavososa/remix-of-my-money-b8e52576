@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { PeriodProvider } from "@/contexts/PeriodContext";
-import { RequireAuth, RequireAdmin, RedirectByRole } from "@/components/auth/RouteGuards";
+import { RequireAuth, RequireAdmin, RequireAdminOrGerente, RedirectByRole } from "@/components/auth/RouteGuards";
 
 // Lazy loaded pages — code splitting para reduzir bundle inicial
 const Login = lazy(() => import("./pages/Login"));
@@ -58,11 +58,11 @@ const App = () => (
                 <Route path="/" element={<RequireAuth><RedirectByRole /></RequireAuth>} />
                 <Route path="/ranking" element={<RequireAuth><Ranking /></RequireAuth>} />
                 <Route path="/meu-painel" element={<RequireAuth><MeuPainel /></RequireAuth>} />
-                <Route path="/gerencial" element={<RequireAuth><RequireAdmin><Gerencial /></RequireAdmin></RequireAuth>} />
+                <Route path="/gerencial" element={<RequireAuth><RequireAdminOrGerente><Gerencial /></RequireAdminOrGerente></RequireAuth>} />
                 <Route path="/admin/regras" element={<RequireAuth><RequireAdmin><AdminRegras /></RequireAdmin></RequireAuth>} />
                 <Route path="/admin/importar" element={<RequireAuth><RequireAdmin><AdminImportar /></RequireAdmin></RequireAuth>} />
                 <Route path="/admin/bonificacao" element={<RequireAuth><RequireAdmin><AdminBonificacao /></RequireAdmin></RequireAuth>} />
-                <Route path="/admin/ranking-comissoes" element={<RequireAuth><RequireAdmin><RankingComissoes /></RequireAdmin></RequireAuth>} />
+                <Route path="/admin/ranking-comissoes" element={<RequireAuth><RequireAdminOrGerente><RankingComissoes /></RequireAdminOrGerente></RequireAuth>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

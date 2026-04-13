@@ -3,6 +3,7 @@ import { AppShell } from '@/components/AppShell';
 import { KPICard } from '@/components/KPICard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { usePeriod } from '@/contexts/PeriodContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { Trophy, DollarSign, Users, Receipt, Crown, Package, ShoppingCart, Tag, Layers, Gift } from 'lucide-react';
@@ -95,6 +96,10 @@ function RankingTable({ data, nameLabel }: { data: RankedItem[]; nameLabel: stri
 }
 
 export default function Ranking() {
+  const { role, filial_gerente } = useAuth();
+  const isGerente = role === 'gerente';
+  const canSee = (unidadeNome: string | null) => !isGerente || (unidadeNome ?? '').toUpperCase() === (filial_gerente ?? '').toUpperCase();
+  const censorVal = (v: number, unidade: string | null) => canSee(unidade) ? fmtCompact(v) : '—';
   const [selectedBonificacao, setSelectedBonificacao] = useState<Bonificacao | null>(null);
   const { periodoAno, periodoMes, dataInicio, dataFim, loading: loadingPeriodo } = usePeriod();
 
@@ -313,10 +318,10 @@ export default function Ranking() {
     { key: 'vendedor_nome' as const, label: 'Vendedor' },
     { key: 'unidade_nome' as const, label: 'Unidade' },
     { key: 'regime' as const, label: 'Regime', render: (v: string | null) => v ? <StatusBadge status={v} /> : '—' },
-    { key: 'total_vendido' as const, label: 'Faturamento', align: 'right' as const, render: (v: number | null) => fmtCompact(v ?? 0) },
-    { key: 'lucro_total' as const, label: 'Lucro Real', align: 'right' as const, render: (v: number | null) => fmtCompact(v ?? 0) },
-    { key: 'total_comissao' as const, label: 'Comissão', align: 'right' as const, render: (v: number | null) => fmtCompact(v ?? 0) },
-    { key: 'percentual_aplicado' as const, label: '% Comissão', align: 'right' as const, render: (v: number | null) => formatPct(v) },
+    { key: 'total_vendido' as const, label: 'Faturamento', align: 'right' as const, render: (v: number | null, row: any) => censorVal(v ?? 0, row.unidade_nome) },
+    { key: 'lucro_total' as const, label: 'Lucro Real', align: 'right' as const, render: (v: number | null, row: any) => censorVal(v ?? 0, row.unidade_nome) },
+    { key: 'total_comissao' as const, label: 'Comissão', align: 'right' as const, render: (v: number | null, row: any) => censorVal(v ?? 0, row.unidade_nome) },
+    { key: 'percentual_aplicado' as const, label: '% Comissão', align: 'right' as const, render: (v: number | null, row: any) => canSee(row.unidade_nome) ? formatPct(v) : '—' },
     { key: 'qtd_notas' as const, label: 'Notas', align: 'right' as const },
   ];
 
@@ -356,7 +361,7 @@ export default function Ranking() {
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-secondary-foreground">Total Vendido</p>
-                  <p className="text-2xl font-extrabold text-foreground">{formatBRL(top1.total_vendido)}</p>
+                  <p className="text-2xl font-extrabold text-foreground">{canSee(top1.unidade_nome) ? formatBRL(top1.total_vendido) : '—'}</p>
                 </div>
               </div>
             </div>
@@ -480,9 +485,9 @@ export default function Ranking() {
                     </div>
                     <p className="text-xs text-secondary-foreground mb-2">{r.unidade_nome}</p>
                     <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div><span className="text-muted-foreground">Faturamento: </span><span className="font-semibold text-foreground">{fmtCompact(r.total_vendido ?? 0)}</span></div>
-                      <div><span className="text-muted-foreground">Lucro: </span><span className="font-semibold text-foreground">{fmtCompact(r.lucro_total ?? 0)}</span></div>
-                      <div><span className="text-muted-foreground">Comissão: </span><span className="font-semibold text-foreground">{fmtCompact(r.total_comissao ?? 0)}</span></div>
+                      <div><span className="text-muted-foreground">Faturamento: </span><span className="font-semibold text-foreground">{censorVal(r.total_vendido ?? 0, r.unidade_nome)}</span></div>
+                      <div><span className="text-muted-foreground">Lucro: </span><span className="font-semibold text-foreground">{censorVal(r.lucro_total ?? 0, r.unidade_nome)}</span></div>
+                      <div><span className="text-muted-foreground">Comissão: </span><span className="font-semibold text-foreground">{censorVal(r.total_comissao ?? 0, r.unidade_nome)}</span></div>
                       <div><span className="text-muted-foreground">Notas: </span><span className="text-foreground">{r.qtd_notas ?? 0}</span></div>
                     </div>
                   </div>

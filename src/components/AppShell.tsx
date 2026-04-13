@@ -10,23 +10,27 @@ interface NavItem {
   label: string;
   to: string;
   icon: React.ElementType;
-  roles: ('admin' | 'vendedor')[];
+  roles: ('admin' | 'vendedor' | 'gerente')[];
 }
 
 const navItems: NavItem[] = [
-  { label: 'Ranking', to: '/ranking', icon: Trophy, roles: ['admin', 'vendedor'] },
+  { label: 'Ranking', to: '/ranking', icon: Trophy, roles: ['admin', 'vendedor', 'gerente'] },
   { label: 'Meu Painel', to: '/meu-painel', icon: User, roles: ['admin', 'vendedor'] },
-  { label: 'Gerencial', to: '/gerencial', icon: BarChart3, roles: ['admin'] },
+  { label: 'Gerencial', to: '/gerencial', icon: BarChart3, roles: ['admin', 'gerente'] },
 ];
-
 
 const adminItems: NavItem[] = [
   { label: 'Regras de Comissão', to: '/admin/regras', icon: FileText, roles: ['admin'] },
   { label: 'Importar Dados', to: '/admin/importar', icon: Download, roles: ['admin'] },
   { label: 'Bonificação', to: '/admin/bonificacao', icon: Gift, roles: ['admin'] },
-  { label: 'Ranking Comissões', to: '/admin/ranking-comissoes', icon: DollarSign, roles: ['admin'] },
+  { label: 'Ranking Comissões', to: '/admin/ranking-comissoes', icon: DollarSign, roles: ['admin', 'gerente'] },
 ];
 
+const roleBadge = (role: string | null) => {
+  if (role === 'admin') return { text: 'Admin', variant: 'gold' as const };
+  if (role === 'gerente') return { text: 'Gerente', variant: 'gold' as const };
+  return { text: 'Vendedor', variant: 'silver' as const };
+};
 
 export function AppShell({ children, title }: {children: React.ReactNode;title: string;}) {
   const { role, nome_completo, user, signOut } = useAuth();
@@ -37,6 +41,7 @@ export function AppShell({ children, title }: {children: React.ReactNode;title: 
   const filteredAdmin = adminItems.filter((i) => role && i.roles.includes(role));
 
   const initials = (nome_completo || user?.email || '?').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+  const badge = roleBadge(role);
 
   const SidebarContent = () =>
   <>
@@ -79,9 +84,7 @@ export function AppShell({ children, title }: {children: React.ReactNode;title: 
           isActive ?
           'bg-sidebar-accent text-foreground border-l-2 border-primary' :
           'text-sidebar-foreground hover:bg-sidebar-accent/50'}`
-
           }>
-
                 <item.icon className="h-4 w-4" />
                 {item.label}
               </NavLink>
@@ -93,18 +96,16 @@ export function AppShell({ children, title }: {children: React.ReactNode;title: 
       <div className="p-4 border-t border-sidebar-border space-y-3">
         <div>
           <p className="text-sm font-medium text-foreground truncate">{nome_completo || user?.email}</p>
-          <CustomBadge text={role === 'admin' ? 'Admin' : 'Vendedor'} variant={role === 'admin' ? 'gold' : 'silver'} />
+          <CustomBadge text={badge.text} variant={badge.variant} />
         </div>
         <button
         onClick={signOut}
         className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-colors">
-
           <LogOut className="h-4 w-4" />
           Sair
         </button>
       </div>
     </>;
-
 
   return (
     <div className="flex min-h-screen">
@@ -151,5 +152,4 @@ export function AppShell({ children, title }: {children: React.ReactNode;title: 
         </main>
       </div>
     </div>);
-
 }
