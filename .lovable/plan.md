@@ -1,41 +1,61 @@
 
 
-## Plano: Desativar RLS e restaurar acesso aos dados
+## Plano: Controle de acesso por filial via email (role "gerente")
 
-### Problema
-O erro "infinite recursion detected in policy for relation perfis" bloqueia **todas** as consultas (vendas, perfis, etc.) porque as políticas RLS da tabela `perfis` referenciam a própria tabela, criando um loop infinito.
+### Contexto
+Hoje existem dois roles: `admin` (vê tudo) e `vendedor` (vê só o próprio). O pedido é criar um nível intermediário — **gerente de filial** — mapeado por email, onde:
+- `matrizatacadao@proton.me` → gerente da filial **Matriz**
+- `recreioatacadao@proton.me` → gerente da filial **Recreio**
 
-### Solução
+### Regras de acesso do gerente
+1. **Dados completos** da sua filial (faturamento, lucro, comissões, vendedores)
+2. **Rankings censurados** para outras filiais: vê posições (#1, #2...) mas **sem valores financeiros** (faturamento, lucro, comissão aparecem como "—")
+3. Acesso às páginas: Ranking, Ranking Comissões, e um painel gerencial **filtrado** para sua filial
+4. **Sem acesso** às páginas de admin (Regras, Importar, Bonificação)
 
-Como o banco de dados está no seu projeto Supabase externo (`tdbuhbppxztuloncplqj`), você precisa executar o SQL abaixo no **SQL Editor** do Supabase:
+### Implementação
 
-```sql
--- 1. Remover todas as políticas problemáticas da tabela perfis
-DROP POLICY IF EXISTS "perfis_select" ON public.perfis;
-DROP POLICY IF EXISTS "perfis_update" ON public.perfis;
-DROP POLICY IF EXISTS "Permitir leitura do próprio perfil" ON public.perfis;
-DROP POLICY IF EXISTS "Permitir leitura admin" ON public.perfis;
-DROP POLICY IF EXISTS "Permitir update próprio perfil" ON public.perfis;
-DROP POLICY IF EXISTS "Admin pode ver todos" ON public.perfis;
-DROP POLICY IF EXISTS "Users can view own profile" ON public.perfis;
-DROP POLICY IF EXISTS "Admins can view all profiles" ON public.perfis;
+#### 1. Criar perfis no banco para os gerentes
+- Inserir registros na tabela `perfis` com um novo role `gerente` para cada email
+- Associar cada perfil a uma `unidade_id` (filial) — adicionar coluna `unidade_id` na tabela `perfis` se não existir
 
--- 2. Desativar RLS nas tabelas afetadas
-ALTER TABLE public.perfis DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.vendas DISABLE ROW LEVEL SECURITY;
+#### 2. Atualizar AuthContext
+- Expandir o type de `role` para incluir `'gerente'`
+- Carregar `unidade_id` e `unidade_nome` do perfil do gerente (sem precisar de `vendedor_id`)
+- Expor `filial_id` no contexto para uso nos filtros
 
--- 3. Manter RLS desativado em controle_pj também (se aplicável)
-ALTER TABLE public.controle_pj DISABLE ROW LEVEL SECURITY;
-```
+#### 3. Atualizar RouteGuards
+- `RequireAdmin` → continua bloqueando gerentes (só admin)
+- Criar `RequireAdminOrGerente` para páginas que ambos acessam (Gerencial com filtro)
+- `RedirectByRole` → gerente redireciona para `/gerencial` (filtrado)
 
-### O que muda
-- **Todas as tabelas** voltarão a funcionar imediatamente para qualquer usuário autenticado
-- O Gerencial, Ranking e Meu Painel carregarão os dados normalmente
-- A segurança de acesso (admin vs vendedor) continuará sendo feita **no frontend** via `AuthContext` e `RouteGuards`
+#### 4. Atualizar AppShell (navegação)
+- Gerente vê: Ranking, Gerencial (filtrado), Ranking Comissões
+- Gerente **não vê**: Regras, Importar, Bonificação
 
-### Próximo passo (futuro)
-Depois de restaurar o acesso, podemos implementar controle de visibilidade de dados via **views filtradas** ou **funções SECURITY DEFINER** no lugar de RLS direto, evitando recursão.
+#### 5. Página Ranking — censura de valores
+- Se `role === 'gerente'`:
+  - Na aba Vendedores: mostrar nome/posição de todos, mas colunas de Faturamento/Lucro/Comissão exibem "—" para vendedores de **outras filiais**
+  - Nas abas Produtos/Marcas/Famílias: mostrar dados completos **apenas da filial do gerente**, censurar valores de itens agregados de outras filiais
 
-### Ação necessária
-Execute o SQL acima no SQL Editor do seu Supabase: https://supabase.com/dashboard/project/tdbuhbppxztuloncplqj/sql e depois recarregue o app.
+#### 6. Página RankingComissoes — mesma lógica de censura
+- KPIs mostram apenas dados da filial do gerente
+- Rankings: posições visíveis, valores censurados para itens de outras filiais
+
+#### 7. Página Gerencial — filtro forçado
+- Se `role === 'gerente'`: forçar filtro de filial para a unidade do gerente, sem permitir trocar
+
+#### 8. Criar contas de autenticação
+- Criar os usuários `matrizatacadao@proton.me` e `recreioatacadao@proton.me` no auth do Supabase externo
+- Inserir os perfis com role `gerente` e `unidade_id` correspondente
+
+### Arquivos modificados
+- `src/contexts/AuthContext.tsx` — novo role + filial_id
+- `src/components/auth/RouteGuards.tsx` — novo guard
+- `src/components/AppShell.tsx` — navegação condicional
+- `src/pages/Ranking.tsx` — censura de valores por filial
+- `src/pages/RankingComissoes.tsx` — censura de valores por filial  
+- `src/pages/Gerencial.tsx` — filtro forçado por filial
+- `src/App.tsx` — rotas com novo guard
+- Migração SQL: coluna `unidade_id` em `perfis` + inserção dos perfis
 
