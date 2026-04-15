@@ -181,7 +181,9 @@ export default function RankingComissoes() {
   const isGerente = role === 'gerente';
   const { periodoAno, periodoMes, dataInicio, dataFim, loading: loadingPeriodo } = usePeriod();
   const [filtroFilial, setFiltroFilial] = useState<string[]>([]);
-  const [filtroVendedor, setFiltroVendedor] = useState('all');
+  const [filtroVendedor, setFiltroVendedor] = useState<string[]>([]);
+  const [filtroFamilia, setFiltroFamilia] = useState<string[]>([]);
+  const [filtroMarca, setFiltroMarca] = useState<string[]>([]);
 
   // Force filial filter for gerente
   useEffect(() => {
@@ -194,20 +196,10 @@ export default function RankingComissoes() {
     if (!isGerente) {
       setFiltroFilial([]);
     }
-    setFiltroVendedor('all');
+    setFiltroVendedor([]);
+    setFiltroFamilia([]);
+    setFiltroMarca([]);
   }, [periodoAno, periodoMes]);
-
-  // Reset vendedor when filial changes (vendor might not exist in new filial)
-  useEffect(() => {
-    if (filtroFilial.length > 0 && filtroVendedor !== 'all') {
-      const vendedoresNaFilial = new Set(
-        comissoesCalculadas.filter(c => filtroFilial.includes(c.filial)).map(c => c.vendedor)
-      );
-      if (!vendedoresNaFilial.has(filtroVendedor)) {
-        setFiltroVendedor('all');
-      }
-    }
-  }, [filtroFilial]);
 
   // Fetch unidades for CNPJ -> Filial mapping
   const { data: unidadesList = [] } = useQuery({
@@ -357,10 +349,12 @@ export default function RankingComissoes() {
   const filtered = useMemo(() => {
     return comissoesCalculadas.filter(c => {
       if (filtroFilial.length > 0 && !filtroFilial.includes(c.filial)) return false;
-      if (filtroVendedor !== 'all' && c.vendedor !== filtroVendedor) return false;
+      if (filtroVendedor.length > 0 && !filtroVendedor.includes(c.vendedor)) return false;
+      if (filtroFamilia.length > 0 && !filtroFamilia.includes(c.familia_produto)) return false;
+      if (filtroMarca.length > 0 && !filtroMarca.includes(c.marca)) return false;
       return true;
     });
-  }, [comissoesCalculadas, filtroFilial, filtroVendedor]);
+  }, [comissoesCalculadas, filtroFilial, filtroVendedor, filtroFamilia, filtroMarca]);
 
   // Aggregations
   const totalComissao = useMemo(() => filtered.reduce((s, c) => s + c.valor_comissao, 0), [filtered]);
@@ -381,6 +375,14 @@ export default function RankingComissoes() {
       : comissoesCalculadas;
     return [...new Set(source.map(c => c.vendedor))].sort();
   }, [comissoesCalculadas, filtroFilial]);
+
+  const familias = useMemo(() => {
+    return [...new Set(comissoesCalculadas.map(c => c.familia_produto))].sort();
+  }, [comissoesCalculadas]);
+
+  const marcas = useMemo(() => {
+    return [...new Set(comissoesCalculadas.map(c => c.marca))].sort();
+  }, [comissoesCalculadas]);
 
   const isLoading = loadingPeriodo || loadVendas || loadRegras;
 
@@ -445,25 +447,88 @@ export default function RankingComissoes() {
                   <PopoverTrigger asChild>
                     <button className="flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-secondary text-sm hover:bg-secondary/80 transition-colors">
                       <Users className="h-4 w-4 text-muted-foreground" />
-                      {filtroVendedor === 'all' ? 'Todos os Vendedores' : filtroVendedor}
+                      {filtroVendedor.length === 0 ? 'Todos os Vendedores' : `${filtroVendedor.length} vendedor(es)`}
                       <ChevronDown className="h-3 w-3 text-muted-foreground" />
                     </button>
                   </PopoverTrigger>
                   <PopoverContent className="w-64 p-2 max-h-64 overflow-auto" align="start">
-                    <button onClick={() => setFiltroVendedor('all')} className={`w-full text-left px-2 py-1.5 rounded text-sm ${filtroVendedor === 'all' ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-secondary'}`}>
+                    <button onClick={() => setFiltroVendedor([])} className={`w-full text-left px-2 py-1.5 rounded text-sm ${filtroVendedor.length === 0 ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-secondary'}`}>
                       Todos
                     </button>
                     {vendedores.map(v => (
-                      <button key={v} onClick={() => setFiltroVendedor(v)} className={`w-full text-left px-2 py-1.5 rounded text-sm truncate ${filtroVendedor === v ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-secondary'}`}>
-                        {v}
-                      </button>
+                      <label key={v} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-secondary cursor-pointer text-sm">
+                        <Checkbox
+                          checked={filtroVendedor.includes(v)}
+                          onCheckedChange={(checked) => {
+                            setFiltroVendedor(prev => checked ? [...prev, v] : prev.filter(x => x !== v));
+                          }}
+                        />
+                        <span className="truncate">{v}</span>
+                      </label>
+                    ))}
+                  </PopoverContent>
+                </Popover>
+
+                {/* Família filter */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button className="flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-secondary text-sm hover:bg-secondary/80 transition-colors">
+                      <Layers className="h-4 w-4 text-muted-foreground" />
+                      {filtroFamilia.length === 0 ? 'Todas as Famílias' : `${filtroFamilia.length} família(s)`}
+                      <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-2 max-h-64 overflow-auto" align="start">
+                    <button onClick={() => setFiltroFamilia([])} className={`w-full text-left px-2 py-1.5 rounded text-sm ${filtroFamilia.length === 0 ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-secondary'}`}>
+                      Todas
+                    </button>
+                    {familias.map(f => (
+                      <label key={f} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-secondary cursor-pointer text-sm">
+                        <Checkbox
+                          checked={filtroFamilia.includes(f)}
+                          onCheckedChange={(checked) => {
+                            setFiltroFamilia(prev => checked ? [...prev, f] : prev.filter(x => x !== f));
+                          }}
+                        />
+                        <span className="truncate">{f}</span>
+                      </label>
+                    ))}
+                  </PopoverContent>
+                </Popover>
+
+                {/* Marca filter */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button className="flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-secondary text-sm hover:bg-secondary/80 transition-colors">
+                      <Tag className="h-4 w-4 text-muted-foreground" />
+                      {filtroMarca.length === 0 ? 'Todas as Marcas' : `${filtroMarca.length} marca(s)`}
+                      <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-2 max-h-64 overflow-auto" align="start">
+                    <button onClick={() => setFiltroMarca([])} className={`w-full text-left px-2 py-1.5 rounded text-sm ${filtroMarca.length === 0 ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-secondary'}`}>
+                      Todas
+                    </button>
+                    {marcas.map(m => (
+                      <label key={m} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-secondary cursor-pointer text-sm">
+                        <Checkbox
+                          checked={filtroMarca.includes(m)}
+                          onCheckedChange={(checked) => {
+                            setFiltroMarca(prev => checked ? [...prev, m] : prev.filter(x => x !== m));
+                          }}
+                        />
+                        <span className="truncate">{m}</span>
+                      </label>
                     ))}
                   </PopoverContent>
                 </Popover>
 
                 {/* Active filter badges */}
-                {(isGerente ? filtroVendedor !== 'all' : (filtroFilial.length > 0 || filtroVendedor !== 'all')) && (
-                  <button onClick={() => { if (!isGerente) setFiltroFilial([]); setFiltroVendedor('all'); }} className="text-xs text-destructive hover:underline flex items-center gap-1">
+                {(isGerente
+                  ? (filtroVendedor.length > 0 || filtroFamilia.length > 0 || filtroMarca.length > 0)
+                  : (filtroFilial.length > 0 || filtroVendedor.length > 0 || filtroFamilia.length > 0 || filtroMarca.length > 0)
+                ) && (
+                  <button onClick={() => { if (!isGerente) setFiltroFilial([]); setFiltroVendedor([]); setFiltroFamilia([]); setFiltroMarca([]); }} className="text-xs text-destructive hover:underline flex items-center gap-1">
                     <X className="h-3 w-3" /> Limpar filtros
                   </button>
                 )}
