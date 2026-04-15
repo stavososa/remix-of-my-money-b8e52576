@@ -376,6 +376,14 @@ export default function RankingComissoes() {
     return [...new Set(source.map(c => c.vendedor))].sort();
   }, [comissoesCalculadas, filtroFilial]);
 
+  const familias = useMemo(() => {
+    return [...new Set(comissoesCalculadas.map(c => c.familia_produto))].sort();
+  }, [comissoesCalculadas]);
+
+  const marcas = useMemo(() => {
+    return [...new Set(comissoesCalculadas.map(c => c.marca))].sort();
+  }, [comissoesCalculadas]);
+
   const isLoading = loadingPeriodo || loadVendas || loadRegras;
 
   return (
