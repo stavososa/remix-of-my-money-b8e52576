@@ -181,7 +181,9 @@ export default function RankingComissoes() {
   const isGerente = role === 'gerente';
   const { periodoAno, periodoMes, dataInicio, dataFim, loading: loadingPeriodo } = usePeriod();
   const [filtroFilial, setFiltroFilial] = useState<string[]>([]);
-  const [filtroVendedor, setFiltroVendedor] = useState('all');
+  const [filtroVendedor, setFiltroVendedor] = useState<string[]>([]);
+  const [filtroFamilia, setFiltroFamilia] = useState<string[]>([]);
+  const [filtroMarca, setFiltroMarca] = useState<string[]>([]);
 
   // Force filial filter for gerente
   useEffect(() => {
