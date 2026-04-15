@@ -349,10 +349,12 @@ export default function RankingComissoes() {
   const filtered = useMemo(() => {
     return comissoesCalculadas.filter(c => {
       if (filtroFilial.length > 0 && !filtroFilial.includes(c.filial)) return false;
-      if (filtroVendedor !== 'all' && c.vendedor !== filtroVendedor) return false;
+      if (filtroVendedor.length > 0 && !filtroVendedor.includes(c.vendedor)) return false;
+      if (filtroFamilia.length > 0 && !filtroFamilia.includes(c.familia_produto)) return false;
+      if (filtroMarca.length > 0 && !filtroMarca.includes(c.marca)) return false;
       return true;
     });
-  }, [comissoesCalculadas, filtroFilial, filtroVendedor]);
+  }, [comissoesCalculadas, filtroFilial, filtroVendedor, filtroFamilia, filtroMarca]);
 
   // Aggregations
   const totalComissao = useMemo(() => filtered.reduce((s, c) => s + c.valor_comissao, 0), [filtered]);
