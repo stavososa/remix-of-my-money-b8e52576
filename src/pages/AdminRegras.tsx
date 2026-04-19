@@ -638,13 +638,17 @@ export default function AdminRegras() {
         ) : (
           <>
             <div className="hidden md:block">
-              <DataTable columns={columns as any} data={regras} />
+              <DataTable
+                columns={columns as any}
+                data={regras}
+                rowClassName={(row: any) => `${row.ativo ? '' : 'opacity-50'} ${row.ativo ? 'bg-transparent' : 'bg-muted/20'}`}
+              />
             </div>
             <div className="md:hidden space-y-3">
               {regras.map((r: any) => {
                 const prio = PRIORIDADE_LABELS[r.prioridade ?? 0] ?? PRIORIDADE_LABELS[0];
                 return (
-                  <div key={r.id} className="bg-card border border-border rounded-lg p-4 shadow-card">
+                  <div key={r.id} className={`bg-card border border-border rounded-lg p-4 shadow-card transition-opacity ${r.ativo ? '' : 'opacity-50'}`}>
                     <div className="flex justify-between items-start mb-2">
                       <div>
                         <p className="font-bold text-foreground">{r.nome}</p>
