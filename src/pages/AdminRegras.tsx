@@ -472,15 +472,24 @@ export default function AdminRegras() {
     },
     {
       key: 'familia_produto' as const, label: 'Família',
-      render: (v: string | null) => v ? <span className="text-xs text-foreground">{v}</span> : <span className="text-muted-foreground text-xs">—</span>,
+      render: (v: string | null, row: RegraRow) => {
+        // Se há produto cadastrado e a família está vazia, mostramos a família/marca derivada do produto se possível
+        if (v) return <span className="text-xs text-foreground">{v}</span>;
+        if ((row as any).produto) return <span className="text-xs text-muted-foreground italic">(via produto)</span>;
+        return <span className="text-muted-foreground text-xs">—</span>;
+      },
     },
     {
       key: 'marca' as const, label: 'Marca',
-      render: (v: string | null) => v ? <span className="text-xs text-foreground">{v}</span> : <span className="text-muted-foreground text-xs">—</span>,
+      render: (v: string | null, row: RegraRow) => {
+        if (v) return <span className="text-xs text-foreground">{v}</span>;
+        if ((row as any).produto) return <span className="text-xs text-muted-foreground italic">(via produto)</span>;
+        return <span className="text-muted-foreground text-xs">—</span>;
+      },
     },
     {
       key: 'produto' as const, label: 'Produto',
-      render: (v: string | null) => v ? <span className="text-xs text-foreground max-w-[150px] truncate block">{v}</span> : <span className="text-muted-foreground text-xs">—</span>,
+      render: (v: string | null) => v ? <span className="text-xs text-foreground max-w-[150px] truncate block" title={v}>{v}</span> : <span className="text-muted-foreground text-xs">—</span>,
     },
     {
       key: 'min_faturamento' as const, label: 'Min. Fat.',
@@ -500,12 +509,18 @@ export default function AdminRegras() {
     {
       key: 'ativo' as const, label: 'Status',
       render: (v: boolean, row: RegraRow) => (
-        <button
-          onClick={(e) => { e.stopPropagation(); toggleAtivo.mutate({ id: row.id, ativo: !v }); }}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${v ? 'bg-success' : 'bg-secondary'}`}
-        >
-          <span className={`inline-block h-4 w-4 rounded-full bg-foreground transition-transform ${v ? 'translate-x-6' : 'translate-x-1'}`} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={(e) => { e.stopPropagation(); toggleAtivo.mutate({ id: row.id, ativo: !v }); }}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${v ? 'bg-success shadow-[0_0_8px_hsl(var(--success)/0.5)]' : 'bg-secondary'}`}
+            aria-label={v ? 'Desativar regra' : 'Ativar regra'}
+          >
+            <span className={`inline-block h-4 w-4 rounded-full bg-foreground transition-transform ${v ? 'translate-x-6' : 'translate-x-1'}`} />
+          </button>
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${v ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'}`}>
+            {v ? 'Ativo' : 'Inativo'}
+          </span>
+        </div>
       ),
     },
     {
