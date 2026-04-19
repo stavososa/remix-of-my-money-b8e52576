@@ -452,6 +452,130 @@ export default function RankingComissoes() {
 
   const isLoading = loadingPeriodo || loadVendas || loadRegras;
 
+  // Vendas sem regra também filtradas (mesma lógica dos filtros)
+  const filteredSemRegra = useMemo(() => {
+    return vendasSemRegra.filter(c => {
+      if (filtroFilial.length > 0 && !filtroFilial.includes(c.filial)) return false;
+      if (filtroVendedor.length > 0 && !filtroVendedor.includes(c.vendedor)) return false;
+      if (filtroFamilia.length > 0 && !filtroFamilia.includes(c.familia_produto)) return false;
+      if (filtroMarca.length > 0 && !filtroMarca.includes(c.marca)) return false;
+      return true;
+    });
+  }, [vendasSemRegra, filtroFilial, filtroVendedor, filtroFamilia, filtroMarca]);
+
+  const sufixoArquivo = useMemo(() => {
+    const partes: string[] = [];
+    if (filtroFilial.length > 0) partes.push(filtroFilial.join('-'));
+    partes.push(`${MESES[periodoMes]}_${periodoAno}`);
+    return partes.join('_').replace(/[^a-z0-9_-]/gi, '_').slice(0, 80);
+  }, [filtroFilial, periodoMes, periodoAno]);
+
+  const fmtDataBR = (d: string) => {
+    if (!d) return '';
+    const [y, m, dd] = d.split('T')[0].split('-');
+    return `${dd}/${m}/${y}`;
+  };
+
+  // Exportação GERAL - Detalhada (todas as vendas)
+  const exportarGeralDetalhado = useCallback(() => {
+    const rows = [
+      ...filtered.map(v => ({
+        Data: fmtDataBR(v.data_emissao),
+        'Nota Fiscal': v.nota_fiscal,
+        Filial: v.filial,
+        Vendedor: v.vendedor,
+        Produto: v.descricao_produto,
+        Família: v.familia_produto,
+        Marca: v.marca,
+        Quantidade: v.quantidade,
+        'Faturamento (R$)': Number(v.valor_venda.toFixed(2)),
+        '% Aplicado': Number(v.percentual.toFixed(2)),
+        'Comissão (R$)': Number(v.valor_comissao.toFixed(2)),
+        'Regra Aplicada': v.regra_nome,
+      })),
+      ...filteredSemRegra.map(v => ({
+        Data: fmtDataBR(v.data_emissao),
+        'Nota Fiscal': v.nota_fiscal,
+        Filial: v.filial,
+        Vendedor: v.vendedor,
+        Produto: v.descricao_produto,
+        Família: v.familia_produto,
+        Marca: v.marca,
+        Quantidade: v.quantidade,
+        'Faturamento (R$)': Number(v.valor_venda.toFixed(2)),
+        '% Aplicado': 0,
+        'Comissão (R$)': 0,
+        'Regra Aplicada': 'SEM REGRA',
+      })),
+    ];
+    if (rows.length === 0) return;
+    const totalFat = rows.reduce((s, r) => s + (r['Faturamento (R$)'] as number), 0);
+    const totalCom = rows.reduce((s, r) => s + (r['Comissão (R$)'] as number), 0);
+    const totalQtd = rows.reduce((s, r) => s + (r.Quantidade as number), 0);
+    rows.push({
+      Data: '', 'Nota Fiscal': '', Filial: '', Vendedor: 'TOTAL', Produto: '', Família: '', Marca: '',
+      Quantidade: totalQtd,
+      'Faturamento (R$)': Number(totalFat.toFixed(2)),
+      '% Aplicado': totalFat > 0 ? Number(((totalCom / totalFat) * 100).toFixed(2)) : 0,
+      'Comissão (R$)': Number(totalCom.toFixed(2)),
+      'Regra Aplicada': '',
+    } as any);
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [
+      { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 28 }, { wch: 40 }, { wch: 22 }, { wch: 18 },
+      { wch: 10 }, { wch: 16 }, { wch: 12 }, { wch: 16 }, { wch: 30 },
+    ];
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+    for (let R = 1; R <= range.e.r; R++) {
+      const fatCell = ws[XLSX.utils.encode_cell({ r: R, c: 8 })];
+      const pctCell = ws[XLSX.utils.encode_cell({ r: R, c: 9 })];
+      const comCell = ws[XLSX.utils.encode_cell({ r: R, c: 10 })];
+      if (fatCell) fatCell.z = 'R$ #,##0.00';
+      if (pctCell) pctCell.z = '0.00"%"';
+      if (comCell) comCell.z = 'R$ #,##0.00';
+    }
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Detalhado');
+    XLSX.writeFile(wb, `comissoes_detalhado_${sufixoArquivo}.xlsx`);
+  }, [filtered, filteredSemRegra, sufixoArquivo]);
+
+  // Exportação GERAL - Resumo por Vendedor
+  const exportarGeralResumo = useCallback(() => {
+    if (byVendedor.length === 0) return;
+    const rows = byVendedor.map(v => ({
+      Posição: v.posicao,
+      Vendedor: v.name,
+      'Qtd Vendas': v.quantidade,
+      'Faturamento (R$)': Number(v.valor_vendas.toFixed(2)),
+      '% Médio': Number(v.percentual_medio.toFixed(2)),
+      'Comissão (R$)': Number(v.valor_comissao.toFixed(2)),
+    }));
+    const totalFat = rows.reduce((s, r) => s + (r['Faturamento (R$)'] as number), 0);
+    const totalCom = rows.reduce((s, r) => s + (r['Comissão (R$)'] as number), 0);
+    const totalQtd = rows.reduce((s, r) => s + (r['Qtd Vendas'] as number), 0);
+    rows.push({
+      Posição: 0, Vendedor: 'TOTAL',
+      'Qtd Vendas': totalQtd,
+      'Faturamento (R$)': Number(totalFat.toFixed(2)),
+      '% Médio': totalFat > 0 ? Number(((totalCom / totalFat) * 100).toFixed(2)) : 0,
+      'Comissão (R$)': Number(totalCom.toFixed(2)),
+    } as any);
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{ wch: 8 }, { wch: 32 }, { wch: 12 }, { wch: 18 }, { wch: 10 }, { wch: 18 }];
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+    for (let R = 1; R <= range.e.r; R++) {
+      const fatCell = ws[XLSX.utils.encode_cell({ r: R, c: 3 })];
+      const pctCell = ws[XLSX.utils.encode_cell({ r: R, c: 4 })];
+      const comCell = ws[XLSX.utils.encode_cell({ r: R, c: 5 })];
+      if (fatCell) fatCell.z = 'R$ #,##0.00';
+      if (pctCell) pctCell.z = '0.00"%"';
+      if (comCell) comCell.z = 'R$ #,##0.00';
+    }
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Resumo Vendedores');
+    XLSX.writeFile(wb, `comissoes_resumo_${sufixoArquivo}.xlsx`);
+  }, [byVendedor, sufixoArquivo]);
+
   return (
     <AppShell title="Ranking de Comissões">
       {isLoading ? (
