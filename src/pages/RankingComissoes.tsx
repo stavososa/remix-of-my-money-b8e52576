@@ -67,12 +67,15 @@ interface ComissaoCalculada {
 }
 
 interface VendaSemRegra {
+  data_emissao: string;
+  nota_fiscal: string;
   vendedor: string;
   filial: string;
   descricao_produto: string;
   familia_produto: string;
   marca: string;
   valor_venda: number;
+  quantidade: number;
 }
 
 interface AggRow {
