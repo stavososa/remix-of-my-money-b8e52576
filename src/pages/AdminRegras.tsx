@@ -180,6 +180,33 @@ function FilialMultiSelect({
           })}
         </div>
       )}
+      {/* Atalhos rápidos */}
+      <div className="flex flex-wrap gap-1.5 mt-2">
+        <button
+          type="button"
+          onClick={() => onChange(null)}
+          className={`text-xs px-2 py-1 rounded-md border transition ${allSelected ? 'bg-primary/20 border-primary text-primary font-semibold' : 'bg-secondary border-border text-secondary-foreground hover:border-primary/50'}`}
+        >
+          Todas
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange('DELIVERY')}
+          className={`text-xs px-2 py-1 rounded-md border transition ${selected.length === 1 && selected[0] === 'DELIVERY' ? 'bg-primary/20 border-primary text-primary font-semibold' : 'bg-secondary border-border text-secondary-foreground hover:border-primary/50'}`}
+        >
+          Só DELIVERY
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const lojas = unidades.filter(u => !/delivery/i.test(u.nome)).map(u => u.nome);
+            onChange(lojas.length ? lojas.join(',') : null);
+          }}
+          className="text-xs px-2 py-1 rounded-md border bg-secondary border-border text-secondary-foreground hover:border-primary/50 transition"
+        >
+          Só Lojas Físicas
+        </button>
+      </div>
       {selected.length > 0 && (
         <div className="flex flex-wrap gap-1 mt-1.5">
           {selected.map(s => (
