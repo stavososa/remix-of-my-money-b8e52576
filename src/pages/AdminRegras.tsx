@@ -479,7 +479,54 @@ export default function AdminRegras() {
     },
   });
 
-  const duplicateMutation = useMutation({
+  const sincronizarMutation = useMutation({
+    mutationFn: async () => {
+      const pendentes = regras.filter((r: any) => r.produto && (!r.familia_produto || !r.marca));
+      if (pendentes.length === 0) return { atualizadas: 0, semDados: 0, total: 0 };
+
+      const produtos = [...new Set(pendentes.map((r: any) => r.produto as string))];
+      const map: Record<string, { familia: string | null; marca: string | null }> = {};
+
+      // Busca em lotes de 100 produtos
+      for (let i = 0; i < produtos.length; i += 100) {
+        const chunk = produtos.slice(i, i + 100);
+        const { data } = await (supabase as any)
+          .from('vendas')
+          .select('descricao_produto, familia_produto, marca')
+          .in('descricao_produto', chunk)
+          .not('familia_produto', 'is', null)
+          .limit(5000);
+        (data ?? []).forEach((v: any) => {
+          if (v.descricao_produto && !map[v.descricao_produto]) {
+            map[v.descricao_produto] = { familia: v.familia_produto, marca: v.marca };
+          }
+        });
+      }
+
+      let atualizadas = 0;
+      let semDados = 0;
+      for (const r of pendentes) {
+        const meta = map[r.produto];
+        if (!meta || (!meta.familia && !meta.marca)) { semDados++; continue; }
+        const update: any = { atualizado_por: user?.id, atualizado_em: new Date().toISOString() };
+        if (!r.familia_produto && meta.familia) update.familia_produto = meta.familia;
+        if (!r.marca && meta.marca) update.marca = meta.marca;
+        if (Object.keys(update).length <= 2) { semDados++; continue; }
+        const { error } = await (supabase as any).from('comissoes').update(update).eq('id', r.id);
+        if (!error) atualizadas++;
+      }
+      return { atualizadas, semDados, total: pendentes.length };
+    },
+    onSuccess: (res) => {
+      if (res.total === 0) toast.info('Nenhuma regra precisa de sincronização');
+      else toast.success(`${res.atualizadas} de ${res.total} regras sincronizadas${res.semDados ? ` (${res.semDados} sem dados nas vendas)` : ''}`);
+      qc.invalidateQueries({ queryKey: ['regras'] });
+      qc.invalidateQueries({ queryKey: ['produto-meta'] });
+    },
+    onError: (e: Error) => toast.error(`Erro: ${e.message}`),
+  });
+
+
     mutationFn: async ({ targetAno, targetMes }: { targetAno: number; targetMes: number }) => {
       const inserts = regras.map((r: any) => ({
         nome: r.nome,
