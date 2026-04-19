@@ -578,6 +578,24 @@ export default function RankingComissoes() {
     XLSX.writeFile(wb, `comissoes_resumo_${sufixoArquivo}.xlsx`);
   }, [byVendedor, sufixoArquivo]);
 
+  // Cobertura de regras: verifica se DELIVERY e Lojas Físicas têm pelo menos 1 regra aplicável
+  const coberturaRegras = useMemo(() => {
+    let cobreDelivery = false;
+    let cobreLoja = false;
+    for (const r of regras as any[]) {
+      const tu = (r.tipo_unidade ?? '').toString().trim();
+      if (!tu) {
+        cobreDelivery = true;
+        cobreLoja = true;
+        break;
+      }
+      const partes = tu.split(',').map((s: string) => s.trim().toUpperCase()).filter(Boolean);
+      if (partes.includes('DELIVERY')) cobreDelivery = true;
+      if (partes.some((p: string) => p !== 'DELIVERY')) cobreLoja = true;
+    }
+    return { cobreDelivery, cobreLoja };
+  }, [regras]);
+
   return (
     <AppShell title="Ranking de Comissões">
       {isLoading ? (
