@@ -885,9 +885,23 @@ export default function AdminRegras() {
 
               {/* Product classification fields */}
               <div className="border border-border rounded-lg p-3 space-y-3 bg-secondary/30">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                  <Search className="h-3.5 w-3.5" /> Classificação do Produto
-                </p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                    <Search className="h-3.5 w-3.5" /> Classificação do Produto
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setModal({ ...modal, familia_produto: null, marca: null, produto: null })}
+                    className={`text-xs px-2 py-1 rounded-md border transition ${
+                      !modal.familia_produto && !modal.marca && !modal.produto
+                        ? 'bg-primary/20 border-primary text-primary font-semibold'
+                        : 'bg-secondary border-border text-secondary-foreground hover:border-primary/50'
+                    }`}
+                    title="Aplica a TODAS as vendas que não tenham regra mais específica"
+                  >
+                    ⭐ Regra Geral (genérica)
+                  </button>
+                </div>
                 <AutocompleteInput
                   label="Família"
                   value={modal.familia_produto || ''}
