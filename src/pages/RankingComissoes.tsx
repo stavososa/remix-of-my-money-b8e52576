@@ -902,13 +902,12 @@ export default function RankingComissoes() {
                             <td className="p-2 italic text-warning">SEM REGRA</td>
                           </tr>
                         ))}
-                        ))}
                       </tbody>
                     </table>
-                    {(vendas.length > 500 || semRegra.length > 200) && (
-                      <p className="p-2 text-center text-xs text-muted-foreground">Mostrando primeiras linhas. Total: {vendas.length + semRegra.length}</p>
-                    )}
                   </div>
+                  <p className="text-[10px] text-muted-foreground mt-2">
+                    Exibindo todas as {(vendas.length + semRegra.length).toLocaleString('pt-BR')} vendas. Use o botão "Exportar XLSX" para baixar a planilha completa com totais.
+                  </p>
                 </>
               );
             })()}
