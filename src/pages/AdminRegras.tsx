@@ -936,14 +936,14 @@ export default function AdminRegras() {
                   label="Família"
                   value={modal.familia_produto || ''}
                   onChange={v => setModal({ ...modal, familia_produto: v })}
-                  options={autocompleteData?.familias ?? []}
+                  options={familiasFiltered}
                   placeholder="Ex: Camisetas, Calças..."
                 />
                 <AutocompleteInput
                   label="Marca"
                   value={modal.marca || ''}
                   onChange={v => setModal({ ...modal, marca: v })}
-                  options={autocompleteData?.marcas ?? []}
+                  options={marcasFiltered}
                   placeholder="Ex: Nike, Adidas..."
                 />
                 <AutocompleteInput
@@ -951,7 +951,7 @@ export default function AdminRegras() {
                   value={modal.produto || ''}
                   onChange={v => setModal({ ...modal, produto: v })}
                   options={produtosOptions}
-                  placeholder={familiaAtual ? "Selecione um produto..." : "Selecione uma família primeiro..."}
+                  placeholder={(familiaAtual || marcaAtual) ? "Selecione um produto..." : "Selecione uma família ou marca primeiro..."}
                 />
               </div>
 
