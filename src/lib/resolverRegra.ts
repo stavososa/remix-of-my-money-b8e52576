@@ -42,7 +42,9 @@ export function resolverRegra(
   const compativeis = regrasAtivas.filter((regra) => {
     if (!regra.ativo) return false;
     if (venda.regime && regra.regime !== venda.regime) return false;
-    if (regra.tipo_unidade && venda.tipo_unidade && regra.tipo_unidade !== venda.tipo_unidade) return false;
+    // If rule requires a specific tipo_unidade (e.g. DELIVERY), the sale MUST match it.
+    // Sales without tipo_unidade (loja física) never receive DELIVERY rules.
+    if (regra.tipo_unidade && regra.tipo_unidade !== venda.tipo_unidade) return false;
     if (regra.produto && regra.produto !== venda.descricao_produto) return false;
     if (regra.familia_produto && regra.familia_produto !== venda.familia_produto) return false;
     if (regra.marca && regra.marca !== venda.marca) return false;
