@@ -268,6 +268,45 @@ export default function AdminRegras() {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Mapa produto -> { familia, marca } para exibir corretamente quando regra só tem produto
+  const produtosUsadosNasRegras = useMemo(() => {
+    const set = new Set<string>();
+    regras.forEach((r: any) => {
+      if (r.produto && (!r.familia_produto || !r.marca)) set.add(r.produto);
+    });
+    return [...set];
+  }, [regras]);
+
+  const { data: produtoMeta = {} } = useQuery({
+    queryKey: ['produto-meta', produtosUsadosNasRegras.sort().join('|')],
+    queryFn: async () => {
+      if (produtosUsadosNasRegras.length === 0) return {};
+      const map: Record<string, { familia: string | null; marca: string | null }> = {};
+      // Busca em lotes de 100
+      const chunks: string[][] = [];
+      for (let i = 0; i < produtosUsadosNasRegras.length; i += 100) {
+        chunks.push(produtosUsadosNasRegras.slice(i, i + 100));
+      }
+      for (const chunk of chunks) {
+        const { data, error } = await (supabase as any)
+          .from('vendas')
+          .select('descricao_produto, familia_produto, marca')
+          .in('descricao_produto', chunk)
+          .not('familia_produto', 'is', null)
+          .limit(5000);
+        if (error) continue;
+        (data ?? []).forEach((r: any) => {
+          if (r.descricao_produto && !map[r.descricao_produto]) {
+            map[r.descricao_produto] = { familia: r.familia_produto, marca: r.marca };
+          }
+        });
+      }
+      return map;
+    },
+    enabled: produtosUsadosNasRegras.length > 0,
+    staleTime: 10 * 60 * 1000,
+  });
+
   // Produtos carregam apenas quando uma família é selecionada
   const familiaAtual = modal?.familia_produto || null;
   const { data: produtosOptions = [] } = useQuery({
