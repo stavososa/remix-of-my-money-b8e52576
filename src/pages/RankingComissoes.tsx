@@ -310,8 +310,8 @@ export default function RankingComissoes() {
     'OmieApp_01', 'Devi PDV_01', 'Devi PDV_02', 'Devi PDV_03', 'Devi PDV_04', 'Devi PDV_06',
   ]);
 
-  const comissoesCalculadas = useMemo<ComissaoCalculada[]>(() => {
-    if (!vendasRaw.length || !regras.length) return [];
+  const { comissoesCalculadas, vendasSemRegra } = useMemo<{ comissoesCalculadas: ComissaoCalculada[]; vendasSemRegra: VendaSemRegra[] }>(() => {
+    if (!vendasRaw.length || !regras.length) return { comissoesCalculadas: [], vendasSemRegra: [] };
 
     // Pre-compute vendor revenue for min_faturamento rules (only commissionable vendors)
     const vendorRevenue = new Map<string, number>();
@@ -322,6 +322,7 @@ export default function RankingComissoes() {
     }
 
     const results: ComissaoCalculada[] = [];
+    const semRegra: VendaSemRegra[] = [];
     for (const v of vendasRaw) {
       const valorVenda = parseMoneyBR(v.total_com_desconto);
       if (valorVenda <= 0) continue;
@@ -329,6 +330,7 @@ export default function RankingComissoes() {
       const vendedor = v.vendedor_nome ?? 'Sem Vendedor';
       if (EXCLUIR_VENDEDORES.has(vendedor)) continue;
       const isDelivery = /DELIVERY/i.test(vendedor);
+      const filial = isDelivery ? 'DELIVERY' : getFilial(v.cnpj_empresa);
       const vendaParaRegra: VendaParaRegra = {
         tipo_unidade: isDelivery ? 'DELIVERY' : undefined,
         familia_produto: v.familia_produto ?? undefined,
@@ -338,21 +340,32 @@ export default function RankingComissoes() {
       };
 
       const regra = resolverRegra(vendaParaRegra, regras);
-      if (!regra) continue;
+      if (!regra) {
+        semRegra.push({
+          vendedor,
+          filial,
+          descricao_produto: v.descricao_produto ?? 'Sem Produto',
+          familia_produto: v.familia_produto ?? 'Sem Família',
+          marca: v.marca ?? 'Sem Marca',
+          valor_venda: valorVenda,
+        });
+        continue;
+      }
 
       results.push({
         descricao_produto: v.descricao_produto ?? 'Sem Produto',
         familia_produto: v.familia_produto ?? 'Sem Família',
         marca: v.marca ?? 'Sem Marca',
         vendedor,
-        filial: isDelivery ? 'DELIVERY' : getFilial(v.cnpj_empresa),
+        filial,
         valor_venda: valorVenda,
         percentual: regra.percentual,
         valor_comissao: valorVenda * regra.percentual / 100,
         quantidade: parseMoneyBR(v.quantidade) || 1,
+        regra_nome: regra.nome,
       });
     }
-    return results;
+    return { comissoesCalculadas: results, vendasSemRegra: semRegra };
   }, [vendasRaw, regras, getFilial]);
 
   // Apply filters
