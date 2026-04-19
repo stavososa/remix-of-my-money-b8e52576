@@ -616,6 +616,20 @@ export default function RankingComissoes() {
         </div>
       ) : (
         <div className="space-y-6">
+          {/* Avisos de cobertura de regras */}
+          {(!coberturaRegras.cobreDelivery || !coberturaRegras.cobreLoja) && (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 flex items-start gap-3">
+              <svg className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
+              <div className="text-sm">
+                <p className="font-semibold text-amber-200">Atenção: cobertura de regras incompleta em {MESES[periodoMes]}/{periodoAno}</p>
+                <p className="text-amber-100/80 mt-0.5">
+                  {!coberturaRegras.cobreDelivery && <>Não há regras configuradas para <strong>DELIVERY</strong> — comissões deste canal serão R$ 0,00. </>}
+                  {!coberturaRegras.cobreLoja && <>Não há regras configuradas para <strong>Lojas Físicas</strong> — comissões destas filiais serão R$ 0,00. </>}
+                  Cadastre as regras correspondentes em <em>Regras de Comissão</em>.
+                </p>
+              </div>
+            </div>
+          )}
           {/* Filters */}
           <Card>
             <CardContent className="py-4">
