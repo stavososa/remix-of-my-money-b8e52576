@@ -154,14 +154,24 @@ function RankingSection({ data, title, nameLabel, limit, icon: Icon, hideFinanci
           <>
             {/* Desktop */}
             <div className="hidden md:block">
-              <DataTable columns={finalColumns} data={display} rowClassName={(row: AggRow) => row.posicao <= 3 ? 'bg-primary/5' : ''} pageSize={limit ? undefined : 20} />
+              <DataTable
+                columns={finalColumns}
+                data={display}
+                rowClassName={(row: AggRow) => row.posicao <= 3 ? 'bg-primary/5' : ''}
+                pageSize={limit ? undefined : 20}
+                onRowClick={onRowClick}
+              />
             </div>
             {/* Mobile */}
             <div className="md:hidden space-y-2">
               {display.map((item) => {
                 const hidden = shouldHideRow(item);
                 return (
-                  <div key={item.name} className={`border border-border rounded-lg p-3 ${item.posicao <= 3 ? 'border-primary/20 bg-primary/[0.02]' : ''}`}>
+                  <div
+                    key={item.name}
+                    onClick={() => onRowClick?.(item)}
+                    className={`border border-border rounded-lg p-3 ${item.posicao <= 3 ? 'border-primary/20 bg-primary/[0.02]' : ''} ${onRowClick ? 'cursor-pointer hover:bg-secondary/30' : ''}`}
+                  >
                     <div className="flex items-center gap-2 mb-1.5">
                       <MedalhaIcone pos={item.posicao} />
                       <span className="font-bold text-sm text-foreground truncate">{item.name}</span>
