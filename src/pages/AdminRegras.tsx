@@ -268,6 +268,45 @@ export default function AdminRegras() {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Mapa produto -> { familia, marca } para exibir corretamente quando regra só tem produto
+  const produtosUsadosNasRegras = useMemo(() => {
+    const set = new Set<string>();
+    regras.forEach((r: any) => {
+      if (r.produto && (!r.familia_produto || !r.marca)) set.add(r.produto);
+    });
+    return [...set];
+  }, [regras]);
+
+  const { data: produtoMeta = {} } = useQuery({
+    queryKey: ['produto-meta', produtosUsadosNasRegras.sort().join('|')],
+    queryFn: async () => {
+      if (produtosUsadosNasRegras.length === 0) return {};
+      const map: Record<string, { familia: string | null; marca: string | null }> = {};
+      // Busca em lotes de 100
+      const chunks: string[][] = [];
+      for (let i = 0; i < produtosUsadosNasRegras.length; i += 100) {
+        chunks.push(produtosUsadosNasRegras.slice(i, i + 100));
+      }
+      for (const chunk of chunks) {
+        const { data, error } = await (supabase as any)
+          .from('vendas')
+          .select('descricao_produto, familia_produto, marca')
+          .in('descricao_produto', chunk)
+          .not('familia_produto', 'is', null)
+          .limit(5000);
+        if (error) continue;
+        (data ?? []).forEach((r: any) => {
+          if (r.descricao_produto && !map[r.descricao_produto]) {
+            map[r.descricao_produto] = { familia: r.familia_produto, marca: r.marca };
+          }
+        });
+      }
+      return map;
+    },
+    enabled: produtosUsadosNasRegras.length > 0,
+    staleTime: 10 * 60 * 1000,
+  });
+
   // Produtos carregam apenas quando uma família é selecionada
   const familiaAtual = modal?.familia_produto || null;
   const { data: produtosOptions = [] } = useQuery({
@@ -421,13 +460,23 @@ export default function AdminRegras() {
     mutationFn: async ({ id, ativo }: { id: string; ativo: boolean }) => {
       const { error } = await (supabase as any).from('comissoes').update({ ativo, atualizado_por: user?.id, atualizado_em: new Date().toISOString() }).eq('id', id);
       if (error) throw error;
-      await logAudit('editou', id, { acao: ativo ? 'ativou' : 'desativou' });
+      logAudit('editou', id, { acao: ativo ? 'ativou' : 'desativou' });
     },
-    onSuccess: () => {
+    onMutate: async ({ id, ativo }) => {
+      await qc.cancelQueries({ queryKey: ['regras', periodoAno, periodoMes] });
+      const prev = qc.getQueryData<any[]>(['regras', periodoAno, periodoMes]);
+      if (prev) {
+        qc.setQueryData(['regras', periodoAno, periodoMes], prev.map((r: any) => r.id === id ? { ...r, ativo } : r));
+      }
+      return { prev };
+    },
+    onError: (e: Error, _vars, ctx: any) => {
+      if (ctx?.prev) qc.setQueryData(['regras', periodoAno, periodoMes], ctx.prev);
+      toast.error(`Erro: ${e.message}`);
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['regras'] });
-      qc.invalidateQueries({ queryKey: ['audit-log'] });
     },
-    onError: (e: Error) => toast.error(`Erro: ${e.message}`),
   });
 
   const duplicateMutation = useMutation({
@@ -501,9 +550,11 @@ export default function AdminRegras() {
     {
       key: 'familia_produto' as const, label: 'Família',
       render: (v: string | null, row: RegraRow) => {
-        // Se há produto cadastrado e a família está vazia, mostramos a família/marca derivada do produto se possível
         if (v) return <span className="text-xs text-foreground">{v}</span>;
-        if ((row as any).produto) return <span className="text-xs text-muted-foreground italic">(via produto)</span>;
+        const prod = (row as any).produto;
+        const meta = prod ? (produtoMeta as any)[prod] : null;
+        if (meta?.familia) return <span className="text-xs text-foreground/80">{meta.familia}</span>;
+        if (prod) return <span className="text-xs text-muted-foreground italic">—</span>;
         return <span className="text-muted-foreground text-xs">—</span>;
       },
     },
@@ -511,7 +562,10 @@ export default function AdminRegras() {
       key: 'marca' as const, label: 'Marca',
       render: (v: string | null, row: RegraRow) => {
         if (v) return <span className="text-xs text-foreground">{v}</span>;
-        if ((row as any).produto) return <span className="text-xs text-muted-foreground italic">(via produto)</span>;
+        const prod = (row as any).produto;
+        const meta = prod ? (produtoMeta as any)[prod] : null;
+        if (meta?.marca) return <span className="text-xs text-foreground/80">{meta.marca}</span>;
+        if (prod) return <span className="text-xs text-muted-foreground italic">—</span>;
         return <span className="text-muted-foreground text-xs">—</span>;
       },
     },
