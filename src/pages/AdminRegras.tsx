@@ -313,12 +313,40 @@ export default function AdminRegras() {
 
   const saveMutation = useMutation({
     mutationFn: async (form: RegraForm) => {
+      // Validação obrigatória
+      if (!form.nome.trim()) throw new Error('Nome é obrigatório');
+      if (!form.percentual || form.percentual <= 0) throw new Error('Percentual deve ser maior que zero');
+      if (!form.familia_produto && !form.marca && !form.produto) {
+        throw new Error('Informe ao menos Família, Marca ou Produto (regra 100% genérica não é permitida)');
+      }
+
+      // Auto-preenche família/marca a partir do produto selecionado, se vazias
+      let famAuto = form.familia_produto;
+      let marcaAuto = form.marca;
+      if (form.produto && (!famAuto || !marcaAuto)) {
+        try {
+          const { data: vendaRef } = await (supabase as any)
+            .from('vendas')
+            .select('familia_produto, marca')
+            .eq('descricao_produto', form.produto)
+            .not('familia_produto', 'is', null)
+            .limit(1)
+            .maybeSingle();
+          if (vendaRef) {
+            if (!famAuto && vendaRef.familia_produto) famAuto = vendaRef.familia_produto;
+            if (!marcaAuto && vendaRef.marca) marcaAuto = vendaRef.marca;
+          }
+        } catch (e) {
+          console.warn('Auto-fill família/marca falhou', e);
+        }
+      }
+
       const payload: any = {
-        nome: form.nome,
+        nome: form.nome.trim(),
         regime: form.regime,
         tipo_unidade: form.tipo_unidade || null,
-        familia_produto: form.familia_produto || null,
-        marca: form.marca || null,
+        familia_produto: famAuto || null,
+        marca: marcaAuto || null,
         produto: form.produto || null,
         percentual: form.percentual,
         min_faturamento: form.min_faturamento || null,
