@@ -381,7 +381,7 @@ export default function RankingComissoes() {
       const isDelivery = /DELIVERY/i.test(vendedor);
       const filial = isDelivery ? 'DELIVERY' : getFilial(v.cnpj_empresa);
       const vendaParaRegra: VendaParaRegra = {
-        tipo_unidade: isDelivery ? 'DELIVERY' : undefined,
+        tipo_unidade: filial,
         familia_produto: v.familia_produto ?? undefined,
         marca: v.marca ?? undefined,
         descricao_produto: v.descricao_produto ?? undefined,
