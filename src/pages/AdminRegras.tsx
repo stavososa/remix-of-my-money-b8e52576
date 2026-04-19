@@ -372,10 +372,11 @@ export default function AdminRegras() {
     staleTime: 10 * 60 * 1000,
   });
 
-  // Produtos carregam apenas quando uma família é selecionada
+  // Produtos carregam quando família OU marca é selecionada
   const familiaAtual = modal?.familia_produto || null;
+  const marcaAtual = modal?.marca || null;
   const { data: produtosOptions = [] } = useQuery({
-    queryKey: ['regras-produtos', familiaAtual],
+    queryKey: ['regras-produtos', familiaAtual, marcaAtual],
     queryFn: async () => {
       const allValues = new Set<string>();
       let from = 0;
@@ -385,9 +386,8 @@ export default function AdminRegras() {
           .from('vendas')
           .select('descricao_produto')
           .not('descricao_produto', 'is', null);
-        if (familiaAtual) {
-          query = query.eq('familia_produto', familiaAtual);
-        }
+        if (familiaAtual) query = query.eq('familia_produto', familiaAtual);
+        if (marcaAtual) query = query.eq('marca', marcaAtual);
         const { data, error } = await query.range(from, from + pageSize - 1);
         if (error || !data || data.length === 0) break;
         data.forEach((r: any) => { if (r.descricao_produto) allValues.add(r.descricao_produto); });
@@ -396,9 +396,26 @@ export default function AdminRegras() {
       }
       return [...allValues].sort();
     },
-    enabled: !!familiaAtual,
+    enabled: !!(familiaAtual || marcaAtual),
     staleTime: 5 * 60 * 1000,
   });
+
+  // Opções filtradas de família/marca baseadas no que já foi selecionado
+  const familiasFiltered = useMemo(() => {
+    if (!autocompleteData) return [];
+    if (marcaAtual && autocompleteData.marcaToFamilias.has(marcaAtual)) {
+      return [...autocompleteData.marcaToFamilias.get(marcaAtual)!].sort();
+    }
+    return autocompleteData.familias;
+  }, [autocompleteData, marcaAtual]);
+
+  const marcasFiltered = useMemo(() => {
+    if (!autocompleteData) return [];
+    if (familiaAtual && autocompleteData.familiaToMarcas.has(familiaAtual)) {
+      return [...autocompleteData.familiaToMarcas.get(familiaAtual)!].sort();
+    }
+    return autocompleteData.marcas;
+  }, [autocompleteData, familiaAtual]);
 
   // Helper: log audit action
   const logAudit = async (acao: string, comissao_id: string | null, detalhes: any) => {
