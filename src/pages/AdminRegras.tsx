@@ -819,8 +819,20 @@ export default function AdminRegras() {
               </button>
               <button
                 onClick={() => saveMutation.mutate(modal)}
-                disabled={!modal.nome || saveMutation.isPending}
-                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                disabled={
+                  !modal.nome.trim() ||
+                  !modal.percentual ||
+                  modal.percentual <= 0 ||
+                  (!modal.familia_produto && !modal.marca && !modal.produto) ||
+                  saveMutation.isPending
+                }
+                title={
+                  !modal.nome.trim() ? 'Informe o nome' :
+                  !modal.percentual || modal.percentual <= 0 ? 'Percentual deve ser maior que zero' :
+                  (!modal.familia_produto && !modal.marca && !modal.produto) ? 'Informe ao menos Família, Marca ou Produto' :
+                  'Salvar'
+                }
+                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {saveMutation.isPending ? 'Salvando...' : 'Salvar'}
               </button>
