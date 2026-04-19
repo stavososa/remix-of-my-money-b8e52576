@@ -139,6 +139,20 @@ function RankingSection({ data, title, nameLabel, limit, icon: Icon, hideFinanci
     { key: 'valor_vendas' as const, label: 'Faturamento', align: 'right' as const, render: (v: number, row: AggRow) => shouldHideRow(row) ? <span className="text-muted-foreground">—</span> : fmtCompact(v) },
     { key: 'percentual_medio' as const, label: '% Médio', align: 'right' as const, render: (v: number) => `${v.toFixed(2)}%` },
     { key: 'quantidade' as const, label: 'Qtd Vendas', align: 'right' as const, render: (v: number) => Math.round(v).toLocaleString('pt-BR') },
+    ...(onRowClick ? [{
+      key: 'name' as const,
+      label: 'Ações',
+      align: 'center' as const,
+      render: (_: any, row: AggRow) => (
+        <button
+          onClick={(e) => { e.stopPropagation(); onRowClick(row); }}
+          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+          title="Detalhar vendas e regras aplicadas"
+        >
+          <Search className="h-3 w-3" /> Detalhar
+        </button>
+      ),
+    }] : []),
   ];
 
   // If fully hidden, remove financial columns entirely
