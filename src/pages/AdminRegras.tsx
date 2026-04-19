@@ -540,9 +540,11 @@ export default function AdminRegras() {
     {
       key: 'familia_produto' as const, label: 'Família',
       render: (v: string | null, row: RegraRow) => {
-        // Se há produto cadastrado e a família está vazia, mostramos a família/marca derivada do produto se possível
         if (v) return <span className="text-xs text-foreground">{v}</span>;
-        if ((row as any).produto) return <span className="text-xs text-muted-foreground italic">(via produto)</span>;
+        const prod = (row as any).produto;
+        const meta = prod ? (produtoMeta as any)[prod] : null;
+        if (meta?.familia) return <span className="text-xs text-foreground/80">{meta.familia}</span>;
+        if (prod) return <span className="text-xs text-muted-foreground italic">—</span>;
         return <span className="text-muted-foreground text-xs">—</span>;
       },
     },
@@ -550,7 +552,10 @@ export default function AdminRegras() {
       key: 'marca' as const, label: 'Marca',
       render: (v: string | null, row: RegraRow) => {
         if (v) return <span className="text-xs text-foreground">{v}</span>;
-        if ((row as any).produto) return <span className="text-xs text-muted-foreground italic">(via produto)</span>;
+        const prod = (row as any).produto;
+        const meta = prod ? (produtoMeta as any)[prod] : null;
+        if (meta?.marca) return <span className="text-xs text-foreground/80">{meta.marca}</span>;
+        if (prod) return <span className="text-xs text-muted-foreground italic">—</span>;
         return <span className="text-muted-foreground text-xs">—</span>;
       },
     },
