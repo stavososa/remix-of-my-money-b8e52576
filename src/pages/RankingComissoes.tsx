@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { usePeriod } from '@/contexts/PeriodContext';
 import { resolverRegra, RegraComissao, VendaParaRegra } from '@/lib/resolverRegra';
-import { DollarSign, Users, Building2, Package, Layers, Tag, Crown, Trophy, ChevronDown, X } from 'lucide-react';
+import { DollarSign, Users, Building2, Package, Layers, Tag, Crown, Trophy, ChevronDown, X, AlertTriangle, Eye } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
