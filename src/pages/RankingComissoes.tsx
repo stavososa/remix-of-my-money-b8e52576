@@ -578,6 +578,24 @@ export default function RankingComissoes() {
     XLSX.writeFile(wb, `comissoes_resumo_${sufixoArquivo}.xlsx`);
   }, [byVendedor, sufixoArquivo]);
 
+  // Cobertura de regras: verifica se DELIVERY e Lojas Físicas têm pelo menos 1 regra aplicável
+  const coberturaRegras = useMemo(() => {
+    let cobreDelivery = false;
+    let cobreLoja = false;
+    for (const r of regras as any[]) {
+      const tu = (r.tipo_unidade ?? '').toString().trim();
+      if (!tu) {
+        cobreDelivery = true;
+        cobreLoja = true;
+        break;
+      }
+      const partes = tu.split(',').map((s: string) => s.trim().toUpperCase()).filter(Boolean);
+      if (partes.includes('DELIVERY')) cobreDelivery = true;
+      if (partes.some((p: string) => p !== 'DELIVERY')) cobreLoja = true;
+    }
+    return { cobreDelivery, cobreLoja };
+  }, [regras]);
+
   return (
     <AppShell title="Ranking de Comissões">
       {isLoading ? (
@@ -598,6 +616,20 @@ export default function RankingComissoes() {
         </div>
       ) : (
         <div className="space-y-6">
+          {/* Avisos de cobertura de regras */}
+          {(!coberturaRegras.cobreDelivery || !coberturaRegras.cobreLoja) && (
+            <div className="rounded-lg border border-primary/40 bg-primary/10 p-3 flex items-start gap-3">
+              <svg className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
+              <div className="text-sm">
+                <p className="font-semibold text-foreground">Atenção: cobertura de regras incompleta em {MESES[periodoMes]}/{periodoAno}</p>
+                <p className="text-muted-foreground mt-0.5">
+                  {!coberturaRegras.cobreDelivery && <>Não há regras configuradas para <strong className="text-primary">DELIVERY</strong> — comissões deste canal serão R$ 0,00. </>}
+                  {!coberturaRegras.cobreLoja && <>Não há regras configuradas para <strong className="text-primary">Lojas Físicas</strong> — comissões destas filiais serão R$ 0,00. </>}
+                  Cadastre as regras correspondentes em <em>Regras de Comissão</em>.
+                </p>
+              </div>
+            </div>
+          )}
           {/* Filters */}
           <Card>
             <CardContent className="py-4">
