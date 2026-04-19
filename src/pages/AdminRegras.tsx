@@ -287,33 +287,48 @@ export default function AdminRegras() {
     },
   });
 
-  // Fetch distinct values for autocomplete
+  // Fetch distinct combos (familia, marca) for cross-filtered autocomplete
   const { data: autocompleteData } = useQuery({
-    queryKey: ['regras-autocomplete-base'],
+    queryKey: ['regras-autocomplete-combos'],
     queryFn: async () => {
-      const fetchAll = async (column: string) => {
-        const allValues = new Set<string>();
-        let from = 0;
-        const pageSize = 1000;
-        while (true) {
-          const { data, error } = await (supabase as any)
-            .from('vendas')
-            .select(column)
-            .not(column, 'is', null)
-            .range(from, from + pageSize - 1);
-          if (error || !data || data.length === 0) break;
-          data.forEach((r: any) => { if (r[column]) allValues.add(r[column]); });
-          if (data.length < pageSize) break;
-          from += pageSize;
+      const combos = new Set<string>(); // "familia||marca"
+      let from = 0;
+      const pageSize = 1000;
+      while (true) {
+        const { data, error } = await (supabase as any)
+          .from('vendas')
+          .select('familia_produto, marca')
+          .range(from, from + pageSize - 1);
+        if (error || !data || data.length === 0) break;
+        data.forEach((r: any) => {
+          const f = r.familia_produto || '';
+          const m = r.marca || '';
+          if (f || m) combos.add(`${f}||${m}`);
+        });
+        if (data.length < pageSize) break;
+        from += pageSize;
+      }
+      const familias = new Set<string>();
+      const marcas = new Set<string>();
+      const familiaToMarcas = new Map<string, Set<string>>();
+      const marcaToFamilias = new Map<string, Set<string>>();
+      combos.forEach(combo => {
+        const [f, m] = combo.split('||');
+        if (f) familias.add(f);
+        if (m) marcas.add(m);
+        if (f && m) {
+          if (!familiaToMarcas.has(f)) familiaToMarcas.set(f, new Set());
+          familiaToMarcas.get(f)!.add(m);
+          if (!marcaToFamilias.has(m)) marcaToFamilias.set(m, new Set());
+          marcaToFamilias.get(m)!.add(f);
         }
-        return [...allValues].sort();
+      });
+      return {
+        familias: [...familias].sort(),
+        marcas: [...marcas].sort(),
+        familiaToMarcas,
+        marcaToFamilias,
       };
-
-      const [familias, marcas] = await Promise.all([
-        fetchAll('familia_produto'),
-        fetchAll('marca'),
-      ]);
-      return { familias, marcas };
     },
     staleTime: 5 * 60 * 1000,
   });
