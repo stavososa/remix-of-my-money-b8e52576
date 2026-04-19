@@ -526,7 +526,7 @@ export default function AdminRegras() {
     onError: (e: Error) => toast.error(`Erro: ${e.message}`),
   });
 
-
+  const duplicateMutation = useMutation({
     mutationFn: async ({ targetAno, targetMes }: { targetAno: number; targetMes: number }) => {
       const inserts = regras.map((r: any) => ({
         nome: r.nome,
