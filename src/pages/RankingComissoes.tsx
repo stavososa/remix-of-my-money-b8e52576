@@ -279,7 +279,7 @@ export default function RankingComissoes() {
         promises.push(
           (supabase as any)
             .from('vendas')
-            .select('descricao_produto, familia_produto, marca, total_com_desconto, quantidade, vendedor_nome, cnpj_empresa')
+            .select('descricao_produto, familia_produto, marca, total_com_desconto, quantidade, vendedor_nome, cnpj_empresa, data_emissao, nota_fiscal')
             .gte('data_emissao', dataInicio)
             .lte('data_emissao', dataFim)
             .order('id', { ascending: true })
