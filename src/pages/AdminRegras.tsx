@@ -219,7 +219,7 @@ export default function AdminRegras() {
     { id: 'fb-valqueire', nome: 'VALQUEIRE', tipo: 'Loja' },
     { id: 'fb-vistaalegre', nome: 'VISTA ALEGRE', tipo: 'Loja' },
   ];
-  const { data: unidades = UNIDADES_FALLBACK } = useQuery({
+  const { data: unidadesRaw = UNIDADES_FALLBACK } = useQuery({
     queryKey: ['unidades-list'],
     queryFn: async () => {
       try {
@@ -236,6 +236,14 @@ export default function AdminRegras() {
     },
     staleTime: 10 * 60 * 1000,
   });
+
+  // Garante que DELIVERY sempre apareça no select, independentemente do que vier do banco
+  const unidades = useMemo(() => {
+    const list = [...unidadesRaw];
+    const hasDelivery = list.some(u => /delivery/i.test(u.nome));
+    if (!hasDelivery) list.unshift({ id: 'virtual-delivery', nome: 'DELIVERY', tipo: 'Delivery' });
+    return list;
+  }, [unidadesRaw]);
 
   const { data: regras = [], isLoading } = useQuery({
     queryKey: ['regras', periodoAno, periodoMes],
