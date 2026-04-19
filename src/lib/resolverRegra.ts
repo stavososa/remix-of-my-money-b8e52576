@@ -42,13 +42,21 @@ export function resolverRegra(
   const compativeis = regrasAtivas.filter((regra) => {
     if (!regra.ativo) return false;
     if (venda.regime && regra.regime !== venda.regime) return false;
-    // If rule requires a specific tipo_unidade (e.g. DELIVERY), the sale MUST match it.
-    // Sales without tipo_unidade (loja física) never receive DELIVERY rules.
-    if (regra.tipo_unidade && regra.tipo_unidade !== venda.tipo_unidade) return false;
+
+    // Regras podem ser genéricas (null), específicas para DELIVERY,
+    // ou uma lista CSV de filiais selecionadas no Admin.
+    if (regra.tipo_unidade) {
+      const unidadesRegra = regra.tipo_unidade
+        .split(',')
+        .map((item) => item.trim().toUpperCase())
+        .filter(Boolean);
+      const unidadeVenda = venda.tipo_unidade?.trim().toUpperCase();
+      if (!unidadeVenda || !unidadesRegra.includes(unidadeVenda)) return false;
+    }
+
     if (regra.produto && regra.produto !== venda.descricao_produto) return false;
     if (regra.familia_produto && regra.familia_produto !== venda.familia_produto) return false;
     if (regra.marca && regra.marca !== venda.marca) return false;
-    // Check min_faturamento threshold
     if (regra.min_faturamento && regra.min_faturamento > 0) {
       if (!venda.faturamento_vendedor || venda.faturamento_vendedor < regra.min_faturamento) return false;
     }
@@ -61,11 +69,9 @@ export function resolverRegra(
     const prioA = a.prioridade ?? calcularPrioridade(a);
     const prioB = b.prioridade ?? calcularPrioridade(b);
     if (prioB !== prioA) return prioB - prioA;
-    // Prefer rules with specific tipo_unidade over generic ones
     const specA = a.tipo_unidade ? 1 : 0;
     const specB = b.tipo_unidade ? 1 : 0;
     if (specB !== specA) return specB - specA;
-    // Prefer rules with higher min_faturamento (more specific)
     const minA = a.min_faturamento ?? 0;
     const minB = b.min_faturamento ?? 0;
     return minB - minA;
