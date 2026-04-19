@@ -55,15 +55,20 @@ function AutocompleteInput({
   options,
   placeholder,
   label,
+  disabled,
 }: {
   value: string;
   onChange: (v: string | null) => void;
   options: string[];
   placeholder: string;
   label: string;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState(value || '');
+
+  // Mantém input sincronizado quando limpo de fora (ex.: ativar Regra Geral)
+  useEffect(() => { setSearch(value || ''); }, [value]);
 
   const filtered = useMemo(() => {
     if (!search) return options.slice(0, 50);
@@ -73,17 +78,18 @@ function AutocompleteInput({
 
   return (
     <div className="relative">
-      <label className="text-sm text-secondary-foreground">{label}</label>
+      <label className={`text-sm ${disabled ? 'text-muted-foreground/50' : 'text-secondary-foreground'}`}>{label}</label>
       <div className="relative mt-1">
         <input
           value={search}
+          disabled={disabled}
           onChange={e => { setSearch(e.target.value); onChange(e.target.value || null); setOpen(true); }}
-          onFocus={() => setOpen(true)}
+          onFocus={() => !disabled && setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 200)}
-          className="w-full px-3 py-2 pr-8 rounded-md bg-secondary border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-          placeholder={placeholder}
+          className="w-full px-3 py-2 pr-8 rounded-md bg-secondary border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
+          placeholder={disabled ? '— desativado (Regra Geral) —' : placeholder}
         />
-        {search && (
+        {search && !disabled && (
           <button
             type="button"
             onClick={() => { setSearch(''); onChange(null); }}
@@ -93,7 +99,7 @@ function AutocompleteInput({
           </button>
         )}
       </div>
-      {open && filtered.length > 0 && (
+      {open && !disabled && filtered.length > 0 && (
         <div className="absolute z-50 mt-1 w-full max-h-40 overflow-y-auto rounded-md bg-card border border-border shadow-lg">
           {filtered.map(opt => (
             <button
