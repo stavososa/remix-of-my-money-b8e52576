@@ -929,7 +929,7 @@ export default function AdminRegras() {
 
               {/* Product classification fields */}
               {(() => {
-                const isGenerica = !modal.familia_produto && !modal.marca && !modal.produto;
+                const isGenerica = genericaToggle;
                 return (
               <div className="border border-border rounded-lg p-3 space-y-3 bg-secondary/30">
                 <div className="flex items-center justify-between gap-2">
@@ -948,7 +948,9 @@ export default function AdminRegras() {
                       role="switch"
                       aria-checked={isGenerica}
                       onClick={() => {
-                        if (!isGenerica) {
+                        const next = !isGenerica;
+                        setGenericaToggle(next);
+                        if (next) {
                           setModal({ ...modal, familia_produto: null, marca: null, produto: null });
                         }
                       }}
