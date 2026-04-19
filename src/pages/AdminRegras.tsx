@@ -928,26 +928,33 @@ export default function AdminRegras() {
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
                     <Search className="h-3.5 w-3.5" /> Classificação do Produto
                   </p>
-                  <label
-                    className={`flex items-center gap-2 text-xs px-2 py-1 rounded-md border cursor-pointer transition select-none ${
-                      isGenerica
-                        ? 'bg-primary/20 border-primary text-primary font-semibold'
-                        : 'bg-secondary border-border text-secondary-foreground hover:border-primary/50'
-                    }`}
-                    title="Quando marcado, a regra vale para TODAS as vendas que não tenham regra mais específica"
+                  <div
+                    className="flex items-center gap-2 select-none"
+                    title="Quando ativo, a regra vale para TODAS as vendas que não tenham regra mais específica"
                   >
-                    <input
-                      type="checkbox"
-                      checked={isGenerica}
-                      onChange={e => {
-                        if (e.target.checked) {
+                    <span className={`text-xs font-semibold uppercase tracking-wide ${isGenerica ? 'text-primary' : 'text-muted-foreground'}`}>
+                      ⭐ Regra Geral
+                    </span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={isGenerica}
+                      onClick={() => {
+                        if (!isGenerica) {
                           setModal({ ...modal, familia_produto: null, marca: null, produto: null });
                         }
                       }}
-                      className="h-3.5 w-3.5 accent-primary cursor-pointer"
-                    />
-                    ⭐ Regra Geral (genérica)
-                  </label>
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40 ${
+                        isGenerica ? 'bg-primary' : 'bg-secondary border border-border'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-5 w-5 transform rounded-full bg-card shadow-md transition-transform ${
+                          isGenerica ? 'translate-x-5' : 'translate-x-0.5'
+                        }`}
+                      />
+                    </button>
+                  </div>
                 </div>
                 <AutocompleteInput
                   label="Família"
