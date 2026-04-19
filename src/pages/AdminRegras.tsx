@@ -313,12 +313,40 @@ export default function AdminRegras() {
 
   const saveMutation = useMutation({
     mutationFn: async (form: RegraForm) => {
+      // Validação obrigatória
+      if (!form.nome.trim()) throw new Error('Nome é obrigatório');
+      if (!form.percentual || form.percentual <= 0) throw new Error('Percentual deve ser maior que zero');
+      if (!form.familia_produto && !form.marca && !form.produto) {
+        throw new Error('Informe ao menos Família, Marca ou Produto (regra 100% genérica não é permitida)');
+      }
+
+      // Auto-preenche família/marca a partir do produto selecionado, se vazias
+      let famAuto = form.familia_produto;
+      let marcaAuto = form.marca;
+      if (form.produto && (!famAuto || !marcaAuto)) {
+        try {
+          const { data: vendaRef } = await (supabase as any)
+            .from('vendas')
+            .select('familia_produto, marca')
+            .eq('descricao_produto', form.produto)
+            .not('familia_produto', 'is', null)
+            .limit(1)
+            .maybeSingle();
+          if (vendaRef) {
+            if (!famAuto && vendaRef.familia_produto) famAuto = vendaRef.familia_produto;
+            if (!marcaAuto && vendaRef.marca) marcaAuto = vendaRef.marca;
+          }
+        } catch (e) {
+          console.warn('Auto-fill família/marca falhou', e);
+        }
+      }
+
       const payload: any = {
-        nome: form.nome,
+        nome: form.nome.trim(),
         regime: form.regime,
         tipo_unidade: form.tipo_unidade || null,
-        familia_produto: form.familia_produto || null,
-        marca: form.marca || null,
+        familia_produto: famAuto || null,
+        marca: marcaAuto || null,
         produto: form.produto || null,
         percentual: form.percentual,
         min_faturamento: form.min_faturamento || null,
@@ -472,15 +500,24 @@ export default function AdminRegras() {
     },
     {
       key: 'familia_produto' as const, label: 'Família',
-      render: (v: string | null) => v ? <span className="text-xs text-foreground">{v}</span> : <span className="text-muted-foreground text-xs">—</span>,
+      render: (v: string | null, row: RegraRow) => {
+        // Se há produto cadastrado e a família está vazia, mostramos a família/marca derivada do produto se possível
+        if (v) return <span className="text-xs text-foreground">{v}</span>;
+        if ((row as any).produto) return <span className="text-xs text-muted-foreground italic">(via produto)</span>;
+        return <span className="text-muted-foreground text-xs">—</span>;
+      },
     },
     {
       key: 'marca' as const, label: 'Marca',
-      render: (v: string | null) => v ? <span className="text-xs text-foreground">{v}</span> : <span className="text-muted-foreground text-xs">—</span>,
+      render: (v: string | null, row: RegraRow) => {
+        if (v) return <span className="text-xs text-foreground">{v}</span>;
+        if ((row as any).produto) return <span className="text-xs text-muted-foreground italic">(via produto)</span>;
+        return <span className="text-muted-foreground text-xs">—</span>;
+      },
     },
     {
       key: 'produto' as const, label: 'Produto',
-      render: (v: string | null) => v ? <span className="text-xs text-foreground max-w-[150px] truncate block">{v}</span> : <span className="text-muted-foreground text-xs">—</span>,
+      render: (v: string | null) => v ? <span className="text-xs text-foreground max-w-[150px] truncate block" title={v}>{v}</span> : <span className="text-muted-foreground text-xs">—</span>,
     },
     {
       key: 'min_faturamento' as const, label: 'Min. Fat.',
@@ -500,12 +537,18 @@ export default function AdminRegras() {
     {
       key: 'ativo' as const, label: 'Status',
       render: (v: boolean, row: RegraRow) => (
-        <button
-          onClick={(e) => { e.stopPropagation(); toggleAtivo.mutate({ id: row.id, ativo: !v }); }}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${v ? 'bg-success' : 'bg-secondary'}`}
-        >
-          <span className={`inline-block h-4 w-4 rounded-full bg-foreground transition-transform ${v ? 'translate-x-6' : 'translate-x-1'}`} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={(e) => { e.stopPropagation(); toggleAtivo.mutate({ id: row.id, ativo: !v }); }}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${v ? 'bg-success shadow-[0_0_8px_hsl(var(--success)/0.5)]' : 'bg-secondary'}`}
+            aria-label={v ? 'Desativar regra' : 'Ativar regra'}
+          >
+            <span className={`inline-block h-4 w-4 rounded-full bg-foreground transition-transform ${v ? 'translate-x-6' : 'translate-x-1'}`} />
+          </button>
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${v ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'}`}>
+            {v ? 'Ativo' : 'Inativo'}
+          </span>
+        </div>
       ),
     },
     {
@@ -595,13 +638,17 @@ export default function AdminRegras() {
         ) : (
           <>
             <div className="hidden md:block">
-              <DataTable columns={columns as any} data={regras} />
+              <DataTable
+                columns={columns as any}
+                data={regras}
+                rowClassName={(row: any) => `${row.ativo ? '' : 'opacity-50'} ${row.ativo ? 'bg-transparent' : 'bg-muted/20'}`}
+              />
             </div>
             <div className="md:hidden space-y-3">
               {regras.map((r: any) => {
                 const prio = PRIORIDADE_LABELS[r.prioridade ?? 0] ?? PRIORIDADE_LABELS[0];
                 return (
-                  <div key={r.id} className="bg-card border border-border rounded-lg p-4 shadow-card">
+                  <div key={r.id} className={`bg-card border border-border rounded-lg p-4 shadow-card transition-opacity ${r.ativo ? '' : 'opacity-50'}`}>
                     <div className="flex justify-between items-start mb-2">
                       <div>
                         <p className="font-bold text-foreground">{r.nome}</p>
@@ -772,8 +819,20 @@ export default function AdminRegras() {
               </button>
               <button
                 onClick={() => saveMutation.mutate(modal)}
-                disabled={!modal.nome || saveMutation.isPending}
-                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                disabled={
+                  !modal.nome.trim() ||
+                  !modal.percentual ||
+                  modal.percentual <= 0 ||
+                  (!modal.familia_produto && !modal.marca && !modal.produto) ||
+                  saveMutation.isPending
+                }
+                title={
+                  !modal.nome.trim() ? 'Informe o nome' :
+                  !modal.percentual || modal.percentual <= 0 ? 'Percentual deve ser maior que zero' :
+                  (!modal.familia_produto && !modal.marca && !modal.produto) ? 'Informe ao menos Família, Marca ou Produto' :
+                  'Salvar'
+                }
+                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {saveMutation.isPending ? 'Salvando...' : 'Salvar'}
               </button>

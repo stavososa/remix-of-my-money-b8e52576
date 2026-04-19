@@ -27,7 +27,7 @@ export interface VendaParaRegra {
   faturamento_vendedor?: number; // total revenue of the vendor for the period
 }
 
-function calcularPrioridade(regra: { produto?: string | null; familia_produto?: string | null; marca?: string | null }): number {
+export function calcularPrioridade(regra: { produto?: string | null; familia_produto?: string | null; marca?: string | null }): number {
   if (regra.produto) return 4;
   if (regra.familia_produto && regra.marca) return 3;
   if (regra.marca) return 2;
