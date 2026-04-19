@@ -650,6 +650,136 @@ export default function RankingComissoes() {
           </Tabs>
         </div>
       )}
+
+      {/* Modal: Vendas sem regra */}
+      {showSemRegra && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowSemRegra(false)} />
+          <div className="relative bg-card border border-border rounded-xl p-5 w-full max-w-4xl shadow-card max-h-[85vh] overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-warning" />
+                Vendas sem regra de comissão ({vendasSemRegra.length.toLocaleString('pt-BR')})
+              </h3>
+              <button onClick={() => setShowSemRegra(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              Agrupado por vendedor. Total ignorado: {fmt(vendasSemRegra.reduce((s, v) => s + v.valor_venda, 0))}
+            </p>
+            <div className="overflow-auto flex-1 border border-border rounded-md">
+              <table className="w-full text-xs">
+                <thead className="bg-secondary sticky top-0">
+                  <tr>
+                    <th className="text-left p-2">Vendedor</th>
+                    <th className="text-left p-2">Filial</th>
+                    <th className="text-right p-2">Vendas</th>
+                    <th className="text-right p-2">Valor</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(
+                    vendasSemRegra.reduce<Record<string, { filial: string; count: number; total: number }>>((acc, v) => {
+                      const k = `${v.vendedor}|${v.filial}`;
+                      if (!acc[k]) acc[k] = { filial: v.filial, count: 0, total: 0 };
+                      acc[k].count++;
+                      acc[k].total += v.valor_venda;
+                      return acc;
+                    }, {})
+                  )
+                    .sort((a, b) => b[1].total - a[1].total)
+                    .map(([key, v]) => {
+                      const vendedor = key.split('|')[0];
+                      return (
+                        <tr key={key} className="border-t border-border hover:bg-secondary/50">
+                          <td className="p-2 text-foreground">{vendedor}</td>
+                          <td className="p-2 text-muted-foreground">{v.filial}</td>
+                          <td className="p-2 text-right">{v.count.toLocaleString('pt-BR')}</td>
+                          <td className="p-2 text-right font-semibold text-warning">{fmt(v.total)}</td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Auditar vendedor (mostra cada venda + regra aplicada) */}
+      {auditarVendedor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setAuditarVendedor(null)} />
+          <div className="relative bg-card border border-border rounded-xl p-5 w-full max-w-5xl shadow-card max-h-[85vh] overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-lg font-bold text-foreground">Auditoria: {auditarVendedor}</h3>
+              <button onClick={() => setAuditarVendedor(null)} className="text-muted-foreground hover:text-foreground">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            {(() => {
+              const vendas = comissoesCalculadas.filter(c => c.vendedor === auditarVendedor);
+              const semRegra = vendasSemRegra.filter(v => v.vendedor === auditarVendedor);
+              const totalCom = vendas.reduce((s, v) => s + v.valor_comissao, 0);
+              const totalFat = vendas.reduce((s, v) => s + v.valor_venda, 0);
+              const totalIgnorado = semRegra.reduce((s, v) => s + v.valor_venda, 0);
+              return (
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3 text-xs">
+                    <div className="p-2 rounded bg-secondary"><div className="text-muted-foreground">Vendas</div><div className="font-bold text-foreground">{vendas.length}</div></div>
+                    <div className="p-2 rounded bg-secondary"><div className="text-muted-foreground">Faturamento</div><div className="font-bold text-foreground">{fmt(totalFat)}</div></div>
+                    <div className="p-2 rounded bg-primary/10"><div className="text-muted-foreground">Comissão</div><div className="font-bold text-primary">{fmt(totalCom)}</div></div>
+                    <div className="p-2 rounded bg-warning/10"><div className="text-muted-foreground">Ignorado (s/ regra)</div><div className="font-bold text-warning">{fmt(totalIgnorado)}</div></div>
+                  </div>
+                  <div className="overflow-auto flex-1 border border-border rounded-md">
+                    <table className="w-full text-xs">
+                      <thead className="bg-secondary sticky top-0">
+                        <tr>
+                          <th className="text-left p-2">Produto</th>
+                          <th className="text-left p-2">Família</th>
+                          <th className="text-left p-2">Marca</th>
+                          <th className="text-left p-2">Regra Aplicada</th>
+                          <th className="text-right p-2">%</th>
+                          <th className="text-right p-2">Venda</th>
+                          <th className="text-right p-2">Comissão</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {vendas.slice(0, 500).map((v, i) => (
+                          <tr key={i} className="border-t border-border hover:bg-secondary/50">
+                            <td className="p-2 text-foreground max-w-[200px] truncate" title={v.descricao_produto}>{v.descricao_produto}</td>
+                            <td className="p-2 text-muted-foreground">{v.familia_produto}</td>
+                            <td className="p-2 text-muted-foreground">{v.marca}</td>
+                            <td className="p-2 text-foreground">{v.regra_nome}</td>
+                            <td className="p-2 text-right">{v.percentual.toFixed(2)}%</td>
+                            <td className="p-2 text-right">{fmt(v.valor_venda)}</td>
+                            <td className="p-2 text-right font-semibold text-primary">{fmt(v.valor_comissao)}</td>
+                          </tr>
+                        ))}
+                        {semRegra.slice(0, 200).map((v, i) => (
+                          <tr key={`sr-${i}`} className="border-t border-border bg-warning/5">
+                            <td className="p-2 text-foreground max-w-[200px] truncate" title={v.descricao_produto}>{v.descricao_produto}</td>
+                            <td className="p-2 text-muted-foreground">{v.familia_produto}</td>
+                            <td className="p-2 text-muted-foreground">{v.marca}</td>
+                            <td className="p-2 italic text-warning">SEM REGRA</td>
+                            <td className="p-2 text-right">—</td>
+                            <td className="p-2 text-right">{fmt(v.valor_venda)}</td>
+                            <td className="p-2 text-right text-warning">—</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {(vendas.length > 500 || semRegra.length > 200) && (
+                      <p className="p-2 text-center text-xs text-muted-foreground">Mostrando primeiras linhas. Total: {vendas.length + semRegra.length}</p>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }
