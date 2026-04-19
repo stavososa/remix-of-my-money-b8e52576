@@ -568,6 +568,31 @@ export default function RankingComissoes() {
             <KPICard label="Vendas com Comissão" value={totalQtd.toLocaleString('pt-BR')} icon={Tag} />
           </div>
 
+          {/* Alerta de vendas sem regra */}
+          {!isGerente && vendasSemRegra.length > 0 && (
+            <Card className="border-warning/50 bg-warning/5">
+              <CardContent className="py-3 flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="h-5 w-5 text-warning shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">
+                      {vendasSemRegra.length.toLocaleString('pt-BR')} vendas sem regra de comissão aplicável
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Total ignorado: {fmt(vendasSemRegra.reduce((s, v) => s + v.valor_venda, 0))} — nenhuma regra ativa cobriu o produto/marca/família dessas vendas. Cadastre uma regra genérica para garantir cobertura.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowSemRegra(true)}
+                  className="text-xs px-3 py-1.5 rounded-md border border-warning/50 text-warning hover:bg-warning/10 transition-colors flex items-center gap-1.5"
+                >
+                  <Eye className="h-3.5 w-3.5" /> Ver detalhes
+                </button>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Resumo por Filial e Vendedor */}
           {!isGerente && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
