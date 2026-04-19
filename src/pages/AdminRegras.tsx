@@ -920,23 +920,34 @@ export default function AdminRegras() {
               </div>
 
               {/* Product classification fields */}
+              {(() => {
+                const isGenerica = !modal.familia_produto && !modal.marca && !modal.produto;
+                return (
               <div className="border border-border rounded-lg p-3 space-y-3 bg-secondary/30">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
                     <Search className="h-3.5 w-3.5" /> Classificação do Produto
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => setModal({ ...modal, familia_produto: null, marca: null, produto: null })}
-                    className={`text-xs px-2 py-1 rounded-md border transition ${
-                      !modal.familia_produto && !modal.marca && !modal.produto
+                  <label
+                    className={`flex items-center gap-2 text-xs px-2 py-1 rounded-md border cursor-pointer transition select-none ${
+                      isGenerica
                         ? 'bg-primary/20 border-primary text-primary font-semibold'
                         : 'bg-secondary border-border text-secondary-foreground hover:border-primary/50'
                     }`}
-                    title="Aplica a TODAS as vendas que não tenham regra mais específica"
+                    title="Quando marcado, a regra vale para TODAS as vendas que não tenham regra mais específica"
                   >
+                    <input
+                      type="checkbox"
+                      checked={isGenerica}
+                      onChange={e => {
+                        if (e.target.checked) {
+                          setModal({ ...modal, familia_produto: null, marca: null, produto: null });
+                        }
+                      }}
+                      className="h-3.5 w-3.5 accent-primary cursor-pointer"
+                    />
                     ⭐ Regra Geral (genérica)
-                  </button>
+                  </label>
                 </div>
                 <AutocompleteInput
                   label="Família"
@@ -944,6 +955,7 @@ export default function AdminRegras() {
                   onChange={v => setModal({ ...modal, familia_produto: v })}
                   options={familiasFiltered}
                   placeholder="Ex: Camisetas, Calças..."
+                  disabled={isGenerica}
                 />
                 <AutocompleteInput
                   label="Marca"
@@ -951,6 +963,7 @@ export default function AdminRegras() {
                   onChange={v => setModal({ ...modal, marca: v })}
                   options={marcasFiltered}
                   placeholder="Ex: Nike, Adidas..."
+                  disabled={isGenerica}
                 />
                 <AutocompleteInput
                   label="Produto"
@@ -958,8 +971,11 @@ export default function AdminRegras() {
                   onChange={v => setModal({ ...modal, produto: v })}
                   options={produtosOptions}
                   placeholder={(familiaAtual || marcaAtual) ? "Selecione um produto..." : "Selecione uma família ou marca primeiro..."}
+                  disabled={isGenerica}
                 />
               </div>
+                );
+              })()}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
