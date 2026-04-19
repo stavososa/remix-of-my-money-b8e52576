@@ -180,6 +180,33 @@ function FilialMultiSelect({
           })}
         </div>
       )}
+      {/* Atalhos rápidos */}
+      <div className="flex flex-wrap gap-1.5 mt-2">
+        <button
+          type="button"
+          onClick={() => onChange(null)}
+          className={`text-xs px-2 py-1 rounded-md border transition ${allSelected ? 'bg-primary/20 border-primary text-primary font-semibold' : 'bg-secondary border-border text-secondary-foreground hover:border-primary/50'}`}
+        >
+          Todas
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange('DELIVERY')}
+          className={`text-xs px-2 py-1 rounded-md border transition ${selected.length === 1 && selected[0] === 'DELIVERY' ? 'bg-primary/20 border-primary text-primary font-semibold' : 'bg-secondary border-border text-secondary-foreground hover:border-primary/50'}`}
+        >
+          Só DELIVERY
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const lojas = unidades.filter(u => !/delivery/i.test(u.nome)).map(u => u.nome);
+            onChange(lojas.length ? lojas.join(',') : null);
+          }}
+          className="text-xs px-2 py-1 rounded-md border bg-secondary border-border text-secondary-foreground hover:border-primary/50 transition"
+        >
+          Só Lojas Físicas
+        </button>
+      </div>
       {selected.length > 0 && (
         <div className="flex flex-wrap gap-1 mt-1.5">
           {selected.map(s => (
@@ -219,7 +246,7 @@ export default function AdminRegras() {
     { id: 'fb-valqueire', nome: 'VALQUEIRE', tipo: 'Loja' },
     { id: 'fb-vistaalegre', nome: 'VISTA ALEGRE', tipo: 'Loja' },
   ];
-  const { data: unidades = UNIDADES_FALLBACK } = useQuery({
+  const { data: unidadesRaw = UNIDADES_FALLBACK } = useQuery({
     queryKey: ['unidades-list'],
     queryFn: async () => {
       try {
@@ -236,6 +263,14 @@ export default function AdminRegras() {
     },
     staleTime: 10 * 60 * 1000,
   });
+
+  // Garante que DELIVERY sempre apareça no select, independentemente do que vier do banco
+  const unidades = useMemo(() => {
+    const list = [...unidadesRaw];
+    const hasDelivery = list.some(u => /delivery/i.test(u.nome));
+    if (!hasDelivery) list.unshift({ id: 'virtual-delivery', nome: 'DELIVERY', tipo: 'Delivery' });
+    return list;
+  }, [unidadesRaw]);
 
   const { data: regras = [], isLoading } = useQuery({
     queryKey: ['regras', periodoAno, periodoMes],
