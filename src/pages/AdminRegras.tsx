@@ -405,9 +405,7 @@ export default function AdminRegras() {
       // Validação obrigatória
       if (!form.nome.trim()) throw new Error('Nome é obrigatório');
       if (!form.percentual || form.percentual <= 0) throw new Error('Percentual deve ser maior que zero');
-      if (!form.familia_produto && !form.marca && !form.produto) {
-        throw new Error('Informe ao menos Família, Marca ou Produto (regra 100% genérica não é permitida)');
-      }
+      // Regra 100% genérica é permitida (atua como fallback geral)
 
       // Auto-preenche família/marca a partir do produto selecionado, se vazias
       let famAuto = form.familia_produto;
@@ -885,9 +883,23 @@ export default function AdminRegras() {
 
               {/* Product classification fields */}
               <div className="border border-border rounded-lg p-3 space-y-3 bg-secondary/30">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                  <Search className="h-3.5 w-3.5" /> Classificação do Produto
-                </p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                    <Search className="h-3.5 w-3.5" /> Classificação do Produto
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setModal({ ...modal, familia_produto: null, marca: null, produto: null })}
+                    className={`text-xs px-2 py-1 rounded-md border transition ${
+                      !modal.familia_produto && !modal.marca && !modal.produto
+                        ? 'bg-primary/20 border-primary text-primary font-semibold'
+                        : 'bg-secondary border-border text-secondary-foreground hover:border-primary/50'
+                    }`}
+                    title="Aplica a TODAS as vendas que não tenham regra mais específica"
+                  >
+                    ⭐ Regra Geral (genérica)
+                  </button>
+                </div>
                 <AutocompleteInput
                   label="Família"
                   value={modal.familia_produto || ''}
@@ -974,13 +986,11 @@ export default function AdminRegras() {
                   !modal.nome.trim() ||
                   !modal.percentual ||
                   modal.percentual <= 0 ||
-                  (!modal.familia_produto && !modal.marca && !modal.produto) ||
                   saveMutation.isPending
                 }
                 title={
                   !modal.nome.trim() ? 'Informe o nome' :
                   !modal.percentual || modal.percentual <= 0 ? 'Percentual deve ser maior que zero' :
-                  (!modal.familia_produto && !modal.marca && !modal.produto) ? 'Informe ao menos Família, Marca ou Produto' :
                   'Salvar'
                 }
                 className="px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
