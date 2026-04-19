@@ -55,15 +55,20 @@ function AutocompleteInput({
   options,
   placeholder,
   label,
+  disabled,
 }: {
   value: string;
   onChange: (v: string | null) => void;
   options: string[];
   placeholder: string;
   label: string;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState(value || '');
+
+  // Mantém input sincronizado quando limpo de fora (ex.: ativar Regra Geral)
+  useEffect(() => { setSearch(value || ''); }, [value]);
 
   const filtered = useMemo(() => {
     if (!search) return options.slice(0, 50);
@@ -73,17 +78,18 @@ function AutocompleteInput({
 
   return (
     <div className="relative">
-      <label className="text-sm text-secondary-foreground">{label}</label>
+      <label className={`text-sm ${disabled ? 'text-muted-foreground/50' : 'text-secondary-foreground'}`}>{label}</label>
       <div className="relative mt-1">
         <input
           value={search}
+          disabled={disabled}
           onChange={e => { setSearch(e.target.value); onChange(e.target.value || null); setOpen(true); }}
-          onFocus={() => setOpen(true)}
+          onFocus={() => !disabled && setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 200)}
-          className="w-full px-3 py-2 pr-8 rounded-md bg-secondary border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-          placeholder={placeholder}
+          className="w-full px-3 py-2 pr-8 rounded-md bg-secondary border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
+          placeholder={disabled ? '— desativado (Regra Geral) —' : placeholder}
         />
-        {search && (
+        {search && !disabled && (
           <button
             type="button"
             onClick={() => { setSearch(''); onChange(null); }}
@@ -93,7 +99,7 @@ function AutocompleteInput({
           </button>
         )}
       </div>
-      {open && filtered.length > 0 && (
+      {open && !disabled && filtered.length > 0 && (
         <div className="absolute z-50 mt-1 w-full max-h-40 overflow-y-auto rounded-md bg-card border border-border shadow-lg">
           {filtered.map(opt => (
             <button
@@ -914,23 +920,34 @@ export default function AdminRegras() {
               </div>
 
               {/* Product classification fields */}
+              {(() => {
+                const isGenerica = !modal.familia_produto && !modal.marca && !modal.produto;
+                return (
               <div className="border border-border rounded-lg p-3 space-y-3 bg-secondary/30">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
                     <Search className="h-3.5 w-3.5" /> Classificação do Produto
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => setModal({ ...modal, familia_produto: null, marca: null, produto: null })}
-                    className={`text-xs px-2 py-1 rounded-md border transition ${
-                      !modal.familia_produto && !modal.marca && !modal.produto
+                  <label
+                    className={`flex items-center gap-2 text-xs px-2 py-1 rounded-md border cursor-pointer transition select-none ${
+                      isGenerica
                         ? 'bg-primary/20 border-primary text-primary font-semibold'
                         : 'bg-secondary border-border text-secondary-foreground hover:border-primary/50'
                     }`}
-                    title="Aplica a TODAS as vendas que não tenham regra mais específica"
+                    title="Quando marcado, a regra vale para TODAS as vendas que não tenham regra mais específica"
                   >
+                    <input
+                      type="checkbox"
+                      checked={isGenerica}
+                      onChange={e => {
+                        if (e.target.checked) {
+                          setModal({ ...modal, familia_produto: null, marca: null, produto: null });
+                        }
+                      }}
+                      className="h-3.5 w-3.5 accent-primary cursor-pointer"
+                    />
                     ⭐ Regra Geral (genérica)
-                  </button>
+                  </label>
                 </div>
                 <AutocompleteInput
                   label="Família"
@@ -938,6 +955,7 @@ export default function AdminRegras() {
                   onChange={v => setModal({ ...modal, familia_produto: v })}
                   options={familiasFiltered}
                   placeholder="Ex: Camisetas, Calças..."
+                  disabled={isGenerica}
                 />
                 <AutocompleteInput
                   label="Marca"
@@ -945,6 +963,7 @@ export default function AdminRegras() {
                   onChange={v => setModal({ ...modal, marca: v })}
                   options={marcasFiltered}
                   placeholder="Ex: Nike, Adidas..."
+                  disabled={isGenerica}
                 />
                 <AutocompleteInput
                   label="Produto"
@@ -952,8 +971,11 @@ export default function AdminRegras() {
                   onChange={v => setModal({ ...modal, produto: v })}
                   options={produtosOptions}
                   placeholder={(familiaAtual || marcaAtual) ? "Selecione um produto..." : "Selecione uma família ou marca primeiro..."}
+                  disabled={isGenerica}
                 />
               </div>
+                );
+              })()}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
