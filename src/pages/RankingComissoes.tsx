@@ -106,7 +106,7 @@ function aggregate(items: ComissaoCalculada[], keyFn: (item: ComissaoCalculada) 
     }));
 }
 
-function RankingSection({ data, title, nameLabel, limit, icon: Icon, hideFinancials, visibleFinancialName }: {
+function RankingSection({ data, title, nameLabel, limit, icon: Icon, hideFinancials, visibleFinancialName, onRowClick }: {
   data: AggRow[];
   title: string;
   nameLabel: string;
@@ -114,6 +114,7 @@ function RankingSection({ data, title, nameLabel, limit, icon: Icon, hideFinanci
   icon: React.ElementType;
   hideFinancials?: boolean;
   visibleFinancialName?: string;
+  onRowClick?: (row: AggRow) => void;
 }) {
   const display = limit ? data.slice(0, limit) : data;
 
