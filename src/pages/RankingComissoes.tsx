@@ -58,6 +58,16 @@ interface ComissaoCalculada {
   percentual: number;
   valor_comissao: number;
   quantidade: number;
+  regra_nome: string;
+}
+
+interface VendaSemRegra {
+  vendedor: string;
+  filial: string;
+  descricao_produto: string;
+  familia_produto: string;
+  marca: string;
+  valor_venda: number;
 }
 
 interface AggRow {
