@@ -361,19 +361,27 @@ export default function RankingComissoes() {
       };
 
       const regra = resolverRegra(vendaParaRegra, regras);
+      const qtd = parseMoneyBR(v.quantidade) || 1;
+      const dataEmissao = v.data_emissao ?? '';
+      const notaFiscal = v.nota_fiscal ?? '';
       if (!regra) {
         semRegra.push({
+          data_emissao: dataEmissao,
+          nota_fiscal: notaFiscal,
           vendedor,
           filial,
           descricao_produto: v.descricao_produto ?? 'Sem Produto',
           familia_produto: v.familia_produto ?? 'Sem Família',
           marca: v.marca ?? 'Sem Marca',
           valor_venda: valorVenda,
+          quantidade: qtd,
         });
         continue;
       }
 
       results.push({
+        data_emissao: dataEmissao,
+        nota_fiscal: notaFiscal,
         descricao_produto: v.descricao_produto ?? 'Sem Produto',
         familia_produto: v.familia_produto ?? 'Sem Família',
         marca: v.marca ?? 'Sem Marca',
@@ -382,7 +390,7 @@ export default function RankingComissoes() {
         valor_venda: valorVenda,
         percentual: regra.percentual,
         valor_comissao: valorVenda * regra.percentual / 100,
-        quantidade: parseMoneyBR(v.quantidade) || 1,
+        quantidade: qtd,
         regra_nome: regra.nome,
       });
     }
