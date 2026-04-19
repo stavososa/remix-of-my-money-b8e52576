@@ -207,17 +207,32 @@ export default function AdminRegras() {
   const [showAuditLog, setShowAuditLog] = useState(false);
   const [dupTarget, setDupTarget] = useState({ ano: periodoAno, mes: periodoMes });
 
-  // Fetch unidades for filial multi-select
-  const { data: unidades = [] } = useQuery({
+  // Fetch unidades for filial multi-select (with fallback when table is empty/missing)
+  const UNIDADES_FALLBACK: { id: string; nome: string; tipo: string }[] = [
+    { id: 'fb-delivery', nome: 'DELIVERY', tipo: 'Delivery' },
+    { id: 'fb-barra', nome: 'BARRA DA TIJUCA', tipo: 'Loja' },
+    { id: 'fb-botafogo', nome: 'BOTAFOGO', tipo: 'Loja' },
+    { id: 'fb-campogrande', nome: 'CAMPO GRANDE', tipo: 'Loja' },
+    { id: 'fb-freguesia', nome: 'FREGUESIA', tipo: 'Loja' },
+    { id: 'fb-novaiguacu', nome: 'NOVA IGUAÇU', tipo: 'Loja' },
+    { id: 'fb-recreio', nome: 'RECREIO', tipo: 'Loja' },
+    { id: 'fb-valqueire', nome: 'VALQUEIRE', tipo: 'Loja' },
+    { id: 'fb-vistaalegre', nome: 'VISTA ALEGRE', tipo: 'Loja' },
+  ];
+  const { data: unidades = UNIDADES_FALLBACK } = useQuery({
     queryKey: ['unidades-list'],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from('unidades')
-        .select('id, nome, tipo')
-        .eq('ativo', true)
-        .order('nome');
-      if (error) throw error;
-      return (data ?? []) as { id: string; nome: string; tipo: string }[];
+      try {
+        const { data, error } = await (supabase as any)
+          .from('unidades')
+          .select('id, nome, tipo')
+          .eq('ativo', true)
+          .order('nome');
+        if (error || !data || data.length === 0) return UNIDADES_FALLBACK;
+        return data as { id: string; nome: string; tipo: string }[];
+      } catch {
+        return UNIDADES_FALLBACK;
+      }
     },
     staleTime: 10 * 60 * 1000,
   });
