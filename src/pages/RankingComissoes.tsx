@@ -325,7 +325,9 @@ export default function RankingComissoes() {
       if (error) throw error;
       return (data ?? []) as RegraComissao[];
     },
-    staleTime: Infinity,
+    staleTime: 30 * 1000, // 30s — regras podem ser editadas no Admin a qualquer momento
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
 
   // Calculate commissions
