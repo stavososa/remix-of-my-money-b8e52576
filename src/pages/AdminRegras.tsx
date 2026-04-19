@@ -6,7 +6,7 @@ import { usePeriod } from '@/contexts/PeriodContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, X, Search, Copy, AlertTriangle, History } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Search, Copy, AlertTriangle, History, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const MESES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -479,6 +479,53 @@ export default function AdminRegras() {
     },
   });
 
+  const sincronizarMutation = useMutation({
+    mutationFn: async () => {
+      const pendentes = regras.filter((r: any) => r.produto && (!r.familia_produto || !r.marca));
+      if (pendentes.length === 0) return { atualizadas: 0, semDados: 0, total: 0 };
+
+      const produtos = [...new Set(pendentes.map((r: any) => r.produto as string))];
+      const map: Record<string, { familia: string | null; marca: string | null }> = {};
+
+      // Busca em lotes de 100 produtos
+      for (let i = 0; i < produtos.length; i += 100) {
+        const chunk = produtos.slice(i, i + 100);
+        const { data } = await (supabase as any)
+          .from('vendas')
+          .select('descricao_produto, familia_produto, marca')
+          .in('descricao_produto', chunk)
+          .not('familia_produto', 'is', null)
+          .limit(5000);
+        (data ?? []).forEach((v: any) => {
+          if (v.descricao_produto && !map[v.descricao_produto]) {
+            map[v.descricao_produto] = { familia: v.familia_produto, marca: v.marca };
+          }
+        });
+      }
+
+      let atualizadas = 0;
+      let semDados = 0;
+      for (const r of pendentes) {
+        const meta = map[r.produto];
+        if (!meta || (!meta.familia && !meta.marca)) { semDados++; continue; }
+        const update: any = { atualizado_por: user?.id, atualizado_em: new Date().toISOString() };
+        if (!r.familia_produto && meta.familia) update.familia_produto = meta.familia;
+        if (!r.marca && meta.marca) update.marca = meta.marca;
+        if (Object.keys(update).length <= 2) { semDados++; continue; }
+        const { error } = await (supabase as any).from('comissoes').update(update).eq('id', r.id);
+        if (!error) atualizadas++;
+      }
+      return { atualizadas, semDados, total: pendentes.length };
+    },
+    onSuccess: (res) => {
+      if (res.total === 0) toast.info('Nenhuma regra precisa de sincronização');
+      else toast.success(`${res.atualizadas} de ${res.total} regras sincronizadas${res.semDados ? ` (${res.semDados} sem dados nas vendas)` : ''}`);
+      qc.invalidateQueries({ queryKey: ['regras'] });
+      qc.invalidateQueries({ queryKey: ['produto-meta'] });
+    },
+    onError: (e: Error) => toast.error(`Erro: ${e.message}`),
+  });
+
   const duplicateMutation = useMutation({
     mutationFn: async ({ targetAno, targetMes }: { targetAno: number; targetMes: number }) => {
       const inserts = regras.map((r: any) => ({
@@ -655,6 +702,17 @@ export default function AdminRegras() {
             >
               <History className="h-4 w-4" /> Auditoria
             </button>
+            {regras.some((r: any) => r.produto && (!r.familia_produto || !r.marca)) && (
+              <button
+                onClick={() => sincronizarMutation.mutate()}
+                disabled={sincronizarMutation.isPending}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-primary/50 text-primary font-semibold text-sm hover:bg-primary/10 transition-colors disabled:opacity-50"
+                title="Busca família e marca nas vendas e atualiza as regras com produto"
+              >
+                <Wand2 className={`h-4 w-4 ${sincronizarMutation.isPending ? 'animate-spin' : ''}`} />
+                {sincronizarMutation.isPending ? 'Sincronizando...' : 'Sincronizar Família/Marca'}
+              </button>
+            )}
             {regras.length > 0 && (
               <>
                 <button
