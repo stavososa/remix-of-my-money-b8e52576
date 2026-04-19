@@ -702,6 +702,17 @@ export default function AdminRegras() {
             >
               <History className="h-4 w-4" /> Auditoria
             </button>
+            {regras.some((r: any) => r.produto && (!r.familia_produto || !r.marca)) && (
+              <button
+                onClick={() => sincronizarMutation.mutate()}
+                disabled={sincronizarMutation.isPending}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-primary/50 text-primary font-semibold text-sm hover:bg-primary/10 transition-colors disabled:opacity-50"
+                title="Busca família e marca nas vendas e atualiza as regras com produto"
+              >
+                <Wand2 className={`h-4 w-4 ${sincronizarMutation.isPending ? 'animate-spin' : ''}`} />
+                {sincronizarMutation.isPending ? 'Sincronizando...' : 'Sincronizar Família/Marca'}
+              </button>
+            )}
             {regras.length > 0 && (
               <>
                 <button
