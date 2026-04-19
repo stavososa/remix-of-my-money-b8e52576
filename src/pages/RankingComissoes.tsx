@@ -194,6 +194,8 @@ export default function RankingComissoes() {
   const [filtroVendedor, setFiltroVendedor] = useState<string[]>([]);
   const [filtroFamilia, setFiltroFamilia] = useState<string[]>([]);
   const [filtroMarca, setFiltroMarca] = useState<string[]>([]);
+  const [showSemRegra, setShowSemRegra] = useState(false);
+  const [auditarVendedor, setAuditarVendedor] = useState<string | null>(null);
 
   // Force filial filter for gerente
   useEffect(() => {
