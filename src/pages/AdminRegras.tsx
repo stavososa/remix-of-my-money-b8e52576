@@ -234,6 +234,14 @@ export default function AdminRegras() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [modal, setModal] = useState<RegraForm | null>(null);
+  const [genericaToggle, setGenericaToggle] = useState(false);
+
+  // Sincroniza toggle ao abrir/editar regra
+  useEffect(() => {
+    if (modal) {
+      setGenericaToggle(!modal.familia_produto && !modal.marca && !modal.produto);
+    }
+  }, [modal?.id]);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
