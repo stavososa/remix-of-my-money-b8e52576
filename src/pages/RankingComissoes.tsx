@@ -287,24 +287,36 @@ export default function RankingComissoes() {
 
       const PAGE = 1000;
       const totalPages = Math.ceil(count / PAGE);
-      const promises = [];
-      for (let i = 0; i < totalPages; i++) {
+
+      // Busca uma página com retry (timeouts intermitentes do PostgREST)
+      const fetchPage = async (i: number): Promise<VendaRow[]> => {
         const from = i * PAGE;
-        promises.push(
-          (supabase as any)
+        const MAX_TENTATIVAS = 4;
+        let ultimaErr: any = null;
+        for (let tentativa = 1; tentativa <= MAX_TENTATIVAS; tentativa++) {
+          const res: any = await (supabase as any)
             .from('vendas')
             .select('descricao_produto, familia_produto, marca, total_com_desconto, quantidade, vendedor_nome, cnpj_empresa, data_emissao, nota_fiscal')
             .gte('data_emissao', dataInicio)
             .lte('data_emissao', dataFim)
             .order('id', { ascending: true })
-            .range(from, from + PAGE - 1)
-        );
-      }
-      const results = await Promise.all(promises);
+            .range(from, from + PAGE - 1);
+          if (!res.error) return (res.data ?? []) as VendaRow[];
+          ultimaErr = res.error;
+          // Backoff exponencial: 400ms, 800ms, 1600ms
+          await new Promise(r => setTimeout(r, 400 * Math.pow(2, tentativa - 1)));
+        }
+        throw ultimaErr;
+      };
+
+      // Concorrência limitada (4 simultâneas) p/ não sobrecarregar o PostgREST
+      const CONCORRENCIA = 4;
       let all: VendaRow[] = [];
-      for (const res of results as any[]) {
-        if (res.error) throw res.error;
-        if (res.data) all = all.concat(res.data);
+      for (let i = 0; i < totalPages; i += CONCORRENCIA) {
+        const lote: Promise<VendaRow[]>[] = [];
+        for (let j = i; j < Math.min(i + CONCORRENCIA, totalPages); j++) lote.push(fetchPage(j));
+        const resultados = await Promise.all(lote);
+        for (const r of resultados) all = all.concat(r);
       }
       return all;
     },
