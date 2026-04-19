@@ -234,6 +234,14 @@ export default function AdminRegras() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [modal, setModal] = useState<RegraForm | null>(null);
+  const [genericaToggle, setGenericaToggle] = useState(false);
+
+  // Sincroniza toggle ao abrir/editar regra
+  useEffect(() => {
+    if (modal) {
+      setGenericaToggle(!modal.familia_produto && !modal.marca && !modal.produto);
+    }
+  }, [modal?.id]);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
@@ -921,7 +929,7 @@ export default function AdminRegras() {
 
               {/* Product classification fields */}
               {(() => {
-                const isGenerica = !modal.familia_produto && !modal.marca && !modal.produto;
+                const isGenerica = genericaToggle;
                 return (
               <div className="border border-border rounded-lg p-3 space-y-3 bg-secondary/30">
                 <div className="flex items-center justify-between gap-2">
@@ -940,7 +948,9 @@ export default function AdminRegras() {
                       role="switch"
                       aria-checked={isGenerica}
                       onClick={() => {
-                        if (!isGenerica) {
+                        const next = !isGenerica;
+                        setGenericaToggle(next);
+                        if (next) {
                           setModal({ ...modal, familia_produto: null, marca: null, produto: null });
                         }
                       }}
