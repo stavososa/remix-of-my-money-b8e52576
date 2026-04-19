@@ -753,11 +753,87 @@ export default function RankingComissoes() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60" onClick={() => setAuditarVendedor(null)} />
           <div className="relative bg-card border border-border rounded-xl p-5 w-full max-w-5xl shadow-card max-h-[85vh] overflow-hidden flex flex-col">
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="text-lg font-bold text-foreground">Auditoria: {auditarVendedor}</h3>
-              <button onClick={() => setAuditarVendedor(null)} className="text-muted-foreground hover:text-foreground">
-                <X className="h-5 w-5" />
-              </button>
+            <div className="flex justify-between items-center mb-3 gap-3">
+              <h3 className="text-lg font-bold text-foreground truncate">Auditoria: {auditarVendedor}</h3>
+              <div className="flex items-center gap-2 shrink-0">
+                {(() => {
+                  const vendas = comissoesCalculadas.filter(c => c.vendedor === auditarVendedor);
+                  const semRegra = vendasSemRegra.filter(v => v.vendedor === auditarVendedor);
+                  const handleExport = () => {
+                    const rows = [
+                      ...vendas.map(v => ({
+                        Data: v.data_emissao,
+                        'Nota Fiscal': v.nota_fiscal,
+                        Filial: v.filial,
+                        Produto: v.descricao_produto,
+                        Família: v.familia_produto,
+                        Marca: v.marca,
+                        Quantidade: v.quantidade,
+                        'Faturamento (R$)': Number(v.valor_venda.toFixed(2)),
+                        '% Aplicado': Number(v.percentual.toFixed(2)),
+                        'Comissão (R$)': Number(v.valor_comissao.toFixed(2)),
+                        'Regra Aplicada': v.regra_nome,
+                      })),
+                      ...semRegra.map(v => ({
+                        Data: v.data_emissao,
+                        'Nota Fiscal': v.nota_fiscal,
+                        Filial: v.filial,
+                        Produto: v.descricao_produto,
+                        Família: v.familia_produto,
+                        Marca: v.marca,
+                        Quantidade: v.quantidade,
+                        'Faturamento (R$)': Number(v.valor_venda.toFixed(2)),
+                        '% Aplicado': 0,
+                        'Comissão (R$)': 0,
+                        'Regra Aplicada': 'SEM REGRA',
+                      })),
+                    ];
+                    const totalFat = rows.reduce((s, r) => s + (r['Faturamento (R$)'] as number), 0);
+                    const totalCom = rows.reduce((s, r) => s + (r['Comissão (R$)'] as number), 0);
+                    rows.push({
+                      Data: '', 'Nota Fiscal': '', Filial: '', Produto: 'TOTAL', Família: '', Marca: '',
+                      Quantidade: rows.reduce((s, r) => s + (r.Quantidade as number), 0),
+                      'Faturamento (R$)': Number(totalFat.toFixed(2)),
+                      '% Aplicado': totalFat > 0 ? Number(((totalCom / totalFat) * 100).toFixed(2)) : 0,
+                      'Comissão (R$)': Number(totalCom.toFixed(2)),
+                      'Regra Aplicada': '',
+                    } as any);
+                    const ws = XLSX.utils.json_to_sheet(rows);
+                    // Column widths
+                    ws['!cols'] = [
+                      { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 40 }, { wch: 22 }, { wch: 18 },
+                      { wch: 10 }, { wch: 16 }, { wch: 12 }, { wch: 16 }, { wch: 30 },
+                    ];
+                    // Currency / percent formatting on data rows (skip header at row 1)
+                    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+                    for (let R = 1; R <= range.e.r; R++) {
+                      const fatCell = ws[XLSX.utils.encode_cell({ r: R, c: 7 })];
+                      const pctCell = ws[XLSX.utils.encode_cell({ r: R, c: 8 })];
+                      const comCell = ws[XLSX.utils.encode_cell({ r: R, c: 9 })];
+                      if (fatCell) fatCell.z = 'R$ #,##0.00';
+                      if (pctCell) pctCell.z = '0.00"%"';
+                      if (comCell) comCell.z = 'R$ #,##0.00';
+                    }
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, 'Comissões');
+                    const safeName = auditarVendedor.replace(/[^a-z0-9]/gi, '_').slice(0, 40);
+                    XLSX.writeFile(wb, `comissoes_${safeName}_${MESES[periodoMes]}_${periodoAno}.xlsx`);
+                  };
+                  return (
+                    <button
+                      onClick={handleExport}
+                      disabled={vendas.length === 0 && semRegra.length === 0}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-success/15 text-success hover:bg-success/25 transition-colors disabled:opacity-40"
+                      title="Exportar todas as vendas detalhadas para Excel"
+                    >
+                      <FileSpreadsheet className="h-3.5 w-3.5" /> Exportar XLSX
+                    </button>
+                  );
+                })()}
+                <button onClick={() => setAuditarVendedor(null)} className="text-muted-foreground hover:text-foreground">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
             {(() => {
               const vendas = comissoesCalculadas.filter(c => c.vendedor === auditarVendedor);
@@ -765,49 +841,67 @@ export default function RankingComissoes() {
               const totalCom = vendas.reduce((s, v) => s + v.valor_comissao, 0);
               const totalFat = vendas.reduce((s, v) => s + v.valor_venda, 0);
               const totalIgnorado = semRegra.reduce((s, v) => s + v.valor_venda, 0);
+              const fmtData = (d: string) => {
+                if (!d) return '—';
+                const [y, m, dd] = d.split('T')[0].split('-');
+                return `${dd}/${m}/${y}`;
+              };
               return (
                 <>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3 text-xs">
-                    <div className="p-2 rounded bg-secondary"><div className="text-muted-foreground">Vendas</div><div className="font-bold text-foreground">{vendas.length}</div></div>
-                    <div className="p-2 rounded bg-secondary"><div className="text-muted-foreground">Faturamento</div><div className="font-bold text-foreground">{fmt(totalFat)}</div></div>
+                    <div className="p-2 rounded bg-secondary"><div className="text-muted-foreground">Vendas</div><div className="font-bold text-foreground">{(vendas.length + semRegra.length).toLocaleString('pt-BR')}</div></div>
+                    <div className="p-2 rounded bg-secondary"><div className="text-muted-foreground">Faturamento</div><div className="font-bold text-foreground">{fmt(totalFat + totalIgnorado)}</div></div>
                     <div className="p-2 rounded bg-primary/10"><div className="text-muted-foreground">Comissão</div><div className="font-bold text-primary">{fmt(totalCom)}</div></div>
                     <div className="p-2 rounded bg-warning/10"><div className="text-muted-foreground">Ignorado (s/ regra)</div><div className="font-bold text-warning">{fmt(totalIgnorado)}</div></div>
                   </div>
                   <div className="overflow-auto flex-1 border border-border rounded-md">
                     <table className="w-full text-xs">
-                      <thead className="bg-secondary sticky top-0">
+                      <thead className="bg-secondary sticky top-0 z-10">
                         <tr>
+                          <th className="text-left p-2 whitespace-nowrap">Data</th>
+                          <th className="text-left p-2 whitespace-nowrap">NF</th>
+                          <th className="text-left p-2">Filial</th>
                           <th className="text-left p-2">Produto</th>
                           <th className="text-left p-2">Família</th>
                           <th className="text-left p-2">Marca</th>
-                          <th className="text-left p-2">Regra Aplicada</th>
-                          <th className="text-right p-2">%</th>
+                          <th className="text-right p-2">Qtd</th>
                           <th className="text-right p-2">Venda</th>
+                          <th className="text-right p-2">%</th>
                           <th className="text-right p-2">Comissão</th>
+                          <th className="text-left p-2">Regra</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {vendas.slice(0, 500).map((v, i) => (
+                        {vendas.map((v, i) => (
                           <tr key={i} className="border-t border-border hover:bg-secondary/50">
-                            <td className="p-2 text-foreground max-w-[200px] truncate" title={v.descricao_produto}>{v.descricao_produto}</td>
+                            <td className="p-2 text-muted-foreground whitespace-nowrap">{fmtData(v.data_emissao)}</td>
+                            <td className="p-2 text-muted-foreground whitespace-nowrap">{v.nota_fiscal || '—'}</td>
+                            <td className="p-2 text-muted-foreground">{v.filial}</td>
+                            <td className="p-2 text-foreground max-w-[220px] truncate" title={v.descricao_produto}>{v.descricao_produto}</td>
                             <td className="p-2 text-muted-foreground">{v.familia_produto}</td>
                             <td className="p-2 text-muted-foreground">{v.marca}</td>
-                            <td className="p-2 text-foreground">{v.regra_nome}</td>
-                            <td className="p-2 text-right">{v.percentual.toFixed(2)}%</td>
+                            <td className="p-2 text-right">{v.quantidade.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</td>
                             <td className="p-2 text-right">{fmt(v.valor_venda)}</td>
+                            <td className="p-2 text-right">{v.percentual.toFixed(2)}%</td>
                             <td className="p-2 text-right font-semibold text-primary">{fmt(v.valor_comissao)}</td>
+                            <td className="p-2 text-foreground">{v.regra_nome}</td>
                           </tr>
                         ))}
-                        {semRegra.slice(0, 200).map((v, i) => (
+                        {semRegra.map((v, i) => (
                           <tr key={`sr-${i}`} className="border-t border-border bg-warning/5">
-                            <td className="p-2 text-foreground max-w-[200px] truncate" title={v.descricao_produto}>{v.descricao_produto}</td>
+                            <td className="p-2 text-muted-foreground whitespace-nowrap">{fmtData(v.data_emissao)}</td>
+                            <td className="p-2 text-muted-foreground whitespace-nowrap">{v.nota_fiscal || '—'}</td>
+                            <td className="p-2 text-muted-foreground">{v.filial}</td>
+                            <td className="p-2 text-foreground max-w-[220px] truncate" title={v.descricao_produto}>{v.descricao_produto}</td>
                             <td className="p-2 text-muted-foreground">{v.familia_produto}</td>
                             <td className="p-2 text-muted-foreground">{v.marca}</td>
-                            <td className="p-2 italic text-warning">SEM REGRA</td>
-                            <td className="p-2 text-right">—</td>
+                            <td className="p-2 text-right">{v.quantidade.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</td>
                             <td className="p-2 text-right">{fmt(v.valor_venda)}</td>
                             <td className="p-2 text-right text-warning">—</td>
+                            <td className="p-2 text-right text-warning">—</td>
+                            <td className="p-2 italic text-warning">SEM REGRA</td>
                           </tr>
+                        ))}
                         ))}
                       </tbody>
                     </table>
