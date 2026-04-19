@@ -460,13 +460,23 @@ export default function AdminRegras() {
     mutationFn: async ({ id, ativo }: { id: string; ativo: boolean }) => {
       const { error } = await (supabase as any).from('comissoes').update({ ativo, atualizado_por: user?.id, atualizado_em: new Date().toISOString() }).eq('id', id);
       if (error) throw error;
-      await logAudit('editou', id, { acao: ativo ? 'ativou' : 'desativou' });
+      logAudit('editou', id, { acao: ativo ? 'ativou' : 'desativou' });
     },
-    onSuccess: () => {
+    onMutate: async ({ id, ativo }) => {
+      await qc.cancelQueries({ queryKey: ['regras', periodoAno, periodoMes] });
+      const prev = qc.getQueryData<any[]>(['regras', periodoAno, periodoMes]);
+      if (prev) {
+        qc.setQueryData(['regras', periodoAno, periodoMes], prev.map((r: any) => r.id === id ? { ...r, ativo } : r));
+      }
+      return { prev };
+    },
+    onError: (e: Error, _vars, ctx: any) => {
+      if (ctx?.prev) qc.setQueryData(['regras', periodoAno, periodoMes], ctx.prev);
+      toast.error(`Erro: ${e.message}`);
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['regras'] });
-      qc.invalidateQueries({ queryKey: ['audit-log'] });
     },
-    onError: (e: Error) => toast.error(`Erro: ${e.message}`),
   });
 
   const duplicateMutation = useMutation({
