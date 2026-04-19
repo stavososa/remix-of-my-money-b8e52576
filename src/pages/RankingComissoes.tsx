@@ -47,9 +47,13 @@ interface VendaRow {
   quantidade: unknown;
   vendedor_nome: string | null;
   cnpj_empresa: string | null;
+  data_emissao: string | null;
+  nota_fiscal: string | null;
 }
 
 interface ComissaoCalculada {
+  data_emissao: string;
+  nota_fiscal: string;
   descricao_produto: string;
   familia_produto: string;
   marca: string;
