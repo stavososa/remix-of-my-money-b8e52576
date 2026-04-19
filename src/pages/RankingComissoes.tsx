@@ -723,6 +723,30 @@ export default function RankingComissoes() {
                   </button>
                 )}
               </div>
+
+              {!isGerente && (
+                <div className="mt-4 pt-4 border-t border-border flex flex-wrap gap-2 items-center">
+                  <span className="text-xs text-muted-foreground mr-1">
+                    Exportar geral {filtroFilial.length > 0 ? `(${filtroFilial.join(', ')})` : '(todas as filiais)'}:
+                  </span>
+                  <button
+                    onClick={exportarGeralDetalhado}
+                    disabled={filtered.length === 0 && filteredSemRegra.length === 0}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary/15 text-primary hover:bg-primary/25 transition-colors disabled:opacity-40"
+                    title="Excel detalhado: cada venda com NF, produto, % e comissão"
+                  >
+                    <FileSpreadsheet className="h-3.5 w-3.5" /> XLSX Detalhado (todas as vendas)
+                  </button>
+                  <button
+                    onClick={exportarGeralResumo}
+                    disabled={byVendedor.length === 0}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-success/15 text-success hover:bg-success/25 transition-colors disabled:opacity-40"
+                    title="Excel resumido: comissão total por vendedor"
+                  >
+                    <FileSpreadsheet className="h-3.5 w-3.5" /> XLSX Resumo (por vendedor)
+                  </button>
+                </div>
+              )}
             </CardContent>
           </Card>
 
