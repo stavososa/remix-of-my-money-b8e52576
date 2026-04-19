@@ -608,7 +608,7 @@ export default function RankingComissoes() {
           {!isGerente && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <RankingSection data={byFilial} title="Comissão por Filial" nameLabel="Filial" icon={Building2} />
-              <RankingSection data={byVendedor} title="Comissão por Vendedor" nameLabel="Vendedor" icon={Users} />
+              <RankingSection data={byVendedor} title="Comissão por Vendedor" nameLabel="Vendedor" icon={Users} onRowClick={(r) => setAuditarVendedor(r.name)} />
             </div>
           )}
 
@@ -633,7 +633,7 @@ export default function RankingComissoes() {
                 <RankingSection data={byMarca} title="Top 10 Marcas por Comissão" nameLabel="Marca" limit={10} icon={Tag} />
               </TabsContent>
               <TabsContent value="vendedores">
-                <RankingSection data={byVendedor} title="Top 10 Vendedores por Comissão" nameLabel="Vendedor" limit={10} icon={Users} />
+                <RankingSection data={byVendedor} title="Top 10 Vendedores por Comissão" nameLabel="Vendedor" limit={10} icon={Users} onRowClick={(r) => setAuditarVendedor(r.name)} />
               </TabsContent>
               <TabsContent value="filiais">
                 <RankingSection data={byFilial} title="Top 10 Filiais por Comissão" nameLabel="Filial" limit={10} icon={Building2} />
