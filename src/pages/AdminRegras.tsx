@@ -405,9 +405,7 @@ export default function AdminRegras() {
       // Validação obrigatória
       if (!form.nome.trim()) throw new Error('Nome é obrigatório');
       if (!form.percentual || form.percentual <= 0) throw new Error('Percentual deve ser maior que zero');
-      if (!form.familia_produto && !form.marca && !form.produto) {
-        throw new Error('Informe ao menos Família, Marca ou Produto (regra 100% genérica não é permitida)');
-      }
+      // Regra 100% genérica é permitida (atua como fallback geral)
 
       // Auto-preenche família/marca a partir do produto selecionado, se vazias
       let famAuto = form.familia_produto;
@@ -988,13 +986,11 @@ export default function AdminRegras() {
                   !modal.nome.trim() ||
                   !modal.percentual ||
                   modal.percentual <= 0 ||
-                  (!modal.familia_produto && !modal.marca && !modal.produto) ||
                   saveMutation.isPending
                 }
                 title={
                   !modal.nome.trim() ? 'Informe o nome' :
                   !modal.percentual || modal.percentual <= 0 ? 'Percentual deve ser maior que zero' :
-                  (!modal.familia_produto && !modal.marca && !modal.produto) ? 'Informe ao menos Família, Marca ou Produto' :
                   'Salvar'
                 }
                 className="px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
