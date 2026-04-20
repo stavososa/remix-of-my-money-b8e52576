@@ -13,6 +13,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
+import { Tooltip as UITooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
+import { Info } from 'lucide-react';
+import { isCanalExterno, PADROES_CANAIS_EXTERNOS_LABEL } from '@/lib/canaisExternos';
 import {
   ResponsiveContainer, AreaChart, Area,
   XAxis, YAxis, Tooltip, CartesianGrid,
@@ -88,6 +92,16 @@ export default function Gerencial() {
   const [buscaTabela, setBuscaTabela] = useState('');
   const [searchDebounced, setSearchDebounced] = useState('');
   const [tabelaPagina, setTabelaPagina] = useState(1);
+  const [hideCanais, setHideCanais] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem('gerencial.hideCanais') === '1';
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('gerencial.hideCanais', hideCanais ? '1' : '0');
+    }
+  }, [hideCanais]);
 
 
   useEffect(() => {
@@ -257,13 +271,14 @@ export default function Gerencial() {
   const filteredAll = useMemo(() => {
     if (!allVendas) return [];
     return allVendas.filter(row => {
+      if (hideCanais && isCanalExterno(row.vendedor_nome)) return false;
       if (filtroUnidade.length > 0 && !filtroUnidade.includes(getFilial(row.cnpj_empresa))) return false;
       if (filtroVendedor !== 'all' && row.vendedor_nome !== filtroVendedor) return false;
       if (filtroFamilia !== 'all' && row.familia_produto !== filtroFamilia) return false;
       if (filtroMarca !== 'all' && row.marca !== filtroMarca) return false;
       return true;
     });
-  }, [allVendas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, getFilial]);
+  }, [allVendas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, getFilial, hideCanais]);
 
   // ===== KPIs (with sanity filter: skip rows with absurd margin > 1000%) =====
   const kpis = useMemo(() => {
@@ -398,14 +413,16 @@ export default function Gerencial() {
   const vendasTotalCount = vendasResult?.totalCount ?? 0;
 
   const mappedRows = useMemo(() => {
-    return vendasRows.map(row => ({
-      ...row,
-      unidade_nome: getFilial(row.cnpj_empresa),
-      total_parsed: parseMoneyBR(row.total_com_desconto),
-      lucro_parsed: parseMoneyBR(row.lucros_reais),
-      margem_parsed: parsePctBR(row.margem_percentual),
-    }));
-  }, [vendasRows, getFilial]);
+    return vendasRows
+      .filter(row => !(hideCanais && isCanalExterno(row.vendedor_nome)))
+      .map(row => ({
+        ...row,
+        unidade_nome: getFilial(row.cnpj_empresa),
+        total_parsed: parseMoneyBR(row.total_com_desconto),
+        lucro_parsed: parseMoneyBR(row.lucros_reais),
+        margem_parsed: parsePctBR(row.margem_percentual),
+      }));
+  }, [vendasRows, getFilial, hideCanais]);
 
   const handleFilterChange = (setter: (v: string) => void) => (v: string) => {
     setter(v);
@@ -474,16 +491,61 @@ export default function Gerencial() {
               Limpar filtros
             </button>
           )}
+          <div className="col-span-2 sm:col-span-1 sm:ml-auto flex items-center gap-2 bg-secondary/50 border border-border rounded-md px-3 py-2">
+            <Switch id="hide-canais" checked={hideCanais} onCheckedChange={setHideCanais} />
+            <label htmlFor="hide-canais" className="text-xs sm:text-sm text-foreground cursor-pointer select-none">
+              Ocultar canais externos
+            </label>
+            <TooltipProvider delayDuration={150}>
+              <UITooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="Sobre canais externos">
+                    <Info className="h-3.5 w-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-[260px]">
+                  <p className="text-xs font-medium mb-1">Padrões filtrados</p>
+                  <p className="text-xs text-muted-foreground">{PADROES_CANAIS_EXTERNOS_LABEL.join(' · ')}</p>
+                </TooltipContent>
+              </UITooltip>
+            </TooltipProvider>
+          </div>
         </div>
 
         {activeFilters.length > 0 && (
           <div className="flex flex-wrap gap-2">
+            {hideCanais && (
+              <span
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
+                style={{ backgroundColor: 'hsl(38 90% 55% / 0.15)', color: 'hsl(38 90% 55%)' }}
+              >
+                Canais externos ocultos
+              </span>
+            )}
             {activeFilters.map(f => (
               <button key={f.label} onClick={f.clear} className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/15 text-primary text-xs font-medium hover:bg-primary/25 transition-colors">
                 {f.label}
                 <X className="h-3 w-3" />
               </button>
             ))}
+          </div>
+        )}
+        {hideCanais && activeFilters.length === 0 && (
+          <div className="flex flex-wrap gap-2">
+            <span
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
+              style={{ backgroundColor: 'hsl(38 90% 55% / 0.15)', color: 'hsl(38 90% 55%)' }}
+            >
+              Canais externos ocultos
+            </span>
+          </div>
+        )}
+        {hideCanais && filtroVendedor !== 'all' && isCanalExterno(filtroVendedor) && (
+          <div
+            className="rounded-md px-3 py-2 text-xs border"
+            style={{ backgroundColor: 'hsl(38 90% 55% / 0.10)', borderColor: 'hsl(38 90% 55% / 0.40)', color: 'hsl(38 90% 55%)' }}
+          >
+            Vendedor selecionado é canal externo — nenhum dado será exibido enquanto o filtro estiver ativo.
           </div>
         )}
 
