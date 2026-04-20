@@ -413,14 +413,16 @@ export default function Gerencial() {
   const vendasTotalCount = vendasResult?.totalCount ?? 0;
 
   const mappedRows = useMemo(() => {
-    return vendasRows.map(row => ({
-      ...row,
-      unidade_nome: getFilial(row.cnpj_empresa),
-      total_parsed: parseMoneyBR(row.total_com_desconto),
-      lucro_parsed: parseMoneyBR(row.lucros_reais),
-      margem_parsed: parsePctBR(row.margem_percentual),
-    }));
-  }, [vendasRows, getFilial]);
+    return vendasRows
+      .filter(row => !(hideCanais && isCanalExterno(row.vendedor_nome)))
+      .map(row => ({
+        ...row,
+        unidade_nome: getFilial(row.cnpj_empresa),
+        total_parsed: parseMoneyBR(row.total_com_desconto),
+        lucro_parsed: parseMoneyBR(row.lucros_reais),
+        margem_parsed: parsePctBR(row.margem_percentual),
+      }));
+  }, [vendasRows, getFilial, hideCanais]);
 
   const handleFilterChange = (setter: (v: string) => void) => (v: string) => {
     setter(v);
