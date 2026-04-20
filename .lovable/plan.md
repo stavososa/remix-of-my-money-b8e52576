@@ -1,64 +1,26 @@
 
-## Diferenças entre sua planilha (Matriz / Fevereiro) e a Plataforma
 
-### Total da planilha
-- **Faturamento:** R$ 481.481,62
-- **Lucro:** R$ 262.541,10
-- **Vendedores listados:** 22
+## Pergunta direta
+Sim, o `0001-01` é o CNPJ da Matriz. A questão é: **como exatamente** o código compara o CNPJ da venda com o `controle_pj`? É comparação exata da string, ou normaliza (tira pontos/traços), ou usa só a raiz (`44.578.137`)?
 
-### O que a plataforma faz diferente hoje (filial = Matriz, mês = Fev)
+Preciso ler o código pra te responder com certeza, não chutar.
 
-#### 1. Itens que o toggle "Ocultar canais externos" REMOVE (e portanto somem do KPI quando ativo)
-Da sua planilha, estes nomes batem com `PADROES_CANAIS_EXTERNOS`:
+## O que vou investigar (read-only)
 
-| Vendedor planilha | Faturamento | Lucro | Padrão que captura |
-|---|---|---|---|
-| CHECK OUT | R$ 21.935,12 | R$ 7.175,27 | ❌ **NÃO captura** (não tem regex pra CHECKOUT) |
-| check | R$ 17,98 | R$ 7,22 | ❌ **NÃO captura** |
-| COMPRA VENDEDOR | R$ 2.760,08 | R$ 1.102,84 | ❌ **NÃO captura** |
-| Devi PDV_01/02/04 | R$ 2.838,20 | R$ 1.458,97 | ❌ **NÃO captura** |
-| OmieApp_01 | R$ 240,79 | R$ 240,79 | ❌ **NÃO captura** |
-| VENDA OPERADOR LOGISTICA | R$ 57.923,20 | R$ 14.814,45 | ❌ **NÃO captura** |
-| LUCIANE ATHANASIO SITE | R$ 12.432,39 | R$ 6.487,68 | ⚠️ regex `^SITE` exige começar com SITE → **NÃO captura** (termina em SITE) |
-| WALLACE OLIVEIRA LOJA | R$ 76.207,57 | R$ 45.431,23 | ❌ não tem padrão `*LOJA` |
+1. **`src/pages/Gerencial.tsx`** — como monta o filtro de filial: pega lista de CNPJs de `controle_pj` onde `unidade = MATRIZ` e faz `.in('cnpj_empresa', [...])`? Ou faz JOIN? Ou mapeia em memória?
+2. **`src/pages/MeuPainel.tsx`** e **`src/pages/RankingComissoes.tsx`** — confirmar se a lógica de vínculo CNPJ→Filial é a mesma em todos os painéis ou diverge.
+3. **Tabela `controle_pj`** (via `supabase--read_query`) — ver os 3 registros mapeados pra MATRIZ hoje: que formato de CNPJ está salvo? `44.578.137/0001-01` com máscara, ou `44578137000101` sem máscara?
+4. **Tabela `vendas`** — ver em que formato `cnpj_empresa` é salvo nas linhas de fevereiro: com máscara ou sem? Comparar com o que está em `controle_pj`.
+5. Confirmar se existe alguma normalização (`replace(/\D/g, '')`) antes da comparação, ou se é match literal.
 
-**Soma desses "operacionais/sistema" não-pessoa:** ~R$ 86.347 fat / ~R$ 25.040 lucro
-(CHECK OUT + check + COMPRA VENDEDOR + Devi PDV + OmieApp + VENDA OPERADOR LOGISTICA)
+## O que te entrego depois de investigar
+Resposta objetiva em 3 linhas:
+- **Onde** a comparação acontece (arquivo + linha).
+- **Como** ela é feita (literal vs. normalizada vs. raiz).
+- **Por que** o `0001-01` da Matriz pode (ou não) estar batendo com o que tem em `vendas` — se o problema é formato de string, raiz vs. sufixo, ou registro faltando mesmo.
 
-#### 2. Duplicidade de cadastro (mesma pessoa, dois nomes)
-- **LUCAS VILAR** (R$ 188,00) e **LUCAS VILLAR** (R$ 4.698,23) — provavelmente a mesma pessoa, grafia diferente. A plataforma trata como dois vendedores distintos no ranking/filtro.
-- **WALLACE OLIVEIRA** (R$ 594,89) e **WALLACE OLIVEIRA LOJA** (R$ 76.207,57) — mesma pessoa em dois canais (PJ vs balcão da loja).
-- **LUCIANE ATHANASIO SITE** — Luciane vendendo no site da Matriz.
+A partir daí decidimos o conserto: cadastrar mais CNPJs em `controle_pj`, normalizar a comparação no código, ou as duas coisas.
 
-#### 3. Por que o número da plataforma ≠ planilha mesmo sem toggle
-A plataforma com toggle **DESLIGADO** deveria bater os R$ 481.481,62. Se não bate, são 3 causas prováveis:
-- **Vínculo de filial por CNPJ**: a plataforma associa venda → Matriz pelo CNPJ em `controle_pj`. Se algum desses "vendedores" (Devi PDV, OmieApp, CHECK OUT, VENDA OPERADOR LOGISTICA) **não tem CNPJ mapeado pra Matriz**, eles caem em "Sem Unidade" e somem do filtro Matriz na plataforma — mas aparecem na sua planilha que provavelmente foi extraída direto do Omie por filial de origem da nota.
-- **Vendas fracionadas**: a plataforma preserva linhas com quantidade decimal (intencional). Se a planilha foi exportada com agrupamento, números batem; se exportada bruta, idem. Geralmente não dá diferença em SOMA de valor, só em contagem.
-- **Filtro de sanidade |margem| > 1000%**: a plataforma descarta vendas com margem absurda. Sua planilha bruta inclui tudo.
-
-### O que vou te entregar (precisa aprovar)
-Um diagnóstico real, não chute:
-
-1. **Rodar query** no Supabase externo somando `total_com_desconto` e `lucros_reais` da Matriz em fevereiro/2025, agrupado por `vendedor_nome`, e comparar linha-a-linha com sua planilha.
-2. Identificar exatamente:
-   - Quais nomes a plataforma **não está vinculando** à Matriz (CNPJ não mapeado em `controle_pj`).
-   - Quais valores divergem por causa do filtro de sanidade.
-   - Quais nomes operacionais (CHECK OUT, COMPRA VENDEDOR, Devi PDV, OmieApp, VENDA OPERADOR LOGISTICA) deveriam entrar no `PADROES_CANAIS_EXTERNOS` — eles **claramente não são pessoas vendendo**.
-3. Te devolver tabela comparativa: `Vendedor | Planilha | Plataforma (toggle off) | Plataforma (toggle on) | Diferença | Causa`.
-
-### Recomendação de patch (separado, depois do diagnóstico)
-Adicionar ao `PADROES_CANAIS_EXTERNOS` em `src/lib/canaisExternos.ts`:
-- `/CHECK\s*OUT/i` (CHECK OUT, check)
-- `/COMPRA\s*VENDEDOR/i`
-- `/^Devi\s*PDV/i`
-- `/^OmieApp/i`
-- `/VENDA\s*OPERADOR\s*LOG[ÍI]STICA/i`
-- `/RETIRADA\s*DIRETORIA/i` (apareceu na auditoria anterior)
-- Trocar `/^\s*SITE\b/i` por `/(^|\s)SITE($|\s)/i` pra pegar também "LUCIANE ATHANASIO SITE"
-
-**Fora de escopo agora:** mexer em `*LOJA` e `*DELIVERY` — ali tem pessoa real (WALLACE OLIVEIRA LOJA é vendedor de balcão). Esses ficam como estão até você decidir.
-
-### Arquivos envolvidos
-- Diagnóstico: query read-only no Supabase externo (sem alterar código).
-- Patch (passo seguinte, se aprovar): `src/lib/canaisExternos.ts`.
+## Fora de escopo
+Não altero nada agora. É só leitura + diagnóstico pontual da pergunta que você fez.
 
