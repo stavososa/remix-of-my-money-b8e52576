@@ -491,16 +491,52 @@ export default function Gerencial() {
               Limpar filtros
             </button>
           )}
+          <div className="col-span-2 sm:col-span-1 sm:ml-auto flex items-center gap-2 bg-secondary/50 border border-border rounded-md px-3 py-2">
+            <Switch id="hide-canais" checked={hideCanais} onCheckedChange={setHideCanais} />
+            <label htmlFor="hide-canais" className="text-xs sm:text-sm text-foreground cursor-pointer select-none">
+              Ocultar canais externos
+            </label>
+            <TooltipProvider delayDuration={150}>
+              <UITooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="Sobre canais externos">
+                    <Info className="h-3.5 w-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-[260px]">
+                  <p className="text-xs font-medium mb-1">Padrões filtrados</p>
+                  <p className="text-xs text-muted-foreground">{PADROES_CANAIS_EXTERNOS_LABEL.join(' · ')}</p>
+                </TooltipContent>
+              </UITooltip>
+            </TooltipProvider>
+          </div>
         </div>
 
         {activeFilters.length > 0 && (
           <div className="flex flex-wrap gap-2">
+            {hideCanais && (
+              <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-500 text-xs font-medium">
+                Canais externos ocultos
+              </span>
+            )}
             {activeFilters.map(f => (
               <button key={f.label} onClick={f.clear} className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/15 text-primary text-xs font-medium hover:bg-primary/25 transition-colors">
                 {f.label}
                 <X className="h-3 w-3" />
               </button>
             ))}
+          </div>
+        )}
+        {hideCanais && activeFilters.length === 0 && (
+          <div className="flex flex-wrap gap-2">
+            <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-500 text-xs font-medium">
+              Canais externos ocultos
+            </span>
+          </div>
+        )}
+        {hideCanais && filtroVendedor !== 'all' && isCanalExterno(filtroVendedor) && (
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-500">
+            Vendedor selecionado é canal externo — nenhum dado será exibido enquanto o filtro estiver ativo.
           </div>
         )}
 
