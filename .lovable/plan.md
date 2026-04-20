@@ -1,26 +1,34 @@
 
 
-## Pergunta direta
-Sim, o `0001-01` é o CNPJ da Matriz. A questão é: **como exatamente** o código compara o CNPJ da venda com o `controle_pj`? É comparação exata da string, ou normaliza (tira pontos/traços), ou usa só a raiz (`44.578.137`)?
+## Mudança no gráfico "Faturamento por Dia"
 
-Preciso ler o código pra te responder com certeza, não chutar.
+### Comportamento atual
+O gráfico mostra apenas os dias que têm vendas (vindo do `GROUP BY data_emissao` no RPC `rpc_gerencial_resumo` em `sql/rpc_gerencial.sql`). Dias sem venda simplesmente não aparecem no eixo X.
 
-## O que vou investigar (read-only)
+### Comportamento desejado
+Mostrar **todos os dias** do dia 1 do mês até o **último dia com informação disponível** no período filtrado. Dias sem venda aparecem com faturamento = 0 (e o acumulado se mantém constante nesses dias).
 
-1. **`src/pages/Gerencial.tsx`** — como monta o filtro de filial: pega lista de CNPJs de `controle_pj` onde `unidade = MATRIZ` e faz `.in('cnpj_empresa', [...])`? Ou faz JOIN? Ou mapeia em memória?
-2. **`src/pages/MeuPainel.tsx`** e **`src/pages/RankingComissoes.tsx`** — confirmar se a lógica de vínculo CNPJ→Filial é a mesma em todos os painéis ou diverge.
-3. **Tabela `controle_pj`** (via `supabase--read_query`) — ver os 3 registros mapeados pra MATRIZ hoje: que formato de CNPJ está salvo? `44.578.137/0001-01` com máscara, ou `44578137000101` sem máscara?
-4. **Tabela `vendas`** — ver em que formato `cnpj_empresa` é salvo nas linhas de fevereiro: com máscara ou sem? Comparar com o que está em `controle_pj`.
-5. Confirmar se existe alguma normalização (`replace(/\D/g, '')`) antes da comparação, ou se é match literal.
+### Como vou implementar
 
-## O que te entrego depois de investigar
-Resposta objetiva em 3 linhas:
-- **Onde** a comparação acontece (arquivo + linha).
-- **Como** ela é feita (literal vs. normalizada vs. raiz).
-- **Por que** o `0001-01` da Matriz pode (ou não) estar batendo com o que tem em `vendas` — se o problema é formato de string, raiz vs. sufixo, ou registro faltando mesmo.
+Ajuste **client-side** em `src/pages/Gerencial.tsx`, no ponto onde o `chart_diario` retornado pelo RPC é consumido para alimentar o gráfico:
 
-A partir daí decidimos o conserto: cadastrar mais CNPJs em `controle_pj`, normalizar a comparação no código, ou as duas coisas.
+1. Identificar `minDate` = dia 1 do mês do período (`periodoAno`/`periodoMes`).
+2. Identificar `maxDate` = **maior `data_emissao`** presente no `chart_diario` retornado (último dia com dado real). Se não houver nenhuma venda, não renderiza nada (mantém estado vazio atual).
+3. Gerar a sequência completa de datas entre `minDate` e `maxDate` (inclusive).
+4. Fazer merge: para cada dia da sequência, usar o registro do RPC se existir; senão, criar `{ data, faturamento_dia: 0, lucro_dia: 0 }`.
+5. Recalcular o `acumulado` em ordem cronológica para que dias sem venda mantenham o acumulado anterior (em vez de "zerar" no gráfico).
 
-## Fora de escopo
-Não altero nada agora. É só leitura + diagnóstico pontual da pergunta que você fez.
+### Por que client-side e não no SQL
+- Não precisa migração de banco.
+- Mantém o RPC enxuto.
+- O cálculo de `maxDate` depende do dataset filtrado e é trivial em JS.
+- Reaproveita o `chart_diario` que já vem.
+
+### Arquivos alterados
+- `src/pages/Gerencial.tsx` — função/`useMemo` que prepara os dados do gráfico de faturamento por dia.
+
+### Fora de escopo
+- Não mexo no RPC SQL.
+- Não mexo nos KPIs, top famílias/marcas ou tabela de vendas.
+- Não mexo na lógica de canais externos / CHECK OUT (ficou pendente da decisão sua).
 
