@@ -503,9 +503,13 @@ export default function Gerencial() {
                     <Info className="h-3.5 w-3.5" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="bottom" className="max-w-[260px]">
-                  <p className="text-xs font-medium mb-1">Padrões filtrados</p>
-                  <p className="text-xs text-muted-foreground">{PADROES_CANAIS_EXTERNOS_LABEL.join(' · ')}</p>
+                <TooltipContent side="bottom" className="max-w-[320px]">
+                  <p className="text-xs font-medium mb-1.5">Padrões ocultados ({PADROES_CANAIS_EXTERNOS_LABEL.length})</p>
+                  <ul className="text-xs text-muted-foreground space-y-0.5 list-disc pl-4">
+                    {PADROES_CANAIS_EXTERNOS_LABEL.map((label) => (
+                      <li key={label}>{label}</li>
+                    ))}
+                  </ul>
                 </TooltipContent>
               </UITooltip>
             </TooltipProvider>
