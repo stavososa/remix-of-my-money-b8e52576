@@ -168,7 +168,7 @@ export default function Gerencial() {
     if (!isGerente || !filial_gerente || !unidadesList) return [];
     const cnpjs = unidadesList
       .filter(u => u.nome.toUpperCase() === filial_gerente.toUpperCase() && u.cnpj)
-      .map(u => u.cnpj!.trim());
+      .map(u => u.cnpj!.replace(/\s+/g, ''));
     if (cnpjs.length === 0) {
       console.warn('[Gerencial] Nenhum CNPJ encontrado para filial_gerente:', filial_gerente, '| unidades disponíveis:', unidadesList?.map(u => u.nome));
     }
@@ -365,7 +365,7 @@ export default function Gerencial() {
     const upper = filiais.map(f => f.toUpperCase());
     return unidadesList
       .filter(u => upper.includes(u.nome.toUpperCase()) && u.cnpj)
-      .map(u => u.cnpj!.trim());
+      .map(u => u.cnpj!.replace(/\s+/g, ''));
   }, [unidadesList]);
 
   // Fetch paginated vendas for table
