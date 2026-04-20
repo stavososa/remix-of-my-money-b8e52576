@@ -92,6 +92,16 @@ export default function Gerencial() {
   const [buscaTabela, setBuscaTabela] = useState('');
   const [searchDebounced, setSearchDebounced] = useState('');
   const [tabelaPagina, setTabelaPagina] = useState(1);
+  const [hideCanais, setHideCanais] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem('gerencial.hideCanais') === '1';
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('gerencial.hideCanais', hideCanais ? '1' : '0');
+    }
+  }, [hideCanais]);
 
 
   useEffect(() => {
