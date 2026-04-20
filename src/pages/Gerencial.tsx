@@ -515,7 +515,10 @@ export default function Gerencial() {
         {activeFilters.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {hideCanais && (
-              <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-500 text-xs font-medium">
+              <span
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
+                style={{ backgroundColor: 'hsl(38 90% 55% / 0.15)', color: 'hsl(38 90% 55%)' }}
+              >
                 Canais externos ocultos
               </span>
             )}
@@ -529,13 +532,19 @@ export default function Gerencial() {
         )}
         {hideCanais && activeFilters.length === 0 && (
           <div className="flex flex-wrap gap-2">
-            <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-500 text-xs font-medium">
+            <span
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
+              style={{ backgroundColor: 'hsl(38 90% 55% / 0.15)', color: 'hsl(38 90% 55%)' }}
+            >
               Canais externos ocultos
             </span>
           </div>
         )}
         {hideCanais && filtroVendedor !== 'all' && isCanalExterno(filtroVendedor) && (
-          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-500">
+          <div
+            className="rounded-md px-3 py-2 text-xs border"
+            style={{ backgroundColor: 'hsl(38 90% 55% / 0.10)', borderColor: 'hsl(38 90% 55% / 0.40)', color: 'hsl(38 90% 55%)' }}
+          >
             Vendedor selecionado é canal externo — nenhum dado será exibido enquanto o filtro estiver ativo.
           </div>
         )}
