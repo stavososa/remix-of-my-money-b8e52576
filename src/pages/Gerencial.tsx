@@ -312,18 +312,40 @@ export default function Gerencial() {
   const isBusy = loadAll || fetchingAll || loadUnidades || !unidadesList;
 
   // ===== Chart: Faturamento por Dia =====
+  // Mostra todos os dias do dia 1 do mês até o último dia com venda no período.
+  // Dias sem venda aparecem com faturamento = 0 e mantêm o acumulado anterior.
   const chartDiario = useMemo(() => {
     const dayMap = new Map<string, number>();
     for (const row of filteredAll) {
       const day = row.data_emissao ?? '';
+      if (!day) continue;
       dayMap.set(day, (dayMap.get(day) ?? 0) + parseMoneyBR(row.total_com_desconto));
     }
-    const sorted = [...dayMap.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    if (dayMap.size === 0) return [];
+
+    const sortedDays = [...dayMap.keys()].sort();
+    const maxDay = sortedDays[sortedDays.length - 1]; // YYYY-MM-DD
+    // minDay = dia 1 do mês do maior dia presente (garante alinhamento mesmo com range custom)
+    const [yStr, mStr] = maxDay.split('-');
+    const year = Number(yStr);
+    const month = Number(mStr);
+    const minDay = `${yStr}-${mStr}-01`;
+
+    // Gera sequência completa de minDay..maxDay
+    const start = new Date(`${minDay}T00:00:00`);
+    const end = new Date(`${maxDay}T00:00:00`);
+    const result: { dia: string; faturamento: number; acumulado: number }[] = [];
     let acum = 0;
-    return sorted.map(([day, val]) => {
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const key = `${y}-${m}-${day}`;
+      const val = dayMap.get(key) ?? 0;
       acum += val;
-      return { dia: day.substring(8), faturamento: val, acumulado: acum };
-    });
+      result.push({ dia: day, faturamento: val, acumulado: acum });
+    }
+    return result;
   }, [filteredAll]);
 
   // Filter options: for gerente use dedicated timeless query; for admin derive from allVendas
