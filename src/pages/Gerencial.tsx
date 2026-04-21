@@ -89,6 +89,9 @@ export default function Gerencial() {
   const [filtroVendedor, setFiltroVendedor] = useState<string>('all');
   const [filtroFamilia, setFiltroFamilia] = useState<string>('all');
   const [filtroMarca, setFiltroMarca] = useState<string>('all');
+  const [excludeVendedores, setExcludeVendedores] = useState<string[]>([]);
+  const [excludeFamilias, setExcludeFamilias] = useState<string[]>([]);
+  const [excludeMarcas, setExcludeMarcas] = useState<string[]>([]);
   const [buscaTabela, setBuscaTabela] = useState('');
   const [searchDebounced, setSearchDebounced] = useState('');
   const [tabelaPagina, setTabelaPagina] = useState(1);
@@ -111,6 +114,9 @@ export default function Gerencial() {
     setFiltroVendedor('all');
     setFiltroFamilia('all');
     setFiltroMarca('all');
+    setExcludeVendedores([]);
+    setExcludeFamilias([]);
+    setExcludeMarcas([]);
     setBuscaTabela('');
     setSearchDebounced('');
     setTabelaPagina(1);
@@ -277,9 +283,12 @@ export default function Gerencial() {
       if (filtroVendedor !== 'all' && row.vendedor_nome !== filtroVendedor) return false;
       if (filtroFamilia !== 'all' && row.familia_produto !== filtroFamilia) return false;
       if (filtroMarca !== 'all' && row.marca !== filtroMarca) return false;
+      if (excludeVendedores.length && row.vendedor_nome && excludeVendedores.includes(row.vendedor_nome)) return false;
+      if (excludeFamilias.length && row.familia_produto && excludeFamilias.includes(row.familia_produto)) return false;
+      if (excludeMarcas.length && row.marca && excludeMarcas.includes(row.marca)) return false;
       return true;
     });
-  }, [allVendas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, getFilial, hideCanais]);
+  }, [allVendas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, excludeVendedores, excludeFamilias, excludeMarcas, getFilial, hideCanais]);
 
   // ===== KPIs (soma direta, espelha SQL/planilha) =====
   const kpis = useMemo(() => {
@@ -391,7 +400,7 @@ export default function Gerencial() {
 
   // Fetch paginated vendas for table
   const { data: vendasResult, isLoading: loadVendas } = useQuery({
-    queryKey: ['gerencial-vendas', startDate, endDate, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, searchDebounced, tabelaPagina, unidadesList],
+    queryKey: ['gerencial-vendas', startDate, endDate, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, excludeVendedores, excludeFamilias, excludeMarcas, searchDebounced, tabelaPagina, unidadesList],
     enabled: !isGerente || filtroUnidade.length > 0,
     queryFn: async () => {
       const offset = (tabelaPagina - 1) * TABLE_PAGE_SIZE;
@@ -416,6 +425,17 @@ export default function Gerencial() {
       if (filtroFamilia !== 'all') query = query.eq('familia_produto', filtroFamilia);
       if (filtroMarca !== 'all') query = query.eq('marca', filtroMarca);
 
+      const escapeForIn = (v: string) => `"${v.replace(/"/g, '\\"')}"`;
+      if (excludeVendedores.length > 0) {
+        query = query.not('vendedor_nome', 'in', `(${excludeVendedores.map(escapeForIn).join(',')})`);
+      }
+      if (excludeFamilias.length > 0) {
+        query = query.not('familia_produto', 'in', `(${excludeFamilias.map(escapeForIn).join(',')})`);
+      }
+      if (excludeMarcas.length > 0) {
+        query = query.not('marca', 'in', `(${excludeMarcas.map(escapeForIn).join(',')})`);
+      }
+
       if (searchDebounced) {
         const term = `%${searchDebounced}%`;
         query = query.or(
@@ -435,7 +455,13 @@ export default function Gerencial() {
 
   const mappedRows = useMemo(() => {
     return vendasRows
-      .filter(row => !(hideCanais && isCanalExterno(row.vendedor_nome, row.descricao_produto, row.familia_produto)))
+      .filter(row => {
+        if (hideCanais && isCanalExterno(row.vendedor_nome, row.descricao_produto, row.familia_produto)) return false;
+        if (excludeVendedores.length && row.vendedor_nome && excludeVendedores.includes(row.vendedor_nome)) return false;
+        if (excludeFamilias.length && row.familia_produto && excludeFamilias.includes(row.familia_produto)) return false;
+        if (excludeMarcas.length && row.marca && excludeMarcas.includes(row.marca)) return false;
+        return true;
+      })
       .map(row => ({
         ...row,
         unidade_nome: getFilial(row.cnpj_empresa),
@@ -443,7 +469,7 @@ export default function Gerencial() {
         lucro_parsed: parseMoneyBR(row.lucros_reais),
         margem_parsed: parsePctBR(row.margem_percentual),
       }));
-  }, [vendasRows, getFilial, hideCanais]);
+  }, [vendasRows, getFilial, hideCanais, excludeVendedores, excludeFamilias, excludeMarcas]);
 
   const handleFilterChange = (setter: (v: string) => void) => (v: string) => {
     setter(v);
@@ -456,6 +482,9 @@ export default function Gerencial() {
     ...(filtroVendedor !== 'all' ? [{ label: `Vendedor: ${filtroVendedor}`, clear: () => { setFiltroVendedor('all'); setTabelaPagina(1); } }] : []),
     ...(filtroFamilia !== 'all' ? [{ label: `Família: ${filtroFamilia}`, clear: () => { setFiltroFamilia('all'); setTabelaPagina(1); } }] : []),
     ...(filtroMarca !== 'all' ? [{ label: `Marca: ${filtroMarca}`, clear: () => { setFiltroMarca('all'); setTabelaPagina(1); } }] : []),
+    ...excludeVendedores.map(v => ({ label: `Excluir Vendedor: ${v}`, clear: () => { setExcludeVendedores(prev => prev.filter(x => x !== v)); setTabelaPagina(1); } })),
+    ...excludeFamilias.map(f => ({ label: `Excluir Família: ${f}`, clear: () => { setExcludeFamilias(prev => prev.filter(x => x !== f)); setTabelaPagina(1); } })),
+    ...excludeMarcas.map(m => ({ label: `Excluir Marca: ${m}`, clear: () => { setExcludeMarcas(prev => prev.filter(x => x !== m)); setTabelaPagina(1); } })),
   ];
 
   const clearAllFilters = () => {
@@ -463,6 +492,9 @@ export default function Gerencial() {
     setFiltroVendedor('all');
     setFiltroFamilia('all');
     setFiltroMarca('all');
+    setExcludeVendedores([]);
+    setExcludeFamilias([]);
+    setExcludeMarcas([]);
     setTabelaPagina(1);
   };
 
@@ -496,44 +528,85 @@ export default function Gerencial() {
           <p className="text-sm text-muted-foreground mt-1">Filtre resultados específicos por loja, vendedor e identifique tendências reais.</p>
         </div>
         {/* Filters */}
-        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-3">
-          {isGerente ? (
-            <div className="bg-secondary/50 border border-border rounded-md px-2 sm:px-3 py-2 text-xs sm:text-sm text-foreground opacity-70">
-              Filial: {filial_gerente}
+        <div className="flex flex-col gap-3">
+          {/* Linha 1: positivos (esquerda) + negativos (direita) */}
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
+            {/* Bloco positivos */}
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-3">
+              {isGerente ? (
+                <div className="bg-secondary/50 border border-border rounded-md px-2 sm:px-3 py-2 text-xs sm:text-sm text-foreground opacity-70">
+                  Filial: {filial_gerente}
+                </div>
+              ) : (
+                <MultiFilterSelect label="Filial" selected={filtroUnidade} onChange={(v) => { setFiltroUnidade(v); setTabelaPagina(1); }} options={filtros.unidades} allLabel="Todas as Filiais" itemLabel="filiais" />
+              )}
+              <FilterSelect label="Vendedor" value={filtroVendedor} onChange={handleFilterChange(setFiltroVendedor)} options={filtros.vendedores.map(v => ({ value: v, label: v }))} allLabel="Todos os Vendedores" />
+              <FilterSelect label="Família" value={filtroFamilia} onChange={handleFilterChange(setFiltroFamilia)} options={filtros.familias.map(f => ({ value: f, label: f }))} allLabel="Todas as Famílias" />
+              <FilterSelect label="Marca" value={filtroMarca} onChange={handleFilterChange(setFiltroMarca)} options={filtros.marcas.map(m => ({ value: m, label: m }))} allLabel="Todas as Marcas" />
             </div>
-          ) : (
-            <MultiFilterSelect label="Filial" selected={filtroUnidade} onChange={(v) => { setFiltroUnidade(v); setTabelaPagina(1); }} options={filtros.unidades} allLabel="Todas as Filiais" />
-          )}
-          <FilterSelect label="Vendedor" value={filtroVendedor} onChange={handleFilterChange(setFiltroVendedor)} options={filtros.vendedores.map(v => ({ value: v, label: v }))} allLabel="Todos os Vendedores" />
-          <FilterSelect label="Família" value={filtroFamilia} onChange={handleFilterChange(setFiltroFamilia)} options={filtros.familias.map(f => ({ value: f, label: f }))} allLabel="Todas as Famílias" />
-          <FilterSelect label="Marca" value={filtroMarca} onChange={handleFilterChange(setFiltroMarca)} options={filtros.marcas.map(m => ({ value: m, label: m }))} allLabel="Todas as Marcas" />
-          {activeFilters.length > 0 && (
-            <button onClick={clearAllFilters} className="text-xs text-muted-foreground hover:text-foreground transition-colors underline">
-              Limpar filtros
-            </button>
-          )}
-          <div className="col-span-2 sm:col-span-1 sm:ml-auto flex items-center gap-2 bg-secondary/50 border border-border rounded-md px-3 py-2">
-            <Switch id="hide-canais" checked={hideCanais} onCheckedChange={setHideCanais} />
-            <label htmlFor="hide-canais" className="text-xs sm:text-sm text-foreground cursor-pointer select-none">
-              Ocultar canais externos
-            </label>
-            <TooltipProvider delayDuration={150}>
-              <UITooltip>
-                <TooltipTrigger asChild>
-                  <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="Sobre canais externos">
-                    <Info className="h-3.5 w-3.5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="max-w-[320px]">
-                  <p className="text-xs font-medium mb-1.5">Padrões ocultados ({PADROES_CANAIS_EXTERNOS_LABEL.length})</p>
-                  <ul className="text-xs text-muted-foreground space-y-0.5 list-disc pl-4">
-                    {PADROES_CANAIS_EXTERNOS_LABEL.map((label) => (
-                      <li key={label}>{label}</li>
-                    ))}
-                  </ul>
-                </TooltipContent>
-              </UITooltip>
-            </TooltipProvider>
+
+            {/* Bloco negativos (direita em desktop) */}
+            <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-3 sm:ml-auto">
+              <MultiFilterSelect
+                label="Excluir Vendedor"
+                selected={excludeVendedores}
+                onChange={(v) => { setExcludeVendedores(v); setTabelaPagina(1); }}
+                options={filtros.vendedores}
+                allLabel="Excluir Vendedor"
+                itemLabel="vendedores"
+                excludeStyle
+              />
+              <MultiFilterSelect
+                label="Excluir Família"
+                selected={excludeFamilias}
+                onChange={(v) => { setExcludeFamilias(v); setTabelaPagina(1); }}
+                options={filtros.familias}
+                allLabel="Excluir Família"
+                itemLabel="famílias"
+                excludeStyle
+              />
+              <MultiFilterSelect
+                label="Excluir Marca"
+                selected={excludeMarcas}
+                onChange={(v) => { setExcludeMarcas(v); setTabelaPagina(1); }}
+                options={filtros.marcas}
+                allLabel="Excluir Marca"
+                itemLabel="marcas"
+                excludeStyle
+              />
+            </div>
+          </div>
+
+          {/* Linha 2: limpar filtros + toggle canais externos */}
+          <div className="flex flex-wrap items-center gap-3">
+            {activeFilters.length > 0 && (
+              <button onClick={clearAllFilters} className="text-xs text-muted-foreground hover:text-foreground transition-colors underline">
+                Limpar filtros
+              </button>
+            )}
+            <div className="flex items-center gap-2 bg-secondary/50 border border-border rounded-md px-3 py-2">
+              <Switch id="hide-canais" checked={hideCanais} onCheckedChange={setHideCanais} />
+              <label htmlFor="hide-canais" className="text-xs sm:text-sm text-foreground cursor-pointer select-none">
+                Ocultar canais externos
+              </label>
+              <TooltipProvider delayDuration={150}>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="Sobre canais externos">
+                      <Info className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-[320px]">
+                    <p className="text-xs font-medium mb-1.5">Padrões ocultados ({PADROES_CANAIS_EXTERNOS_LABEL.length})</p>
+                    <ul className="text-xs text-muted-foreground space-y-0.5 list-disc pl-4">
+                      {PADROES_CANAIS_EXTERNOS_LABEL.map((label) => (
+                        <li key={label}>{label}</li>
+                      ))}
+                    </ul>
+                  </TooltipContent>
+                </UITooltip>
+              </TooltipProvider>
+            </div>
           </div>
         </div>
 
@@ -695,26 +768,35 @@ function FilterSelect({ label, value, onChange, options, allLabel }: {
   );
 }
 
-function MultiFilterSelect({ label, selected, onChange, options, allLabel }: {
+function MultiFilterSelect({ label, selected, onChange, options, allLabel, itemLabel = 'itens', excludeStyle = false }: {
   label: string;
   selected: string[];
   onChange: (v: string[]) => void;
   options: string[];
   allLabel: string;
+  itemLabel?: string;
+  excludeStyle?: boolean;
 }) {
   const toggle = (val: string) => {
     onChange(selected.includes(val) ? selected.filter(x => x !== val) : [...selected, val]);
   };
 
+  const triggerBase = "border rounded-md px-2 sm:px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-ring w-full sm:w-auto sm:min-w-[140px] sm:max-w-[220px] flex items-center justify-between gap-1";
+  const triggerStyle = excludeStyle && selected.length > 0
+    ? "bg-destructive/10 border-destructive/40 text-destructive"
+    : excludeStyle
+      ? "bg-secondary/40 border-dashed border-border text-muted-foreground hover:text-foreground"
+      : "bg-secondary border-border text-foreground";
+
   return (
     <Popover>
       <PopoverTrigger asChild>
         <button
-          className="bg-secondary border border-border rounded-md px-2 sm:px-3 py-2 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring w-full sm:w-auto sm:min-w-[140px] sm:max-w-[220px] flex items-center justify-between gap-1"
+          className={`${triggerBase} ${triggerStyle}`}
           title={label}
         >
           <span className="truncate">
-            {selected.length === 0 ? allLabel : selected.length === 1 ? selected[0] : `${selected.length} filiais`}
+            {selected.length === 0 ? allLabel : selected.length === 1 ? (excludeStyle ? `≠ ${selected[0]}` : selected[0]) : `${selected.length} ${itemLabel}`}
           </span>
           <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
         </button>
@@ -731,7 +813,7 @@ function MultiFilterSelect({ label, selected, onChange, options, allLabel }: {
             <span className="truncate">{opt}</span>
           </label>
         ))}
-        {options.length === 0 && <p className="text-xs text-muted-foreground px-2 py-2">Nenhuma filial encontrada</p>}
+        {options.length === 0 && <p className="text-xs text-muted-foreground px-2 py-2">Nenhum item encontrado</p>}
       </PopoverContent>
     </Popover>
   );
