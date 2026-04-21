@@ -278,14 +278,17 @@ export default function Gerencial() {
   const filteredAll = useMemo(() => {
     if (!allVendas) return [];
     return allVendas.filter(row => {
-      if (hideCanais && isCanalExterno(row.vendedor_nome, row.descricao_produto, row.familia_produto)) return false;
+      if (hideCanais && isCanalExterno(row.vendedor_nome, row.descricao_produto, row.familia_proteu_produto as any)) return false;
       if (filtroUnidade.length > 0 && !filtroUnidade.includes(getFilial(row.cnpj_empresa))) return false;
       if (filtroVendedor !== 'all' && row.vendedor_nome !== filtroVendedor) return false;
       if (filtroFamilia !== 'all' && row.familia_produto !== filtroFamilia) return false;
       if (filtroMarca !== 'all' && row.marca !== filtroMarca) return false;
+      if (excludeVendedores.length && row.vendedor_nome && excludeVendedores.includes(row.vendedor_nome)) return false;
+      if (excludeFamilias.length && row.familia_produto && excludeFamilias.includes(row.familia_produto)) return false;
+      if (excludeMarcas.length && row.marca && excludeMarcas.includes(row.marca)) return false;
       return true;
     });
-  }, [allVendas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, getFilial, hideCanais]);
+  }, [allVendas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, excludeVendedores, excludeFamilias, excludeMarcas, getFilial, hideCanais]);
 
   // ===== KPIs (soma direta, espelha SQL/planilha) =====
   const kpis = useMemo(() => {
