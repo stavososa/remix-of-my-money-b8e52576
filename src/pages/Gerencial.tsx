@@ -482,6 +482,9 @@ export default function Gerencial() {
     ...(filtroVendedor !== 'all' ? [{ label: `Vendedor: ${filtroVendedor}`, clear: () => { setFiltroVendedor('all'); setTabelaPagina(1); } }] : []),
     ...(filtroFamilia !== 'all' ? [{ label: `Família: ${filtroFamilia}`, clear: () => { setFiltroFamilia('all'); setTabelaPagina(1); } }] : []),
     ...(filtroMarca !== 'all' ? [{ label: `Marca: ${filtroMarca}`, clear: () => { setFiltroMarca('all'); setTabelaPagina(1); } }] : []),
+    ...excludeVendedores.map(v => ({ label: `Excluir Vendedor: ${v}`, clear: () => { setExcludeVendedores(prev => prev.filter(x => x !== v)); setTabelaPagina(1); } })),
+    ...excludeFamilias.map(f => ({ label: `Excluir Família: ${f}`, clear: () => { setExcludeFamilias(prev => prev.filter(x => x !== f)); setTabelaPagina(1); } })),
+    ...excludeMarcas.map(m => ({ label: `Excluir Marca: ${m}`, clear: () => { setExcludeMarcas(prev => prev.filter(x => x !== m)); setTabelaPagina(1); } })),
   ];
 
   const clearAllFilters = () => {
@@ -489,6 +492,9 @@ export default function Gerencial() {
     setFiltroVendedor('all');
     setFiltroFamilia('all');
     setFiltroMarca('all');
+    setExcludeVendedores([]);
+    setExcludeFamilias([]);
+    setExcludeMarcas([]);
     setTabelaPagina(1);
   };
 
