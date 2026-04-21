@@ -54,12 +54,14 @@ export async function auditNomesNovaIguacu() {
     total_com_desconto: number | null;
     lucros_reais: number | null;
     nota_fiscal: string | null;
+    descricao_produto: string | null;
+    familia_produto: string | null;
   }> = [];
 
   while (true) {
     const { data, error } = await supabase
       .from('vendas')
-      .select('vendedor_nome,total_com_desconto,lucros_reais,nota_fiscal')
+      .select('vendedor_nome,total_com_desconto,lucros_reais,nota_fiscal,descricao_produto,familia_produto')
       .gte('data_emissao', '2026-02-01')
       .lte('data_emissao', '2026-02-28')
       .in('cnpj_empresa', cnpjs)
@@ -81,19 +83,22 @@ export async function auditNomesNovaIguacu() {
   // Agrupa por vendedor
   const map = new Map<
     string,
-    { qtd_linhas: number; faturamento: number; lucro: number; nfs: Set<string> }
+    { qtd_linhas: number; faturamento: number; lucro: number; nfs: Set<string>; tem_linha_canal_ext: boolean }
   >();
 
   for (const r of all) {
     const nome = (r.vendedor_nome ?? '(sem nome)').trim();
     if (!map.has(nome)) {
-      map.set(nome, { qtd_linhas: 0, faturamento: 0, lucro: 0, nfs: new Set() });
+      map.set(nome, { qtd_linhas: 0, faturamento: 0, lucro: 0, nfs: new Set(), tem_linha_canal_ext: false });
     }
     const agg = map.get(nome)!;
     agg.qtd_linhas += 1;
     agg.faturamento += Number(r.total_com_desconto) || 0;
     agg.lucro += Number(r.lucros_reais) || 0;
     if (r.nota_fiscal) agg.nfs.add(r.nota_fiscal);
+    if (isCanalExterno(r.vendedor_nome, r.descricao_produto, r.familia_produto)) {
+      agg.tem_linha_canal_ext = true;
+    }
   }
 
   type Row = {
@@ -110,7 +115,7 @@ export async function auditNomesNovaIguacu() {
     const upper = nome.toUpperCase();
     let classificacao: Row['classificacao'] = 'ESTRANHO';
     if (LISTA_OFICIAL.has(upper)) classificacao = 'OFICIAL';
-    else if (isCanalExterno(nome)) classificacao = 'CANAL_EXTERNO';
+    else if (isCanalExterno(nome) || agg.tem_linha_canal_ext) classificacao = 'CANAL_EXTERNO';
 
     rows.push({
       vendedor: nome,
