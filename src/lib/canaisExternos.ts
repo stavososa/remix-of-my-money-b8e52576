@@ -26,7 +26,8 @@ const PADROES_CANAIS_EXTERNOS = [
 // Regra adicional: linhas das famílias OUTROS/ATACADO cuja descrição contenha
 // um percentual (ex.: "TAXA 4%", "REPASSE 7%") são tratadas como canal externo.
 export const PADRAO_DESCRICAO_PERCENTUAL = /\d+([.,]\d+)?\s*%/;
-export const FAMILIAS_CANAL_EXTERNO_COM_PCT = new Set(['OUTROS', 'ATACADO']);
+export const FAMILIAS_CANAL_EXTERNO_COM_PCT = new Set(['OUTROS']);
+export const FAMILIAS_CANAL_EXTERNO_TOTAL = new Set(['ATACADO']);
 
 export const PADROES_CANAIS_EXTERNOS_LABEL = [
   'iFood (todas filiais)',
@@ -43,7 +44,8 @@ export const PADROES_CANAIS_EXTERNOS_LABEL = [
   'PROMOTOR / DEGUSTAÇÃO Valqueire',
   'PARCERIA / COLLAB / INFLUENCER',
   'RESGATE (Barra, Botafogo, Recreio)',
-  'Famílias OUTROS/ATACADO com % na descrição (taxas)',
+  'Família OUTROS com % na descrição (taxas)',
+  'Família ATACADO (todos os itens)',
 ];
 
 export function isCanalExterno(
@@ -55,6 +57,8 @@ export function isCanalExterno(
   if (nome && PADROES_CANAIS_EXTERNOS.some((re) => re.test(nome))) return true;
 
   const familia = (familiaProduto ?? '').trim().toUpperCase();
+  if (familia && FAMILIAS_CANAL_EXTERNO_TOTAL.has(familia)) return true;
+
   const descricao = (descricaoProduto ?? '').trim();
   if (
     familia &&
