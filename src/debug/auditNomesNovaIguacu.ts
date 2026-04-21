@@ -83,19 +83,22 @@ export async function auditNomesNovaIguacu() {
   // Agrupa por vendedor
   const map = new Map<
     string,
-    { qtd_linhas: number; faturamento: number; lucro: number; nfs: Set<string> }
+    { qtd_linhas: number; faturamento: number; lucro: number; nfs: Set<string>; tem_linha_canal_ext: boolean }
   >();
 
   for (const r of all) {
     const nome = (r.vendedor_nome ?? '(sem nome)').trim();
     if (!map.has(nome)) {
-      map.set(nome, { qtd_linhas: 0, faturamento: 0, lucro: 0, nfs: new Set() });
+      map.set(nome, { qtd_linhas: 0, faturamento: 0, lucro: 0, nfs: new Set(), tem_linha_canal_ext: false });
     }
     const agg = map.get(nome)!;
     agg.qtd_linhas += 1;
     agg.faturamento += Number(r.total_com_desconto) || 0;
     agg.lucro += Number(r.lucros_reais) || 0;
     if (r.nota_fiscal) agg.nfs.add(r.nota_fiscal);
+    if (isCanalExterno(r.vendedor_nome, r.descricao_produto, r.familia_produto)) {
+      agg.tem_linha_canal_ext = true;
+    }
   }
 
   type Row = {
