@@ -607,8 +607,8 @@ export default function Gerencial() {
     ...(filtroVendedor !== 'all' ? [{ label: `Vendedor: ${filtroVendedor}`, clear: () => { setFiltroVendedor('all'); setTabelaPagina(1); } }] : []),
     ...(filtroFamilia !== 'all' ? [{ label: `Família: ${filtroFamilia}`, clear: () => { setFiltroFamilia('all'); setTabelaPagina(1); } }] : []),
     ...(filtroMarca !== 'all' ? [{ label: `Marca: ${filtroMarca}`, clear: () => { setFiltroMarca('all'); setTabelaPagina(1); } }] : []),
-    ...excludeVendedores.map(v => ({ label: `Excluir Vendedor: ${v}`, clear: () => { setExcludeVendedores(prev => prev.filter(x => x !== v)); setTabelaPagina(1); } })),
-    ...excludeFamilias.map(f => ({ label: `Excluir Família: ${f}`, clear: () => { setExcludeFamilias(prev => prev.filter(x => x !== f)); setTabelaPagina(1); } })),
+    ...excludeVendedores.map(v => ({ label: `Excluir Vendedor: ${v}`, clear: () => { updateExcludeVendedores(excludeVendedores.filter(x => x !== v)); } })),
+    ...excludeFamilias.map(f => ({ label: `Excluir Família: ${f}`, clear: () => { updateExcludeFamilias(excludeFamilias.filter(x => x !== f)); } })),
     ...excludeMarcas.map(m => ({ label: `Excluir Marca: ${m}`, clear: () => { setExcludeMarcas(prev => prev.filter(x => x !== m)); setTabelaPagina(1); } })),
   ];
 
