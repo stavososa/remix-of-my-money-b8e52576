@@ -271,7 +271,7 @@ export default function Gerencial() {
   const filteredAll = useMemo(() => {
     if (!allVendas) return [];
     return allVendas.filter(row => {
-      if (hideCanais && isCanalExterno(row.vendedor_nome, (row as any).descricao_produto)) return false;
+      if (hideCanais && isCanalExterno(row.vendedor_nome)) return false;
       if (filtroUnidade.length > 0 && !filtroUnidade.includes(getFilial(row.cnpj_empresa))) return false;
       if (filtroVendedor !== 'all' && row.vendedor_nome !== filtroVendedor) return false;
       if (filtroFamilia !== 'all' && row.familia_produto !== filtroFamilia) return false;
