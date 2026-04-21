@@ -781,7 +781,7 @@ export default function Gerencial() {
               <MultiFilterSelect
                 label="Excluir Família"
                 selected={excludeFamilias}
-                onChange={(v) => { setExcludeFamilias(v); setTabelaPagina(1); }}
+                onChange={(v) => { updateExcludeFamilias(v); }}
                 options={filtros.familias}
                 allLabel="Excluir Família"
                 itemLabel="famílias"
