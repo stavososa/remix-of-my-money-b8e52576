@@ -23,6 +23,11 @@ const PADROES_CANAIS_EXTERNOS = [
   /\bRESGATE\b/i,          // RESGATE BARRA, BOTAFOGO, RECREIO
 ];
 
+// Regra adicional: linhas das famílias OUTROS/ATACADO cuja descrição contenha
+// um percentual (ex.: "TAXA 4%", "REPASSE 7%") são tratadas como canal externo.
+export const PADRAO_DESCRICAO_PERCENTUAL = /\d+([.,]\d+)?\s*%/;
+export const FAMILIAS_CANAL_EXTERNO_COM_PCT = new Set(['OUTROS', 'ATACADO']);
+
 export const PADROES_CANAIS_EXTERNOS_LABEL = [
   'iFood (todas filiais)',
   'Mercado Livre',
