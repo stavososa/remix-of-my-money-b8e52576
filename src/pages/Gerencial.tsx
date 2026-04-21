@@ -114,6 +114,9 @@ export default function Gerencial() {
     setFiltroVendedor('all');
     setFiltroFamilia('all');
     setFiltroMarca('all');
+    setExcludeVendedores([]);
+    setExcludeFamilias([]);
+    setExcludeMarcas([]);
     setBuscaTabela('');
     setSearchDebounced('');
     setTabelaPagina(1);
