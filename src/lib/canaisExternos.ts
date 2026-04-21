@@ -43,11 +43,27 @@ export const PADROES_CANAIS_EXTERNOS_LABEL = [
   'PROMOTOR / DEGUSTAÇÃO Valqueire',
   'PARCERIA / COLLAB / INFLUENCER',
   'RESGATE (Barra, Botafogo, Recreio)',
+  'Famílias OUTROS/ATACADO com % na descrição (taxas)',
 ];
 
-export function isCanalExterno(vendedorNome: string | null | undefined): boolean {
-  if (!vendedorNome) return false;
-  const nome = vendedorNome.trim();
-  if (!nome) return false;
-  return PADROES_CANAIS_EXTERNOS.some((re) => re.test(nome));
+export function isCanalExterno(
+  vendedorNome?: string | null,
+  descricaoProduto?: string | null,
+  familiaProduto?: string | null,
+): boolean {
+  const nome = (vendedorNome ?? '').trim();
+  if (nome && PADROES_CANAIS_EXTERNOS.some((re) => re.test(nome))) return true;
+
+  const familia = (familiaProduto ?? '').trim().toUpperCase();
+  const descricao = (descricaoProduto ?? '').trim();
+  if (
+    familia &&
+    FAMILIAS_CANAL_EXTERNO_COM_PCT.has(familia) &&
+    descricao &&
+    PADRAO_DESCRICAO_PERCENTUAL.test(descricao)
+  ) {
+    return true;
+  }
+
+  return false;
 }
