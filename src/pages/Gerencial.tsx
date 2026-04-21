@@ -528,44 +528,85 @@ export default function Gerencial() {
           <p className="text-sm text-muted-foreground mt-1">Filtre resultados específicos por loja, vendedor e identifique tendências reais.</p>
         </div>
         {/* Filters */}
-        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-3">
-          {isGerente ? (
-            <div className="bg-secondary/50 border border-border rounded-md px-2 sm:px-3 py-2 text-xs sm:text-sm text-foreground opacity-70">
-              Filial: {filial_gerente}
+        <div className="flex flex-col gap-3">
+          {/* Linha 1: positivos (esquerda) + negativos (direita) */}
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
+            {/* Bloco positivos */}
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-3">
+              {isGerente ? (
+                <div className="bg-secondary/50 border border-border rounded-md px-2 sm:px-3 py-2 text-xs sm:text-sm text-foreground opacity-70">
+                  Filial: {filial_gerente}
+                </div>
+              ) : (
+                <MultiFilterSelect label="Filial" selected={filtroUnidade} onChange={(v) => { setFiltroUnidade(v); setTabelaPagina(1); }} options={filtros.unidades} allLabel="Todas as Filiais" itemLabel="filiais" />
+              )}
+              <FilterSelect label="Vendedor" value={filtroVendedor} onChange={handleFilterChange(setFiltroVendedor)} options={filtros.vendedores.map(v => ({ value: v, label: v }))} allLabel="Todos os Vendedores" />
+              <FilterSelect label="Família" value={filtroFamilia} onChange={handleFilterChange(setFiltroFamilia)} options={filtros.familias.map(f => ({ value: f, label: f }))} allLabel="Todas as Famílias" />
+              <FilterSelect label="Marca" value={filtroMarca} onChange={handleFilterChange(setFiltroMarca)} options={filtros.marcas.map(m => ({ value: m, label: m }))} allLabel="Todas as Marcas" />
             </div>
-          ) : (
-            <MultiFilterSelect label="Filial" selected={filtroUnidade} onChange={(v) => { setFiltroUnidade(v); setTabelaPagina(1); }} options={filtros.unidades} allLabel="Todas as Filiais" />
-          )}
-          <FilterSelect label="Vendedor" value={filtroVendedor} onChange={handleFilterChange(setFiltroVendedor)} options={filtros.vendedores.map(v => ({ value: v, label: v }))} allLabel="Todos os Vendedores" />
-          <FilterSelect label="Família" value={filtroFamilia} onChange={handleFilterChange(setFiltroFamilia)} options={filtros.familias.map(f => ({ value: f, label: f }))} allLabel="Todas as Famílias" />
-          <FilterSelect label="Marca" value={filtroMarca} onChange={handleFilterChange(setFiltroMarca)} options={filtros.marcas.map(m => ({ value: m, label: m }))} allLabel="Todas as Marcas" />
-          {activeFilters.length > 0 && (
-            <button onClick={clearAllFilters} className="text-xs text-muted-foreground hover:text-foreground transition-colors underline">
-              Limpar filtros
-            </button>
-          )}
-          <div className="col-span-2 sm:col-span-1 sm:ml-auto flex items-center gap-2 bg-secondary/50 border border-border rounded-md px-3 py-2">
-            <Switch id="hide-canais" checked={hideCanais} onCheckedChange={setHideCanais} />
-            <label htmlFor="hide-canais" className="text-xs sm:text-sm text-foreground cursor-pointer select-none">
-              Ocultar canais externos
-            </label>
-            <TooltipProvider delayDuration={150}>
-              <UITooltip>
-                <TooltipTrigger asChild>
-                  <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="Sobre canais externos">
-                    <Info className="h-3.5 w-3.5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="max-w-[320px]">
-                  <p className="text-xs font-medium mb-1.5">Padrões ocultados ({PADROES_CANAIS_EXTERNOS_LABEL.length})</p>
-                  <ul className="text-xs text-muted-foreground space-y-0.5 list-disc pl-4">
-                    {PADROES_CANAIS_EXTERNOS_LABEL.map((label) => (
-                      <li key={label}>{label}</li>
-                    ))}
-                  </ul>
-                </TooltipContent>
-              </UITooltip>
-            </TooltipProvider>
+
+            {/* Bloco negativos (direita em desktop) */}
+            <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-3 sm:ml-auto">
+              <MultiFilterSelect
+                label="Excluir Vendedor"
+                selected={excludeVendedores}
+                onChange={(v) => { setExcludeVendedores(v); setTabelaPagina(1); }}
+                options={filtros.vendedores}
+                allLabel="Excluir Vendedor"
+                itemLabel="vendedores"
+                excludeStyle
+              />
+              <MultiFilterSelect
+                label="Excluir Família"
+                selected={excludeFamilias}
+                onChange={(v) => { setExcludeFamilias(v); setTabelaPagina(1); }}
+                options={filtros.familias}
+                allLabel="Excluir Família"
+                itemLabel="famílias"
+                excludeStyle
+              />
+              <MultiFilterSelect
+                label="Excluir Marca"
+                selected={excludeMarcas}
+                onChange={(v) => { setExcludeMarcas(v); setTabelaPagina(1); }}
+                options={filtros.marcas}
+                allLabel="Excluir Marca"
+                itemLabel="marcas"
+                excludeStyle
+              />
+            </div>
+          </div>
+
+          {/* Linha 2: limpar filtros + toggle canais externos */}
+          <div className="flex flex-wrap items-center gap-3">
+            {activeFilters.length > 0 && (
+              <button onClick={clearAllFilters} className="text-xs text-muted-foreground hover:text-foreground transition-colors underline">
+                Limpar filtros
+              </button>
+            )}
+            <div className="flex items-center gap-2 bg-secondary/50 border border-border rounded-md px-3 py-2">
+              <Switch id="hide-canais" checked={hideCanais} onCheckedChange={setHideCanais} />
+              <label htmlFor="hide-canais" className="text-xs sm:text-sm text-foreground cursor-pointer select-none">
+                Ocultar canais externos
+              </label>
+              <TooltipProvider delayDuration={150}>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="Sobre canais externos">
+                      <Info className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-[320px]">
+                    <p className="text-xs font-medium mb-1.5">Padrões ocultados ({PADROES_CANAIS_EXTERNOS_LABEL.length})</p>
+                    <ul className="text-xs text-muted-foreground space-y-0.5 list-disc pl-4">
+                      {PADROES_CANAIS_EXTERNOS_LABEL.map((label) => (
+                        <li key={label}>{label}</li>
+                      ))}
+                    </ul>
+                  </TooltipContent>
+                </UITooltip>
+              </TooltipProvider>
+            </div>
           </div>
         </div>
 
