@@ -840,7 +840,7 @@ export default function Gerencial() {
             {hideCanais && (
               <button
                 type="button"
-                onClick={() => setHideCanais(false)}
+                onClick={() => handleToggleHideCanais(false)}
                 className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-destructive/15 text-destructive border border-destructive/40 hover:bg-destructive/25 transition-colors"
               >
                 Canais externos ocultos
