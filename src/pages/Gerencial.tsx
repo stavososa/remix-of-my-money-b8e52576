@@ -629,7 +629,7 @@ export default function Gerencial() {
             <div className="flex items-center gap-2 bg-secondary/50 border border-border rounded-md px-3 py-2">
               <Switch id="hide-daniel-loja" checked={hideDanielLoja} onCheckedChange={setHideDanielLoja} />
               <label htmlFor="hide-daniel-loja" className="text-xs sm:text-sm text-foreground cursor-pointer select-none">
-                Remover Daniel Cohen, Loja e Desenho Loja
+                Remover Daniel Cohen, Daniel Loja e Desenho Loja
               </label>
             </div>
           </div>
@@ -650,7 +650,7 @@ export default function Gerencial() {
                 className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
                 style={{ backgroundColor: 'hsl(38 90% 55% / 0.15)', color: 'hsl(38 90% 55%)' }}
               >
-                Daniel Cohen, Loja e Desenho Loja ocultos
+                Daniel Cohen, Daniel Loja e Desenho Loja ocultos
               </span>
             )}
             {activeFilters.map(f => (
