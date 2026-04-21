@@ -51,7 +51,6 @@ export async function auditNomesNovaIguacu() {
   let from = 0;
   const all: Array<{
     vendedor_nome: string | null;
-    descricao_produto: string | null;
     total_com_desconto: number | null;
     lucros_reais: number | null;
     nota_fiscal: string | null;
@@ -60,7 +59,7 @@ export async function auditNomesNovaIguacu() {
   while (true) {
     const { data, error } = await supabase
       .from('vendas')
-      .select('vendedor_nome,descricao_produto,total_com_desconto,lucros_reais,nota_fiscal')
+      .select('vendedor_nome,total_com_desconto,lucros_reais,nota_fiscal')
       .gte('data_emissao', '2026-02-01')
       .lte('data_emissao', '2026-02-28')
       .in('cnpj_empresa', cnpjs)
@@ -79,43 +78,22 @@ export async function auditNomesNovaIguacu() {
 
   console.log(`Total de linhas Nova Iguaçu fev/2026: ${all.length}`);
 
-  // Agrupa por vendedor — separando linhas "canal externo por descrição (%)"
-  type Agg = {
-    qtd_linhas: number;
-    faturamento: number;
-    lucro: number;
-    nfs: Set<string>;
-    qtd_linhas_pct_desc: number; // linhas excluídas por % na descrição
-    fat_pct_desc: number;
-  };
-  const map = new Map<string, Agg>();
+  // Agrupa por vendedor
+  const map = new Map<
+    string,
+    { qtd_linhas: number; faturamento: number; lucro: number; nfs: Set<string> }
+  >();
 
   for (const r of all) {
     const nome = (r.vendedor_nome ?? '(sem nome)').trim();
     if (!map.has(nome)) {
-      map.set(nome, {
-        qtd_linhas: 0,
-        faturamento: 0,
-        lucro: 0,
-        nfs: new Set(),
-        qtd_linhas_pct_desc: 0,
-        fat_pct_desc: 0,
-      });
+      map.set(nome, { qtd_linhas: 0, faturamento: 0, lucro: 0, nfs: new Set() });
     }
     const agg = map.get(nome)!;
-    const fat = Number(r.total_com_desconto) || 0;
-    const lucro = Number(r.lucros_reais) || 0;
-    const isPctDesc = isCanalExterno(null, r.descricao_produto);
-
-    if (isPctDesc) {
-      agg.qtd_linhas_pct_desc += 1;
-      agg.fat_pct_desc += fat;
-    } else {
-      agg.qtd_linhas += 1;
-      agg.faturamento += fat;
-      agg.lucro += lucro;
-      if (r.nota_fiscal) agg.nfs.add(r.nota_fiscal);
-    }
+    agg.qtd_linhas += 1;
+    agg.faturamento += Number(r.total_com_desconto) || 0;
+    agg.lucro += Number(r.lucros_reais) || 0;
+    if (r.nota_fiscal) agg.nfs.add(r.nota_fiscal);
   }
 
   type Row = {
@@ -124,8 +102,6 @@ export async function auditNomesNovaIguacu() {
     qtd_nfs: number;
     faturamento: string;
     lucro: string;
-    linhas_pct_desc: number;
-    fat_pct_desc: string;
     classificacao: 'OFICIAL' | 'CANAL_EXTERNO' | 'ESTRANHO';
   };
 
@@ -142,8 +118,6 @@ export async function auditNomesNovaIguacu() {
       qtd_nfs: agg.nfs.size,
       faturamento: agg.faturamento.toFixed(2),
       lucro: agg.lucro.toFixed(2),
-      linhas_pct_desc: agg.qtd_linhas_pct_desc,
-      fat_pct_desc: agg.fat_pct_desc.toFixed(2),
       classificacao,
     });
   }
