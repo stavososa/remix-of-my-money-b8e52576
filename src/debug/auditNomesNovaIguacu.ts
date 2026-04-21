@@ -115,7 +115,7 @@ export async function auditNomesNovaIguacu() {
     const upper = nome.toUpperCase();
     let classificacao: Row['classificacao'] = 'ESTRANHO';
     if (LISTA_OFICIAL.has(upper)) classificacao = 'OFICIAL';
-    else if (isCanalExterno(nome)) classificacao = 'CANAL_EXTERNO';
+    else if (isCanalExterno(nome) || agg.tem_linha_canal_ext) classificacao = 'CANAL_EXTERNO';
 
     rows.push({
       vendedor: nome,
