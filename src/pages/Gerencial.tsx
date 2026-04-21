@@ -116,15 +116,11 @@ export default function Gerencial() {
     }
   }, [hideDanielLoja]);
 
-  // Alvos do switch "Remover Daniel Cohen, Loja e Desenho Loja"
-  const DANIEL_LOJA_VENDEDORES = ['DANIEL COHEN'];
-  const DANIEL_LOJA_FAMILIAS = ['LOJA', 'DESENHO LOJA'];
-  const matchesDanielLoja = (vendedor?: string | null, familia?: string | null) => {
+  // Alvos do switch "Remover Daniel Cohen, Daniel Loja e Desenho Loja" (todos vendedores)
+  const DANIEL_LOJA_VENDEDORES = ['DANIEL COHEN', 'DANIEL LOJA', 'DESENHO LOJA'];
+  const matchesDanielLoja = (vendedor?: string | null) => {
     const v = (vendedor ?? '').trim().toUpperCase();
-    const f = (familia ?? '').trim().toUpperCase();
-    if (v && DANIEL_LOJA_VENDEDORES.includes(v)) return true;
-    if (f && DANIEL_LOJA_FAMILIAS.includes(f)) return true;
-    return false;
+    return !!v && DANIEL_LOJA_VENDEDORES.includes(v);
   };
 
 
