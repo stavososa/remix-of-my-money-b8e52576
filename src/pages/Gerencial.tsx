@@ -6,7 +6,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { usePeriod } from '@/contexts/PeriodContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { X, Search, DollarSign, TrendingUp, Percent, ShoppingCart, FileText, ChevronDown, Check } from 'lucide-react';
+import { X, Search, DollarSign, TrendingUp, Percent, ShoppingCart, FileText, ChevronDown, Check, Users } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -519,6 +520,37 @@ export default function Gerencial() {
 
   const [selectedVenda, setSelectedVenda] = useState<any>(null);
 
+  // Botão "Vendedores da Filial"
+  const [vendedoresFilialOpen, setVendedoresFilialOpen] = useState(false);
+  const [buscaVendedoresFilial, setBuscaVendedoresFilial] = useState('');
+
+  const filiaisAtivasParaVendedores = useMemo<string[]>(() => {
+    if (isGerente && filial_gerente) return [filial_gerente.toUpperCase()];
+    return filtroUnidade.map(u => u.toUpperCase());
+  }, [isGerente, filial_gerente, filtroUnidade]);
+
+  const vendedoresPorFilial = useMemo(() => {
+    if (!allVendas || filiaisAtivasParaVendedores.length === 0) return [];
+    const counts = new Map<string, number>();
+    for (const row of allVendas) {
+      if (hideCanais && isCanalExterno(row.vendedor_nome, row.descricao_produto, row.familia_produto)) continue;
+      const filial = (getFilial(row.cnpj_empresa) ?? '').toUpperCase();
+      if (!filiaisAtivasParaVendedores.includes(filial)) continue;
+      const nome = (row.vendedor_nome ?? '').trim();
+      if (!nome) continue;
+      counts.set(nome, (counts.get(nome) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([nome, count]) => ({ nome, count }))
+      .sort((a, b) => b.count - a.count || a.nome.localeCompare(b.nome));
+  }, [allVendas, filiaisAtivasParaVendedores, hideCanais, getFilial]);
+
+  const vendedoresPorFilialFiltrados = useMemo(() => {
+    const q = buscaVendedoresFilial.trim().toLowerCase();
+    if (!q) return vendedoresPorFilial;
+    return vendedoresPorFilial.filter(v => v.nome.toLowerCase().includes(q));
+  }, [vendedoresPorFilial, buscaVendedoresFilial]);
+
   const detailColumns = [
     { key: 'data_emissao' as const, label: 'Data', render: (v: string) => v ? v.split('-').reverse().join('/') : '—' },
     { key: 'vendedor_nome' as const, label: 'Vendedor' },
@@ -603,6 +635,26 @@ export default function Gerencial() {
                 Limpar filtros
               </button>
             )}
+            <TooltipProvider delayDuration={150}>
+              <UITooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <button
+                      type="button"
+                      onClick={() => setVendedoresFilialOpen(true)}
+                      disabled={filiaisAtivasParaVendedores.length === 0}
+                      className="inline-flex items-center gap-1.5 text-xs sm:text-sm bg-secondary/50 border border-border rounded-md px-3 py-2 text-foreground hover:bg-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Users className="h-3.5 w-3.5" />
+                      Vendedores da filial
+                    </button>
+                  </span>
+                </TooltipTrigger>
+                {filiaisAtivasParaVendedores.length === 0 && (
+                  <TooltipContent side="bottom"><p className="text-xs">Selecione uma filial</p></TooltipContent>
+                )}
+              </UITooltip>
+            </TooltipProvider>
             <div className="flex items-center gap-2 bg-secondary/50 border border-border rounded-md px-3 py-2">
               <Switch id="hide-canais" checked={hideCanais} onCheckedChange={setHideCanais} />
               <label htmlFor="hide-canais" className="text-xs sm:text-sm text-foreground cursor-pointer select-none">
@@ -745,6 +797,42 @@ export default function Gerencial() {
             }}
           />
         </div>
+
+        {/* Vendedores da filial dialog */}
+        <Dialog open={vendedoresFilialOpen} onOpenChange={(open) => { setVendedoresFilialOpen(open); if (!open) setBuscaVendedoresFilial(''); }}>
+          <DialogContent className="max-w-md rounded-lg">
+            <DialogHeader>
+              <DialogTitle className="text-sm">
+                Vendedores — {filiaisAtivasParaVendedores.join(', ') || '—'}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="text-xs text-muted-foreground">
+              {vendedoresPorFilial.length} vendedor{vendedoresPorFilial.length === 1 ? '' : 'es'} no período
+            </div>
+            <Input
+              placeholder="Buscar vendedor..."
+              value={buscaVendedoresFilial}
+              onChange={(e) => setBuscaVendedoresFilial(e.target.value)}
+              className="h-9 text-sm"
+            />
+            <div className="max-h-[55vh] overflow-y-auto -mx-2 px-2">
+              {vendedoresPorFilialFiltrados.length === 0 ? (
+                <div className="text-xs text-muted-foreground text-center py-6">Nenhum vendedor encontrado.</div>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {vendedoresPorFilialFiltrados.map(v => (
+                    <li key={v.nome} className="flex items-center justify-between gap-2 py-2">
+                      <span className="text-sm text-foreground truncate" title={v.nome}>{v.nome}</span>
+                      <Badge variant="secondary" className="shrink-0">
+                        {v.count} {v.count === 1 ? 'venda' : 'vendas'}
+                      </Badge>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Mobile detail dialog */}
         <Dialog open={!!selectedVenda} onOpenChange={(open) => !open && setSelectedVenda(null)}>
