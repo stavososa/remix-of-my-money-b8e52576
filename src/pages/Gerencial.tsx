@@ -796,20 +796,24 @@ export default function Gerencial() {
         {(activeFilters.length > 0 || hideCanais || hideDanielLoja) && (
           <div className="flex flex-wrap gap-2">
             {hideCanais && (
-              <span
-                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
-                style={{ backgroundColor: 'hsl(38 90% 55% / 0.15)', color: 'hsl(38 90% 55%)' }}
+              <button
+                type="button"
+                onClick={() => setHideCanais(false)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-destructive/15 text-destructive border border-destructive/40 hover:bg-destructive/25 transition-colors"
               >
                 Canais externos ocultos
-              </span>
+                <X className="h-3 w-3" />
+              </button>
             )}
             {hideDanielLoja && (
-              <span
-                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
-                style={{ backgroundColor: 'hsl(38 90% 55% / 0.15)', color: 'hsl(38 90% 55%)' }}
+              <button
+                type="button"
+                onClick={() => setHideDanielLoja(false)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-destructive/15 text-destructive border border-destructive/40 hover:bg-destructive/25 transition-colors"
               >
                 Daniel Cohen, Daniel Loja e Desenho Loja ocultos
-              </span>
+                <X className="h-3 w-3" />
+              </button>
             )}
             {activeFilters.map(f => (
               <button key={f.label} onClick={f.clear} className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/15 text-primary text-xs font-medium hover:bg-primary/25 transition-colors">
