@@ -520,36 +520,102 @@ export default function Gerencial() {
 
   const [selectedVenda, setSelectedVenda] = useState<any>(null);
 
-  // Botão "Vendedores da Filial"
+  // Botões "Vendedores / Famílias / Marcas da Filial"
   const [vendedoresFilialOpen, setVendedoresFilialOpen] = useState(false);
   const [buscaVendedoresFilial, setBuscaVendedoresFilial] = useState('');
+  const [familiasFilialOpen, setFamiliasFilialOpen] = useState(false);
+  const [buscaFamiliasFilial, setBuscaFamiliasFilial] = useState('');
+  const [marcasFilialOpen, setMarcasFilialOpen] = useState(false);
+  const [buscaMarcasFilial, setBuscaMarcasFilial] = useState('');
 
   const filiaisAtivasParaVendedores = useMemo<string[]>(() => {
     if (isGerente && filial_gerente) return [filial_gerente.toUpperCase()];
     return filtroUnidade.map(u => u.toUpperCase());
   }, [isGerente, filial_gerente, filtroUnidade]);
 
-  const vendedoresPorFilial = useMemo(() => {
-    if (!allVendas || filiaisAtivasParaVendedores.length === 0) return [];
-    const counts = new Map<string, number>();
+  // Agregação SEM aplicar filtros de exclusão (responde "quem/que existe na filial")
+  const agregadosPorFilial = useMemo(() => {
+    const vendedores = new Map<string, number>();
+    const familias = new Map<string, { count: number; sampleDescricao: string | null }>();
+    const marcas = new Map<string, number>();
+    if (!allVendas || filiaisAtivasParaVendedores.length === 0) {
+      return {
+        vendedores: [] as { nome: string; count: number }[],
+        familias: [] as { nome: string; count: number; sampleDescricao: string | null }[],
+        marcas: [] as { nome: string; count: number }[],
+      };
+    }
     for (const row of allVendas) {
-      if (hideCanais && isCanalExterno(row.vendedor_nome, row.descricao_produto, row.familia_produto)) continue;
       const filial = (getFilial(row.cnpj_empresa) ?? '').toUpperCase();
       if (!filiaisAtivasParaVendedores.includes(filial)) continue;
       const nome = (row.vendedor_nome ?? '').trim();
-      if (!nome) continue;
-      counts.set(nome, (counts.get(nome) ?? 0) + 1);
+      if (nome) vendedores.set(nome, (vendedores.get(nome) ?? 0) + 1);
+      const fam = (row.familia_produto ?? '').trim();
+      if (fam) {
+        const cur = familias.get(fam) ?? { count: 0, sampleDescricao: null as string | null };
+        cur.count += 1;
+        if (!cur.sampleDescricao && row.descricao_produto) cur.sampleDescricao = row.descricao_produto;
+        familias.set(fam, cur);
+      }
+      const mar = (row.marca ?? '').trim();
+      if (mar) marcas.set(mar, (marcas.get(mar) ?? 0) + 1);
     }
-    return Array.from(counts.entries())
-      .map(([nome, count]) => ({ nome, count }))
-      .sort((a, b) => b.count - a.count || a.nome.localeCompare(b.nome));
-  }, [allVendas, filiaisAtivasParaVendedores, hideCanais, getFilial]);
+    return {
+      vendedores: Array.from(vendedores.entries())
+        .map(([nome, count]) => ({ nome, count }))
+        .sort((a, b) => b.count - a.count || a.nome.localeCompare(b.nome)),
+      familias: Array.from(familias.entries())
+        .map(([nome, v]) => ({ nome, count: v.count, sampleDescricao: v.sampleDescricao }))
+        .sort((a, b) => b.count - a.count || a.nome.localeCompare(b.nome)),
+      marcas: Array.from(marcas.entries())
+        .map(([nome, count]) => ({ nome, count }))
+        .sort((a, b) => b.count - a.count || a.nome.localeCompare(b.nome)),
+    };
+  }, [allVendas, filiaisAtivasParaVendedores, getFilial]);
+
+  const vendedoresPorFilial = agregadosPorFilial.vendedores;
+  const familiasPorFilial = agregadosPorFilial.familias;
+  const marcasPorFilial = agregadosPorFilial.marcas;
+
+  // Helpers de motivos de exclusão (para sinalizar em vermelho nos modais)
+  const motivosExclusaoVendedor = useCallback((nome: string): string[] => {
+    const motivos: string[] = [];
+    if (excludeVendedores.includes(nome)) motivos.push('filtro negativo');
+    if (hideCanais && isCanalExterno(nome, null, null)) motivos.push('canais externos');
+    if (hideDanielLoja && matchesDanielLoja(nome)) motivos.push('Daniel/Loja');
+    return motivos;
+  }, [excludeVendedores, hideCanais, hideDanielLoja]);
+
+  const motivosExclusaoFamilia = useCallback((nome: string, sampleDescricao: string | null): string[] => {
+    const motivos: string[] = [];
+    if (excludeFamilias.includes(nome)) motivos.push('filtro negativo');
+    if (hideCanais && isCanalExterno(null, sampleDescricao, nome)) motivos.push('canais externos');
+    return motivos;
+  }, [excludeFamilias, hideCanais]);
+
+  const motivosExclusaoMarca = useCallback((nome: string): string[] => {
+    const motivos: string[] = [];
+    if (excludeMarcas.includes(nome)) motivos.push('filtro negativo');
+    return motivos;
+  }, [excludeMarcas]);
 
   const vendedoresPorFilialFiltrados = useMemo(() => {
     const q = buscaVendedoresFilial.trim().toLowerCase();
     if (!q) return vendedoresPorFilial;
     return vendedoresPorFilial.filter(v => v.nome.toLowerCase().includes(q));
   }, [vendedoresPorFilial, buscaVendedoresFilial]);
+
+  const familiasPorFilialFiltrados = useMemo(() => {
+    const q = buscaFamiliasFilial.trim().toLowerCase();
+    if (!q) return familiasPorFilial;
+    return familiasPorFilial.filter(v => v.nome.toLowerCase().includes(q));
+  }, [familiasPorFilial, buscaFamiliasFilial]);
+
+  const marcasPorFilialFiltrados = useMemo(() => {
+    const q = buscaMarcasFilial.trim().toLowerCase();
+    if (!q) return marcasPorFilial;
+    return marcasPorFilial.filter(v => v.nome.toLowerCase().includes(q));
+  }, [marcasPorFilial, buscaMarcasFilial]);
 
   const detailColumns = [
     { key: 'data_emissao' as const, label: 'Data', render: (v: string) => v ? v.split('-').reverse().join('/') : '—' },
