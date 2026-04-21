@@ -434,9 +434,14 @@ export default function Gerencial() {
     setHideCanais(checked);
     const { vendedores, familias } = getCanaisExternosFromOptions();
     if (checked) {
+      // Re-aplica regra a todos os itens, descartando overrides
+      setOverrideCanaisVendedores(new Set());
+      setOverrideCanaisFamilias(new Set());
       if (vendedores.length) setExcludeVendedores(prev => Array.from(new Set([...prev, ...vendedores])));
       if (familias.length) setExcludeFamilias(prev => Array.from(new Set([...prev, ...familias])));
     } else {
+      setOverrideCanaisVendedores(new Set());
+      setOverrideCanaisFamilias(new Set());
       if (vendedores.length) setExcludeVendedores(prev => prev.filter(v => !vendedores.includes(v)));
       if (familias.length) setExcludeFamilias(prev => prev.filter(f => !familias.includes(f)));
     }
@@ -445,6 +450,7 @@ export default function Gerencial() {
 
   const handleToggleHideDanielLoja = useCallback((checked: boolean) => {
     setHideDanielLoja(checked);
+    setOverrideDanielLoja(new Set());
     const vendedores = getDanielLojaFromOptions();
     if (!vendedores.length) {
       setTabelaPagina(1);
@@ -457,6 +463,51 @@ export default function Gerencial() {
     }
     setTabelaPagina(1);
   }, [getDanielLojaFromOptions]);
+
+  // Wrappers para "soltar" itens individualmente: se o item removido casa com um toggle ativo,
+  // adiciona ao override correspondente para que o cálculo passe a ignorá-lo.
+  const updateExcludeVendedores = useCallback((next: string[]) => {
+    setExcludeVendedores(prev => {
+      const removed = prev.filter(v => !next.includes(v));
+      if (removed.length) {
+        if (hideCanais) {
+          const canais = removed.filter(v => isCanalExterno(v, null, null));
+          if (canais.length) setOverrideCanaisVendedores(p => { const s = new Set(p); canais.forEach(c => s.add(c)); return s; });
+        }
+        if (hideDanielLoja) {
+          const dl = removed.filter(v => matchesDanielLoja(v));
+          if (dl.length) setOverrideDanielLoja(p => { const s = new Set(p); dl.forEach(c => s.add(c)); return s; });
+        }
+      }
+      // Remove de override quando o usuário re-adiciona manualmente
+      const added = next.filter(v => !prev.includes(v));
+      if (added.length) {
+        setOverrideCanaisVendedores(p => { const s = new Set(p); added.forEach(a => s.delete(a)); return s; });
+        setOverrideDanielLoja(p => { const s = new Set(p); added.forEach(a => s.delete(a)); return s; });
+      }
+      return next;
+    });
+    setTabelaPagina(1);
+  }, [hideCanais, hideDanielLoja]);
+
+  const updateExcludeFamilias = useCallback((next: string[]) => {
+    setExcludeFamilias(prev => {
+      const removed = prev.filter(f => !next.includes(f));
+      if (removed.length && hideCanais) {
+        const canais = removed.filter(f => {
+          const up = f.trim().toUpperCase();
+          return FAMILIAS_CANAL_EXTERNO_TOTAL.has(up) || FAMILIAS_CANAL_EXTERNO_COM_PCT.has(up);
+        });
+        if (canais.length) setOverrideCanaisFamilias(p => { const s = new Set(p); canais.forEach(c => s.add(c)); return s; });
+      }
+      const added = next.filter(f => !prev.includes(f));
+      if (added.length) {
+        setOverrideCanaisFamilias(p => { const s = new Set(p); added.forEach(a => s.delete(a)); return s; });
+      }
+      return next;
+    });
+    setTabelaPagina(1);
+  }, [hideCanais]);
 
   // Get CNPJs for a given filial (from unidades)
   const getCnpjsByFiliais = useCallback((filiais: string[]): string[] => {
