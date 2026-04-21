@@ -51,6 +51,7 @@ export async function auditNomesNovaIguacu() {
   let from = 0;
   const all: Array<{
     vendedor_nome: string | null;
+    descricao_produto: string | null;
     total_com_desconto: number | null;
     lucros_reais: number | null;
     nota_fiscal: string | null;
@@ -59,7 +60,7 @@ export async function auditNomesNovaIguacu() {
   while (true) {
     const { data, error } = await supabase
       .from('vendas')
-      .select('vendedor_nome,total_com_desconto,lucros_reais,nota_fiscal')
+      .select('vendedor_nome,descricao_produto,total_com_desconto,lucros_reais,nota_fiscal')
       .gte('data_emissao', '2026-02-01')
       .lte('data_emissao', '2026-02-28')
       .in('cnpj_empresa', cnpjs)
