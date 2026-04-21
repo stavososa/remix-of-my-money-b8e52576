@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { usePeriod } from '@/contexts/PeriodContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { X, Search, DollarSign, TrendingUp, Percent, ShoppingCart, FileText, ChevronDown, Check, Users } from 'lucide-react';
+import { X, Search, DollarSign, TrendingUp, Percent, ShoppingCart, FileText, ChevronDown, Check, Users, Package, Tag } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Input } from '@/components/ui/input';
@@ -520,36 +520,102 @@ export default function Gerencial() {
 
   const [selectedVenda, setSelectedVenda] = useState<any>(null);
 
-  // Botão "Vendedores da Filial"
+  // Botões "Vendedores / Famílias / Marcas da Filial"
   const [vendedoresFilialOpen, setVendedoresFilialOpen] = useState(false);
   const [buscaVendedoresFilial, setBuscaVendedoresFilial] = useState('');
+  const [familiasFilialOpen, setFamiliasFilialOpen] = useState(false);
+  const [buscaFamiliasFilial, setBuscaFamiliasFilial] = useState('');
+  const [marcasFilialOpen, setMarcasFilialOpen] = useState(false);
+  const [buscaMarcasFilial, setBuscaMarcasFilial] = useState('');
 
   const filiaisAtivasParaVendedores = useMemo<string[]>(() => {
     if (isGerente && filial_gerente) return [filial_gerente.toUpperCase()];
     return filtroUnidade.map(u => u.toUpperCase());
   }, [isGerente, filial_gerente, filtroUnidade]);
 
-  const vendedoresPorFilial = useMemo(() => {
-    if (!allVendas || filiaisAtivasParaVendedores.length === 0) return [];
-    const counts = new Map<string, number>();
+  // Agregação SEM aplicar filtros de exclusão (responde "quem/que existe na filial")
+  const agregadosPorFilial = useMemo(() => {
+    const vendedores = new Map<string, number>();
+    const familias = new Map<string, { count: number; sampleDescricao: string | null }>();
+    const marcas = new Map<string, number>();
+    if (!allVendas || filiaisAtivasParaVendedores.length === 0) {
+      return {
+        vendedores: [] as { nome: string; count: number }[],
+        familias: [] as { nome: string; count: number; sampleDescricao: string | null }[],
+        marcas: [] as { nome: string; count: number }[],
+      };
+    }
     for (const row of allVendas) {
-      if (hideCanais && isCanalExterno(row.vendedor_nome, row.descricao_produto, row.familia_produto)) continue;
       const filial = (getFilial(row.cnpj_empresa) ?? '').toUpperCase();
       if (!filiaisAtivasParaVendedores.includes(filial)) continue;
       const nome = (row.vendedor_nome ?? '').trim();
-      if (!nome) continue;
-      counts.set(nome, (counts.get(nome) ?? 0) + 1);
+      if (nome) vendedores.set(nome, (vendedores.get(nome) ?? 0) + 1);
+      const fam = (row.familia_produto ?? '').trim();
+      if (fam) {
+        const cur = familias.get(fam) ?? { count: 0, sampleDescricao: null as string | null };
+        cur.count += 1;
+        if (!cur.sampleDescricao && row.descricao_produto) cur.sampleDescricao = row.descricao_produto;
+        familias.set(fam, cur);
+      }
+      const mar = (row.marca ?? '').trim();
+      if (mar) marcas.set(mar, (marcas.get(mar) ?? 0) + 1);
     }
-    return Array.from(counts.entries())
-      .map(([nome, count]) => ({ nome, count }))
-      .sort((a, b) => b.count - a.count || a.nome.localeCompare(b.nome));
-  }, [allVendas, filiaisAtivasParaVendedores, hideCanais, getFilial]);
+    return {
+      vendedores: Array.from(vendedores.entries())
+        .map(([nome, count]) => ({ nome, count }))
+        .sort((a, b) => b.count - a.count || a.nome.localeCompare(b.nome)),
+      familias: Array.from(familias.entries())
+        .map(([nome, v]) => ({ nome, count: v.count, sampleDescricao: v.sampleDescricao }))
+        .sort((a, b) => b.count - a.count || a.nome.localeCompare(b.nome)),
+      marcas: Array.from(marcas.entries())
+        .map(([nome, count]) => ({ nome, count }))
+        .sort((a, b) => b.count - a.count || a.nome.localeCompare(b.nome)),
+    };
+  }, [allVendas, filiaisAtivasParaVendedores, getFilial]);
+
+  const vendedoresPorFilial = agregadosPorFilial.vendedores;
+  const familiasPorFilial = agregadosPorFilial.familias;
+  const marcasPorFilial = agregadosPorFilial.marcas;
+
+  // Helpers de motivos de exclusão (para sinalizar em vermelho nos modais)
+  const motivosExclusaoVendedor = useCallback((nome: string): string[] => {
+    const motivos: string[] = [];
+    if (excludeVendedores.includes(nome)) motivos.push('filtro negativo');
+    if (hideCanais && isCanalExterno(nome, null, null)) motivos.push('canais externos');
+    if (hideDanielLoja && matchesDanielLoja(nome)) motivos.push('Daniel/Loja');
+    return motivos;
+  }, [excludeVendedores, hideCanais, hideDanielLoja]);
+
+  const motivosExclusaoFamilia = useCallback((nome: string, sampleDescricao: string | null): string[] => {
+    const motivos: string[] = [];
+    if (excludeFamilias.includes(nome)) motivos.push('filtro negativo');
+    if (hideCanais && isCanalExterno(null, sampleDescricao, nome)) motivos.push('canais externos');
+    return motivos;
+  }, [excludeFamilias, hideCanais]);
+
+  const motivosExclusaoMarca = useCallback((nome: string): string[] => {
+    const motivos: string[] = [];
+    if (excludeMarcas.includes(nome)) motivos.push('filtro negativo');
+    return motivos;
+  }, [excludeMarcas]);
 
   const vendedoresPorFilialFiltrados = useMemo(() => {
     const q = buscaVendedoresFilial.trim().toLowerCase();
     if (!q) return vendedoresPorFilial;
     return vendedoresPorFilial.filter(v => v.nome.toLowerCase().includes(q));
   }, [vendedoresPorFilial, buscaVendedoresFilial]);
+
+  const familiasPorFilialFiltrados = useMemo(() => {
+    const q = buscaFamiliasFilial.trim().toLowerCase();
+    if (!q) return familiasPorFilial;
+    return familiasPorFilial.filter(v => v.nome.toLowerCase().includes(q));
+  }, [familiasPorFilial, buscaFamiliasFilial]);
+
+  const marcasPorFilialFiltrados = useMemo(() => {
+    const q = buscaMarcasFilial.trim().toLowerCase();
+    if (!q) return marcasPorFilial;
+    return marcasPorFilial.filter(v => v.nome.toLowerCase().includes(q));
+  }, [marcasPorFilial, buscaMarcasFilial]);
 
   const detailColumns = [
     { key: 'data_emissao' as const, label: 'Data', render: (v: string) => v ? v.split('-').reverse().join('/') : '—' },
@@ -655,6 +721,46 @@ export default function Gerencial() {
                 )}
               </UITooltip>
             </TooltipProvider>
+            <TooltipProvider delayDuration={150}>
+              <UITooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <button
+                      type="button"
+                      onClick={() => setFamiliasFilialOpen(true)}
+                      disabled={filiaisAtivasParaVendedores.length === 0}
+                      className="inline-flex items-center gap-1.5 text-xs sm:text-sm bg-secondary/50 border border-border rounded-md px-3 py-2 text-foreground hover:bg-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Package className="h-3.5 w-3.5" />
+                      Famílias da filial
+                    </button>
+                  </span>
+                </TooltipTrigger>
+                {filiaisAtivasParaVendedores.length === 0 && (
+                  <TooltipContent side="bottom"><p className="text-xs">Selecione uma filial</p></TooltipContent>
+                )}
+              </UITooltip>
+            </TooltipProvider>
+            <TooltipProvider delayDuration={150}>
+              <UITooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <button
+                      type="button"
+                      onClick={() => setMarcasFilialOpen(true)}
+                      disabled={filiaisAtivasParaVendedores.length === 0}
+                      className="inline-flex items-center gap-1.5 text-xs sm:text-sm bg-secondary/50 border border-border rounded-md px-3 py-2 text-foreground hover:bg-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Tag className="h-3.5 w-3.5" />
+                      Marcas da filial
+                    </button>
+                  </span>
+                </TooltipTrigger>
+                {filiaisAtivasParaVendedores.length === 0 && (
+                  <TooltipContent side="bottom"><p className="text-xs">Selecione uma filial</p></TooltipContent>
+                )}
+              </UITooltip>
+            </TooltipProvider>
             <div className="flex items-center gap-2 bg-secondary/50 border border-border rounded-md px-3 py-2">
               <Switch id="hide-canais" checked={hideCanais} onCheckedChange={setHideCanais} />
               <label htmlFor="hide-canais" className="text-xs sm:text-sm text-foreground cursor-pointer select-none">
@@ -690,20 +796,24 @@ export default function Gerencial() {
         {(activeFilters.length > 0 || hideCanais || hideDanielLoja) && (
           <div className="flex flex-wrap gap-2">
             {hideCanais && (
-              <span
-                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
-                style={{ backgroundColor: 'hsl(38 90% 55% / 0.15)', color: 'hsl(38 90% 55%)' }}
+              <button
+                type="button"
+                onClick={() => setHideCanais(false)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-destructive/15 text-destructive border border-destructive/40 hover:bg-destructive/25 transition-colors"
               >
                 Canais externos ocultos
-              </span>
+                <X className="h-3 w-3" />
+              </button>
             )}
             {hideDanielLoja && (
-              <span
-                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
-                style={{ backgroundColor: 'hsl(38 90% 55% / 0.15)', color: 'hsl(38 90% 55%)' }}
+              <button
+                type="button"
+                onClick={() => setHideDanielLoja(false)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-destructive/15 text-destructive border border-destructive/40 hover:bg-destructive/25 transition-colors"
               >
                 Daniel Cohen, Daniel Loja e Desenho Loja ocultos
-              </span>
+                <X className="h-3 w-3" />
+              </button>
             )}
             {activeFilters.map(f => (
               <button key={f.label} onClick={f.clear} className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/15 text-primary text-xs font-medium hover:bg-primary/25 transition-colors">
@@ -820,14 +930,119 @@ export default function Gerencial() {
                 <div className="text-xs text-muted-foreground text-center py-6">Nenhum vendedor encontrado.</div>
               ) : (
                 <ul className="divide-y divide-border">
-                  {vendedoresPorFilialFiltrados.map(v => (
-                    <li key={v.nome} className="flex items-center justify-between gap-2 py-2">
-                      <span className="text-sm text-foreground truncate" title={v.nome}>{v.nome}</span>
-                      <Badge variant="secondary" className="shrink-0">
-                        {v.count} {v.count === 1 ? 'venda' : 'vendas'}
-                      </Badge>
-                    </li>
-                  ))}
+                  {vendedoresPorFilialFiltrados.map(v => {
+                    const motivos = motivosExclusaoVendedor(v.nome);
+                    const excluido = motivos.length > 0;
+                    return (
+                      <li key={v.nome} className={`flex items-center justify-between gap-2 py-2 ${excluido ? 'opacity-70' : ''}`}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`text-sm truncate ${excluido ? 'text-destructive' : 'text-foreground'}`} title={v.nome}>{v.nome}</span>
+                          {excluido && (
+                            <Badge variant="destructive" className="shrink-0 text-[10px] py-0 px-1.5">
+                              Excluído ({motivos.join(', ')})
+                            </Badge>
+                          )}
+                        </div>
+                        <Badge variant="secondary" className="shrink-0">
+                          {v.count} {v.count === 1 ? 'venda' : 'vendas'}
+                        </Badge>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Famílias da filial dialog */}
+        <Dialog open={familiasFilialOpen} onOpenChange={(open) => { setFamiliasFilialOpen(open); if (!open) setBuscaFamiliasFilial(''); }}>
+          <DialogContent className="max-w-md rounded-lg">
+            <DialogHeader>
+              <DialogTitle className="text-sm">
+                Famílias — {filiaisAtivasParaVendedores.join(', ') || '—'}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="text-xs text-muted-foreground">
+              {familiasPorFilial.length} família{familiasPorFilial.length === 1 ? '' : 's'} no período
+            </div>
+            <Input
+              placeholder="Buscar família..."
+              value={buscaFamiliasFilial}
+              onChange={(e) => setBuscaFamiliasFilial(e.target.value)}
+              className="h-9 text-sm"
+            />
+            <div className="max-h-[55vh] overflow-y-auto -mx-2 px-2">
+              {familiasPorFilialFiltrados.length === 0 ? (
+                <div className="text-xs text-muted-foreground text-center py-6">Nenhuma família encontrada.</div>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {familiasPorFilialFiltrados.map(f => {
+                    const motivos = motivosExclusaoFamilia(f.nome, f.sampleDescricao);
+                    const excluido = motivos.length > 0;
+                    return (
+                      <li key={f.nome} className={`flex items-center justify-between gap-2 py-2 ${excluido ? 'opacity-70' : ''}`}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`text-sm truncate ${excluido ? 'text-destructive' : 'text-foreground'}`} title={f.nome}>{f.nome}</span>
+                          {excluido && (
+                            <Badge variant="destructive" className="shrink-0 text-[10px] py-0 px-1.5">
+                              Excluído ({motivos.join(', ')})
+                            </Badge>
+                          )}
+                        </div>
+                        <Badge variant="secondary" className="shrink-0">
+                          {f.count} {f.count === 1 ? 'venda' : 'vendas'}
+                        </Badge>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Marcas da filial dialog */}
+        <Dialog open={marcasFilialOpen} onOpenChange={(open) => { setMarcasFilialOpen(open); if (!open) setBuscaMarcasFilial(''); }}>
+          <DialogContent className="max-w-md rounded-lg">
+            <DialogHeader>
+              <DialogTitle className="text-sm">
+                Marcas — {filiaisAtivasParaVendedores.join(', ') || '—'}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="text-xs text-muted-foreground">
+              {marcasPorFilial.length} marca{marcasPorFilial.length === 1 ? '' : 's'} no período
+            </div>
+            <Input
+              placeholder="Buscar marca..."
+              value={buscaMarcasFilial}
+              onChange={(e) => setBuscaMarcasFilial(e.target.value)}
+              className="h-9 text-sm"
+            />
+            <div className="max-h-[55vh] overflow-y-auto -mx-2 px-2">
+              {marcasPorFilialFiltrados.length === 0 ? (
+                <div className="text-xs text-muted-foreground text-center py-6">Nenhuma marca encontrada.</div>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {marcasPorFilialFiltrados.map(m => {
+                    const motivos = motivosExclusaoMarca(m.nome);
+                    const excluido = motivos.length > 0;
+                    return (
+                      <li key={m.nome} className={`flex items-center justify-between gap-2 py-2 ${excluido ? 'opacity-70' : ''}`}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`text-sm truncate ${excluido ? 'text-destructive' : 'text-foreground'}`} title={m.nome}>{m.nome}</span>
+                          {excluido && (
+                            <Badge variant="destructive" className="shrink-0 text-[10px] py-0 px-1.5">
+                              Excluído ({motivos.join(', ')})
+                            </Badge>
+                          )}
+                        </div>
+                        <Badge variant="secondary" className="shrink-0">
+                          {m.count} {m.count === 1 ? 'venda' : 'vendas'}
+                        </Badge>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>
