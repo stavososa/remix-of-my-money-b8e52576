@@ -220,6 +220,7 @@ export default function Gerencial() {
         lucros_reais: unknown;
         margem_percentual: unknown;
         familia_produto: string | null;
+        descricao_produto: string | null;
         marca: string | null;
         nota_fiscal: string | null;
         cnpj_empresa: string | null;
