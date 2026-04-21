@@ -1,37 +1,60 @@
 
 
-## Botão "Ver Vendedores da Filial" no Gerencial
+## Botões "Famílias" e "Marcas" da filial + indicação visual de exclusões
 
 ### Objetivo
-Adicionar um botão ao lado dos filtros que abre um modal listando todos os `vendedor_nome` distintos que tiveram venda nas filiais atualmente selecionadas (no período vigente). Não lista as vendas — apenas a relação única de vendedores, com a contagem de vendas de cada um.
+Estender o padrão do botão "Vendedores da filial" para também listar **Famílias** e **Marcas** presentes nas filiais selecionadas, e fazer com que cada item dos três modais (Vendedores, Famílias, Marcas) sinalize visualmente, em **vermelho com tag "Excluído via filtro"**, quando estiver sendo removido por algum filtro de exclusão ativo (filtro negativo, "Ocultar canais externos" ou "Remover Daniel Cohen / Daniel Loja / Desenho Loja").
 
 ### Comportamento
-- Botão **"Vendedores da filial"** (ícone Users) ao lado do botão "Limpar filtros" (linha 2 dos filtros).
-- Habilitado quando houver **pelo menos uma filial selecionada** (ou quando for `gerente`, que já tem filial fixa). Desabilitado caso contrário, com tooltip "Selecione uma filial".
-- Ao clicar abre um `Dialog` com:
-  - Título: `Vendedores — {filiais selecionadas}` (ex.: "Vendedores — BOTAFOGO" ou "Vendedores — BOTAFOGO, NOVA IGUAÇU").
-  - Subtítulo com contagem total: `N vendedores no período`.
-  - Campo de busca local (filtra a lista por nome).
-  - Lista (scroll) com cada linha mostrando: **Nome do vendedor** + badge com **nº de vendas** (linhas em `vendas`).
-  - Ordenação: por nº de vendas desc, depois alfabética.
+
+**Novos botões na linha 2 dos filtros (ao lado de "Vendedores da filial"):**
+- **Famílias da filial** (ícone `Package`) — abre modal com `familia_produto` distintos.
+- **Marcas da filial** (ícone `Tag`) — abre modal com `marca_produto` distintos.
+- Mesma regra de habilitação/tooltip do botão de vendedores (precisa ter filial selecionada; gerente sempre habilitado).
+
+**Modais (mesmo layout dos Vendedores):**
+- Título: `Famílias — {filiais}` / `Marcas — {filiais}`.
+- Subtítulo com contagem total.
+- `Input` de busca local.
+- Lista ordenada por nº de ocorrências desc, depois alfabética.
+- Cada linha: nome + `Badge` com nº de vendas.
+
+**Sinalização visual de exclusão (nos 3 modais):**
+Para cada item da lista, avalia se ele seria removido pelos filtros de exclusão ativos:
+- Filtro negativo (`exclVendedores` / `exclFamilias` / `exclMarcas`).
+- `hideCanais` → marca itens detectados por `isCanalExterno` (aplicável principalmente em Vendedores; Famílias `ATACADO` e `OUTROS` com % também).
+- `hideDanielLoja` → marca `DANIEL COHEN`, `DANIEL LOJA`, `DESENHO LOJA` no modal de Vendedores.
+
+Quando excluído:
+- Nome em **vermelho** (`text-destructive`).
+- `Badge` extra `variant="destructive"` ao lado do nome com texto curto indicando o motivo: `Excluído (filtro negativo)`, `Excluído (canais externos)` ou `Excluído (Daniel/Loja)`. Se mais de um motivo, concatena (ex.: `Excluído (canais externos, filtro negativo)`).
+- Linha levemente esmaecida (`opacity-70`).
+
+**Refletir toggles nos filtros positivos:**
+Logo abaixo dos chips de status atuais (linha de "Filtros ativos"), quando `hideCanais` ou `hideDanielLoja` estiverem ativos, exibir chips em **vermelho** (`bg-destructive/15 text-destructive border-destructive/40`) com:
+- `Canais externos ocultos` (X remove → desativa toggle).
+- `Daniel Cohen / Daniel Loja / Desenho Loja ocultos` (X remove → desativa toggle).
+
+Hoje esses chips são âmbar; passam a vermelho para reforçar que são exclusões.
 
 ### Fonte de dados
-Reutiliza o `allVendas` já carregado e o `filteredAll` parcialmente — mas **ignora** os filtros de Vendedor/Família/Marca/Exclusões para responder estritamente "quem vendeu nesta filial". Aplica:
-- Filtro de filial atual (`filtroUnidade` ou `filial_gerente`).
-- Toggle `hideCanais` se ativo (respeita preferência atual).
-- Período já vem implícito de `allVendas`.
+Reutiliza `allVendas` filtrado **somente** por filial (sem aplicar exclusões), igual à lógica atual de `vendedoresPorFilial`. Cria dois novos `useMemo`:
+- `familiasPorFilial`: agrega `familia_produto` (ignora vazios).
+- `marcasPorFilial`: agrega `marca_produto` (ignora vazios).
 
-Agrega via `useMemo` em `Map<vendedor_nome, count>`.
+A flag de "está excluído" é calculada por linha do modal usando os mesmos predicados já existentes (`matchesNegativos`, `isCanalExterno`, `matchesDanielLoja`).
 
 ### Mudanças em `src/pages/Gerencial.tsx` (único arquivo)
-1. Novo estado `const [vendedoresFilialOpen, setVendedoresFilialOpen] = useState(false)` e `const [buscaVendedoresFilial, setBuscaVendedoresFilial] = useState('')`.
-2. Novo `useMemo` `vendedoresPorFilial` que percorre `allVendas`, filtra por `filtroUnidade`/`filial_gerente` (+ `hideCanais` opcional) e devolve array `{ nome, count }[]` ordenado.
-3. Novo botão (`Button` variant outline) na linha 2 dos filtros, ao lado de "Limpar filtros".
-4. Novo `<Dialog>` no final do JSX (próximo ao `selectedVenda` dialog) renderizando a lista com `Input` de busca e linhas com nome + `Badge` de contagem.
+1. Estados: `familiasFilialOpen`, `marcasFilialOpen`, `buscaFamiliasFilial`, `buscaMarcasFilial`.
+2. `useMemo` `familiasPorFilial` e `marcasPorFilial` (mesmo padrão de `vendedoresPorFilial`).
+3. Helper `motivosExclusaoVendedor(nome)`, `motivosExclusaoFamilia(familia)`, `motivosExclusaoMarca(marca)` retornando array de strings de motivo.
+4. Refatorar a lista do modal de Vendedores para também usar os motivos (já que hoje não marca exclusão).
+5. Dois novos botões na linha de filtros + dois novos `<Dialog>` no final do JSX.
+6. Trocar variante visual dos chips de "Canais externos ocultos" e "Daniel..." de âmbar para vermelho/destructive.
 
 ### O que NÃO muda
-- KPIs, gráfico, tabela paginada, motor de comissão, demais filtros e toggles.
-- Demais páginas.
+- KPIs, gráfico, tabela, motor de comissão, filtros positivos e demais páginas.
+- Lógica dos toggles em si — apenas a aparência dos chips muda.
 
 ### Arquivo
 - `src/pages/Gerencial.tsx`
