@@ -1,48 +1,53 @@
 
 
-## Adicionar exclusão de produtos com "%" na descrição (taxas de cartão / canais externos)
+## Adicionar exclusão: famílias OUTROS / ATACADO **com `%` na descrição**
 
-### Contexto
-Hoje `src/lib/canaisExternos.ts` filtra apenas pelo `vendedor_nome` (iFood, Mercado Livre, AVARIA, BONIFICAÇÃO, etc). Você quer que também sejam tratadas como "canal externo / não-comissionável" as linhas cuja `descricao_produto` contenha um percentual (ex.: `TAXA IFOOD 12%`, `REPASSE SHOPEE 7%`, `TAXA CARTÃO 4%`) — tipicamente taxas de marketplaces e adquirentes que aparecem como item da nota.
+### Regra
+Tratar como **canal externo / não-comissionável** uma linha quando **TODAS** forem verdadeiras:
+1. `familia_produto` é `OUTROS` **ou** `ATACADO` (case/trim-insensitive).
+2. `descricao_produto` contém um padrão de porcentagem (ex.: `4%`, `7%`, `10%`, `12,5%`, `3.5 %`).
 
-### Comportamento desejado
-Uma venda é "canal externo" se **qualquer uma** for verdadeira:
-1. `vendedor_nome` casa com os regex já existentes em `PADROES_CANAIS_EXTERNOS`.
-2. **NOVO:** `descricao_produto` contém um padrão de porcentagem (ex.: `4%`, `10%`, `12,5%`, `7 %`).
+Regex de %: `/\d+([.,]\d+)?\s*%/`
 
-Regex proposto para o item 2:
-```
-/\d+([.,]\d+)?\s*%/
-```
-Casa: `4%`, `10%`, `12,5%`, `7 %`, `TAXA 3.5%`. Não casa: textos sem dígito antes do `%` (improvável em descrição real).
+Continua valendo a regra antiga: `vendedor_nome` casando com `PADROES_CANAIS_EXTERNOS` também marca como canal externo. As duas regras são **OR** entre si (linha é canal externo se qualquer uma valer); **dentro** da regra nova, família e `%` são **AND**.
 
 ### Mudanças
 
 **1. `src/lib/canaisExternos.ts`**
-- Adicionar constante `PADRAO_DESCRICAO_PERCENTUAL = /\d+([.,]\d+)?\s*%/`.
-- Trocar a assinatura de `isCanalExterno` para aceitar também a descrição:
+- Adicionar:
+  - `PADRAO_DESCRICAO_PERCENTUAL = /\d+([.,]\d+)?\s*%/`
+  - `FAMILIAS_CANAL_EXTERNO_COM_PCT = new Set(['OUTROS', 'ATACADO'])`
+- Nova assinatura:
   ```ts
-  isCanalExterno(vendedorNome, descricaoProduto?)
+  isCanalExterno(
+    vendedorNome?: string | null,
+    descricaoProduto?: string | null,
+    familiaProduto?: string | null,
+  ): boolean
   ```
-  Mantém compatibilidade (descrição opcional). Se a descrição for passada e casar com o regex de %, retorna `true`.
-- Adicionar entrada no `PADROES_CANAIS_EXTERNOS_LABEL`: `"Produtos com % na descrição (ex: TAXA 4%, 10%)"`.
+  Retorna `true` se:
+  - vendedor casa com `PADROES_CANAIS_EXTERNOS`, **ou**
+  - `familia ∈ {OUTROS, ATACADO}` **e** `descricao` casa com `PADRAO_DESCRICAO_PERCENTUAL`.
+- Manter parâmetros opcionais → call sites antigos continuam compilando (só perdem a regra nova até serem atualizados).
+- Adicionar label: `'Famílias OUTROS/ATACADO com % na descrição (taxas)'`.
 
-**2. Ajustar todos os call sites de `isCanalExterno`**
-Passar `descricao_produto` junto. Vou localizar com `rg "isCanalExterno"` e atualizar cada chamada (provavelmente em `Gerencial.tsx`, `RankingComissoes.tsx`, `Ranking.tsx`, `MeuPainel.tsx`, e o debug `auditNomesNovaIguacu.ts`). Em cada um, garantir que o `select` já traz `descricao_produto` (a maioria já traz; onde não trouxer, adicionar ao `.select(...)`).
+**2. Call sites**
+Localizar com `rg "isCanalExterno"` e atualizar cada chamada para passar `(vendedor_nome, descricao_produto, familia_produto)`. Provável: `Gerencial.tsx`, `RankingComissoes.tsx`, `Ranking.tsx`, `MeuPainel.tsx`, `auditNomesNovaIguacu.ts`. Garantir que o `.select(...)` da query Supabase já traz `descricao_produto` e `familia_produto`; adicionar onde faltar.
 
 **3. `src/debug/auditNomesNovaIguacu.ts`**
-Atualizar para usar a nova assinatura — passa a classificar também como `CANAL_EXTERNO` linhas com `%` na descrição, mesmo que o `vendedor_nome` seja "estranho".
+- Incluir `descricao_produto` e `familia_produto` no `select`.
+- Passar os 3 args na classificação.
 
 ### Onde NÃO mexo
-- Não altero o RPC SQL (`sql/rpc_gerencial.sql`) — o filtro continua client-side, consistente com o padrão atual.
-- Não altero o motor de comissão (`resolverRegra.ts`) — ele já tem suas próprias exclusões em `base-comissionavel-e-exclusoes`. Se quiser estender lá também, é outro passo (me avisa).
-- Não toco em KPIs nem em layout.
+- RPC SQL (`sql/rpc_gerencial.sql`) — filtro segue client-side.
+- Motor de comissão (`resolverRegra.ts`) — exclusões próprias permanecem.
+- KPIs e layout.
 
-### Risco / observações
-- Se houver produto **legítimo** cuja descrição contenha `%` (ex.: `LEITE 0% LACTOSE`, `WHEY 100%`), ele será excluído indevidamente. Se isso for um problema, a gente refina o regex pra exigir contexto (ex.: palavras `TAXA|REPASSE|COMISS|IFOOD|SHOPEE` próximas do `%`). **Pergunta implícita:** posso seguir com o regex amplo (`\d+%`) ou prefere uma versão mais conservadora exigindo palavra-chave junto?
+### Risco
+Regex amplo (`\d+%`) restrito às famílias OUTROS/ATACADO reduz falso-positivo (não pega `WHEY 100%` se ele estiver em outra família). Se mesmo dentro de OUTROS/ATACADO houver produto legítimo com `%`, refinamos depois exigindo palavras-chave (`TAXA|REPASSE|COMISS`).
 
-### Arquivos editados
+### Arquivos
 - `src/lib/canaisExternos.ts`
 - `src/debug/auditNomesNovaIguacu.ts`
-- Páginas que chamam `isCanalExterno` (a confirmar via busca no momento da implementação).
+- Páginas que chamam `isCanalExterno` (a confirmar na implementação).
 
