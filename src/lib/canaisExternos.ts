@@ -24,7 +24,6 @@ const PADROES_CANAIS_EXTERNOS = [
 ];
 
 export const PADROES_CANAIS_EXTERNOS_LABEL = [
-  'Família OUTROS (não-comissionável)',
   'iFood (todas filiais)',
   'Mercado Livre',
   'Shopee',
@@ -41,13 +40,7 @@ export const PADROES_CANAIS_EXTERNOS_LABEL = [
   'RESGATE (Barra, Botafogo, Recreio)',
 ];
 
-export function isCanalExterno(
-  vendedorNome: string | null | undefined,
-  familiaProduto?: string | null | undefined,
-): boolean {
-  if (familiaProduto && familiaProduto.trim().toUpperCase() === 'OUTROS') {
-    return true;
-  }
+export function isCanalExterno(vendedorNome: string | null | undefined): boolean {
   if (!vendedorNome) return false;
   const nome = vendedorNome.trim();
   if (!nome) return false;

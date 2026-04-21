@@ -271,7 +271,7 @@ export default function Gerencial() {
   const filteredAll = useMemo(() => {
     if (!allVendas) return [];
     return allVendas.filter(row => {
-      if (hideCanais && isCanalExterno(row.vendedor_nome, row.familia_produto)) return false;
+      if (hideCanais && isCanalExterno(row.vendedor_nome)) return false;
       if (filtroUnidade.length > 0 && !filtroUnidade.includes(getFilial(row.cnpj_empresa))) return false;
       if (filtroVendedor !== 'all' && row.vendedor_nome !== filtroVendedor) return false;
       if (filtroFamilia !== 'all' && row.familia_produto !== filtroFamilia) return false;
@@ -436,7 +436,7 @@ export default function Gerencial() {
 
   const mappedRows = useMemo(() => {
     return vendasRows
-      .filter(row => !(hideCanais && isCanalExterno(row.vendedor_nome, row.familia_produto)))
+      .filter(row => !(hideCanais && isCanalExterno(row.vendedor_nome)))
       .map(row => ({
         ...row,
         unidade_nome: getFilial(row.cnpj_empresa),
