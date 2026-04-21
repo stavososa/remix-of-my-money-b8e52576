@@ -455,7 +455,13 @@ export default function Gerencial() {
 
   const mappedRows = useMemo(() => {
     return vendasRows
-      .filter(row => !(hideCanais && isCanalExterno(row.vendedor_nome, row.descricao_produto, row.familia_produto)))
+      .filter(row => {
+        if (hideCanais && isCanalExterno(row.vendedor_nome, row.descricao_produto, row.familia_produto)) return false;
+        if (excludeVendedores.length && row.vendedor_nome && excludeVendedores.includes(row.vendedor_nome)) return false;
+        if (excludeFamilias.length && row.familia_produto && excludeFamilias.includes(row.familia_produto)) return false;
+        if (excludeMarcas.length && row.marca && excludeMarcas.includes(row.marca)) return false;
+        return true;
+      })
       .map(row => ({
         ...row,
         unidade_nome: getFilial(row.cnpj_empresa),
@@ -463,7 +469,7 @@ export default function Gerencial() {
         lucro_parsed: parseMoneyBR(row.lucros_reais),
         margem_parsed: parsePctBR(row.margem_percentual),
       }));
-  }, [vendasRows, getFilial, hideCanais]);
+  }, [vendasRows, getFilial, hideCanais, excludeVendedores, excludeFamilias, excludeMarcas]);
 
   const handleFilterChange = (setter: (v: string) => void) => (v: string) => {
     setter(v);
