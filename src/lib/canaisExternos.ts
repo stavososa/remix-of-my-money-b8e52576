@@ -44,9 +44,16 @@ export const PADROES_CANAIS_EXTERNOS_LABEL = [
   'PROMOTOR / DEGUSTAÇÃO Valqueire',
   'PARCERIA / COLLAB / INFLUENCER',
   'RESGATE (Barra, Botafogo, Recreio)',
+  'Produtos com % na descrição (ex.: TAXA 4%, 10%, REPASSE 7%)',
 ];
 
-export function isCanalExterno(vendedorNome: string | null | undefined): boolean {
+export function isCanalExterno(
+  vendedorNome: string | null | undefined,
+  descricaoProduto?: string | null,
+): boolean {
+  if (descricaoProduto && PADRAO_DESCRICAO_PERCENTUAL.test(descricaoProduto)) {
+    return true;
+  }
   if (!vendedorNome) return false;
   const nome = vendedorNome.trim();
   if (!nome) return false;
