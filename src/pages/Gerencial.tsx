@@ -307,9 +307,10 @@ export default function Gerencial() {
       if (excludeVendedores.length && row.vendedor_nome && excludeVendedores.includes(row.vendedor_nome)) return false;
       if (excludeFamilias.length && row.familia_produto && excludeFamilias.includes(row.familia_produto)) return false;
       if (excludeMarcas.length && row.marca && excludeMarcas.includes(row.marca)) return false;
+      if (hideDanielLoja && matchesDanielLoja(row.vendedor_nome, row.familia_produto)) return false;
       return true;
     });
-  }, [allVendas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, excludeVendedores, excludeFamilias, excludeMarcas, getFilial, hideCanais]);
+  }, [allVendas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, excludeVendedores, excludeFamilias, excludeMarcas, getFilial, hideCanais, hideDanielLoja]);
 
   // ===== KPIs (soma direta, espelha SQL/planilha) =====
   const kpis = useMemo(() => {
@@ -481,6 +482,7 @@ export default function Gerencial() {
         if (excludeVendedores.length && row.vendedor_nome && excludeVendedores.includes(row.vendedor_nome)) return false;
         if (excludeFamilias.length && row.familia_produto && excludeFamilias.includes(row.familia_produto)) return false;
         if (excludeMarcas.length && row.marca && excludeMarcas.includes(row.marca)) return false;
+        if (hideDanielLoja && matchesDanielLoja(row.vendedor_nome, row.familia_produto)) return false;
         return true;
       })
       .map(row => ({
@@ -490,7 +492,7 @@ export default function Gerencial() {
         lucro_parsed: parseMoneyBR(row.lucros_reais),
         margem_parsed: parsePctBR(row.margem_percentual),
       }));
-  }, [vendasRows, getFilial, hideCanais, excludeVendedores, excludeFamilias, excludeMarcas]);
+  }, [vendasRows, getFilial, hideCanais, excludeVendedores, excludeFamilias, excludeMarcas, hideDanielLoja]);
 
   const handleFilterChange = (setter: (v: string) => void) => (v: string) => {
     setter(v);
