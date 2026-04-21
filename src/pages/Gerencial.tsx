@@ -408,6 +408,48 @@ export default function Gerencial() {
     };
   }, [allVendas, unidadesList, isGerente, gerenteFilterOpts]);
 
+  // Helpers para sincronizar toggles com filtros de exclusão
+  const getCanaisExternosFromOptions = useCallback(() => {
+    const vendedores = (filterOptions.vendedores ?? []).filter(v => isCanalExterno(v, null, null));
+    const familias = (filterOptions.familias ?? []).filter(f => {
+      const up = f.trim().toUpperCase();
+      return FAMILIAS_CANAL_EXTERNO_TOTAL.has(up) || FAMILIAS_CANAL_EXTERNO_COM_PCT.has(up);
+    });
+    return { vendedores, familias };
+  }, [filterOptions]);
+
+  const getDanielLojaFromOptions = useCallback(() => {
+    return (filterOptions.vendedores ?? []).filter(v => matchesDanielLoja(v));
+  }, [filterOptions]);
+
+  const handleToggleHideCanais = useCallback((checked: boolean) => {
+    setHideCanais(checked);
+    const { vendedores, familias } = getCanaisExternosFromOptions();
+    if (checked) {
+      if (vendedores.length) setExcludeVendedores(prev => Array.from(new Set([...prev, ...vendedores])));
+      if (familias.length) setExcludeFamilias(prev => Array.from(new Set([...prev, ...familias])));
+    } else {
+      if (vendedores.length) setExcludeVendedores(prev => prev.filter(v => !vendedores.includes(v)));
+      if (familias.length) setExcludeFamilias(prev => prev.filter(f => !familias.includes(f)));
+    }
+    setTabelaPagina(1);
+  }, [getCanaisExternosFromOptions]);
+
+  const handleToggleHideDanielLoja = useCallback((checked: boolean) => {
+    setHideDanielLoja(checked);
+    const vendedores = getDanielLojaFromOptions();
+    if (!vendedores.length) {
+      setTabelaPagina(1);
+      return;
+    }
+    if (checked) {
+      setExcludeVendedores(prev => Array.from(new Set([...prev, ...vendedores])));
+    } else {
+      setExcludeVendedores(prev => prev.filter(v => !vendedores.includes(v)));
+    }
+    setTabelaPagina(1);
+  }, [getDanielLojaFromOptions]);
+
   // Get CNPJs for a given filial (from unidades)
   const getCnpjsByFiliais = useCallback((filiais: string[]): string[] => {
     if (!unidadesList) return [];
