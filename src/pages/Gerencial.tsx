@@ -804,7 +804,7 @@ export default function Gerencial() {
               </UITooltip>
             </TooltipProvider>
             <div className="flex items-center gap-2 bg-secondary/50 border border-border rounded-md px-3 py-2">
-              <Switch id="hide-canais" checked={hideCanais} onCheckedChange={setHideCanais} />
+              <Switch id="hide-canais" checked={hideCanais} onCheckedChange={handleToggleHideCanais} />
               <label htmlFor="hide-canais" className="text-xs sm:text-sm text-foreground cursor-pointer select-none">
                 Ocultar canais externos
               </label>
