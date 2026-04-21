@@ -772,7 +772,7 @@ export default function Gerencial() {
               <MultiFilterSelect
                 label="Excluir Vendedor"
                 selected={excludeVendedores}
-                onChange={(v) => { setExcludeVendedores(v); setTabelaPagina(1); }}
+                onChange={(v) => { updateExcludeVendedores(v); }}
                 options={filtros.vendedores}
                 allLabel="Excluir Vendedor"
                 itemLabel="vendedores"
