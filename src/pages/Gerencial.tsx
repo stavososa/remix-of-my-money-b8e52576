@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Switch } from '@/components/ui/switch';
 import { Tooltip as UITooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { Info } from 'lucide-react';
-import { isCanalExterno, PADROES_CANAIS_EXTERNOS_LABEL } from '@/lib/canaisExternos';
+import { isCanalExterno, PADROES_CANAIS_EXTERNOS_LABEL, FAMILIAS_CANAL_EXTERNO_TOTAL, FAMILIAS_CANAL_EXTERNO_COM_PCT } from '@/lib/canaisExternos';
 import {
   ResponsiveContainer, AreaChart, Area,
   XAxis, YAxis, Tooltip, CartesianGrid,
@@ -408,6 +408,48 @@ export default function Gerencial() {
     };
   }, [allVendas, unidadesList, isGerente, gerenteFilterOpts]);
 
+  // Helpers para sincronizar toggles com filtros de exclusão
+  const getCanaisExternosFromOptions = useCallback(() => {
+    const vendedores = (filterOptions.vendedores ?? []).filter(v => isCanalExterno(v, null, null));
+    const familias = (filterOptions.familias ?? []).filter(f => {
+      const up = f.trim().toUpperCase();
+      return FAMILIAS_CANAL_EXTERNO_TOTAL.has(up) || FAMILIAS_CANAL_EXTERNO_COM_PCT.has(up);
+    });
+    return { vendedores, familias };
+  }, [filterOptions]);
+
+  const getDanielLojaFromOptions = useCallback(() => {
+    return (filterOptions.vendedores ?? []).filter(v => matchesDanielLoja(v));
+  }, [filterOptions]);
+
+  const handleToggleHideCanais = useCallback((checked: boolean) => {
+    setHideCanais(checked);
+    const { vendedores, familias } = getCanaisExternosFromOptions();
+    if (checked) {
+      if (vendedores.length) setExcludeVendedores(prev => Array.from(new Set([...prev, ...vendedores])));
+      if (familias.length) setExcludeFamilias(prev => Array.from(new Set([...prev, ...familias])));
+    } else {
+      if (vendedores.length) setExcludeVendedores(prev => prev.filter(v => !vendedores.includes(v)));
+      if (familias.length) setExcludeFamilias(prev => prev.filter(f => !familias.includes(f)));
+    }
+    setTabelaPagina(1);
+  }, [getCanaisExternosFromOptions]);
+
+  const handleToggleHideDanielLoja = useCallback((checked: boolean) => {
+    setHideDanielLoja(checked);
+    const vendedores = getDanielLojaFromOptions();
+    if (!vendedores.length) {
+      setTabelaPagina(1);
+      return;
+    }
+    if (checked) {
+      setExcludeVendedores(prev => Array.from(new Set([...prev, ...vendedores])));
+    } else {
+      setExcludeVendedores(prev => prev.filter(v => !vendedores.includes(v)));
+    }
+    setTabelaPagina(1);
+  }, [getDanielLojaFromOptions]);
+
   // Get CNPJs for a given filial (from unidades)
   const getCnpjsByFiliais = useCallback((filiais: string[]): string[] => {
     if (!unidadesList) return [];
@@ -762,7 +804,7 @@ export default function Gerencial() {
               </UITooltip>
             </TooltipProvider>
             <div className="flex items-center gap-2 bg-secondary/50 border border-border rounded-md px-3 py-2">
-              <Switch id="hide-canais" checked={hideCanais} onCheckedChange={setHideCanais} />
+              <Switch id="hide-canais" checked={hideCanais} onCheckedChange={handleToggleHideCanais} />
               <label htmlFor="hide-canais" className="text-xs sm:text-sm text-foreground cursor-pointer select-none">
                 Ocultar canais externos
               </label>
@@ -785,7 +827,7 @@ export default function Gerencial() {
               </TooltipProvider>
             </div>
             <div className="flex items-center gap-2 bg-secondary/50 border border-border rounded-md px-3 py-2">
-              <Switch id="hide-daniel-loja" checked={hideDanielLoja} onCheckedChange={setHideDanielLoja} />
+              <Switch id="hide-daniel-loja" checked={hideDanielLoja} onCheckedChange={handleToggleHideDanielLoja} />
               <label htmlFor="hide-daniel-loja" className="text-xs sm:text-sm text-foreground cursor-pointer select-none">
                 Remover Daniel Cohen, Daniel Loja e Desenho Loja
               </label>
@@ -798,7 +840,7 @@ export default function Gerencial() {
             {hideCanais && (
               <button
                 type="button"
-                onClick={() => setHideCanais(false)}
+                onClick={() => handleToggleHideCanais(false)}
                 className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-destructive/15 text-destructive border border-destructive/40 hover:bg-destructive/25 transition-colors"
               >
                 Canais externos ocultos
@@ -808,7 +850,7 @@ export default function Gerencial() {
             {hideDanielLoja && (
               <button
                 type="button"
-                onClick={() => setHideDanielLoja(false)}
+                onClick={() => handleToggleHideDanielLoja(false)}
                 className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-destructive/15 text-destructive border border-destructive/40 hover:bg-destructive/25 transition-colors"
               >
                 Daniel Cohen, Daniel Loja e Desenho Loja ocultos
