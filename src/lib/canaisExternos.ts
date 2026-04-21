@@ -23,6 +23,12 @@ const PADROES_CANAIS_EXTERNOS = [
   /\bRESGATE\b/i,          // RESGATE BARRA, BOTAFOGO, RECREIO
 ];
 
+// Detecta itens "técnicos" (taxas, repasses, comissões de marketplace/cartão)
+// que aparecem como produto da nota fiscal. Qualquer descrição contendo
+// um número seguido de % (ex.: "TAXA IFOOD 12%", "REPASSE 7%", "3,5%") é tratada
+// como canal externo / não-comissionável.
+export const PADRAO_DESCRICAO_PERCENTUAL = /\d+([.,]\d+)?\s*%/;
+
 export const PADROES_CANAIS_EXTERNOS_LABEL = [
   'iFood (todas filiais)',
   'Mercado Livre',
@@ -38,9 +44,16 @@ export const PADROES_CANAIS_EXTERNOS_LABEL = [
   'PROMOTOR / DEGUSTAÇÃO Valqueire',
   'PARCERIA / COLLAB / INFLUENCER',
   'RESGATE (Barra, Botafogo, Recreio)',
+  'Produtos com % na descrição (ex.: TAXA 4%, 10%, REPASSE 7%)',
 ];
 
-export function isCanalExterno(vendedorNome: string | null | undefined): boolean {
+export function isCanalExterno(
+  vendedorNome: string | null | undefined,
+  descricaoProduto?: string | null,
+): boolean {
+  if (descricaoProduto && PADRAO_DESCRICAO_PERCENTUAL.test(descricaoProduto)) {
+    return true;
+  }
   if (!vendedorNome) return false;
   const nome = vendedorNome.trim();
   if (!nome) return false;

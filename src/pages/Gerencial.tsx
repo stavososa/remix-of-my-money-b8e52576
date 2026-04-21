@@ -245,7 +245,7 @@ export default function Gerencial() {
         const from = i * step;
         let q = supabase
           .from('vendas')
-          .select('data_emissao, vendedor_nome, total_com_desconto, lucros_reais, margem_percentual, familia_produto, marca, nota_fiscal, cnpj_empresa')
+          .select('data_emissao, vendedor_nome, descricao_produto, total_com_desconto, lucros_reais, margem_percentual, familia_produto, marca, nota_fiscal, cnpj_empresa')
           .gte('data_emissao', startDate)
           .lte('data_emissao', endDate)
           .order('id', { ascending: true })
@@ -271,7 +271,7 @@ export default function Gerencial() {
   const filteredAll = useMemo(() => {
     if (!allVendas) return [];
     return allVendas.filter(row => {
-      if (hideCanais && isCanalExterno(row.vendedor_nome)) return false;
+      if (hideCanais && isCanalExterno(row.vendedor_nome, (row as any).descricao_produto)) return false;
       if (filtroUnidade.length > 0 && !filtroUnidade.includes(getFilial(row.cnpj_empresa))) return false;
       if (filtroVendedor !== 'all' && row.vendedor_nome !== filtroVendedor) return false;
       if (filtroFamilia !== 'all' && row.familia_produto !== filtroFamilia) return false;
@@ -436,7 +436,7 @@ export default function Gerencial() {
 
   const mappedRows = useMemo(() => {
     return vendasRows
-      .filter(row => !(hideCanais && isCanalExterno(row.vendedor_nome)))
+      .filter(row => !(hideCanais && isCanalExterno(row.vendedor_nome, (row as any).descricao_produto)))
       .map(row => ({
         ...row,
         unidade_nome: getFilial(row.cnpj_empresa),
