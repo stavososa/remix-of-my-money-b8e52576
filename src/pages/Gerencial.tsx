@@ -639,7 +639,7 @@ export default function Gerencial() {
           </div>
         </div>
 
-        {activeFilters.length > 0 && (
+        {(activeFilters.length > 0 || hideCanais || hideDanielLoja) && (
           <div className="flex flex-wrap gap-2">
             {hideCanais && (
               <span
@@ -649,22 +649,20 @@ export default function Gerencial() {
                 Canais externos ocultos
               </span>
             )}
+            {hideDanielLoja && (
+              <span
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
+                style={{ backgroundColor: 'hsl(38 90% 55% / 0.15)', color: 'hsl(38 90% 55%)' }}
+              >
+                Daniel Cohen, Loja e Desenho Loja ocultos
+              </span>
+            )}
             {activeFilters.map(f => (
               <button key={f.label} onClick={f.clear} className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/15 text-primary text-xs font-medium hover:bg-primary/25 transition-colors">
                 {f.label}
                 <X className="h-3 w-3" />
               </button>
             ))}
-          </div>
-        )}
-        {hideCanais && activeFilters.length === 0 && (
-          <div className="flex flex-wrap gap-2">
-            <span
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
-              style={{ backgroundColor: 'hsl(38 90% 55% / 0.15)', color: 'hsl(38 90% 55%)' }}
-            >
-              Canais externos ocultos
-            </span>
           </div>
         )}
         {hideCanais && filtroVendedor !== 'all' && isCanalExterno(filtroVendedor) && (
