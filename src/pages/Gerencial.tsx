@@ -525,11 +525,15 @@ export default function Gerencial() {
   const mappedRows = useMemo(() => {
     return vendasRows
       .filter(row => {
-        if (hideCanais && isCanalExterno(row.vendedor_nome, row.descricao_produto, row.familia_produto)) return false;
+        if (hideCanais && isCanalExterno(row.vendedor_nome, row.descricao_produto, row.familia_produto)) {
+          const v = row.vendedor_nome ?? '';
+          const f = row.familia_produto ?? '';
+          if (!overrideCanaisVendedores.has(v) && !overrideCanaisFamilias.has(f)) return false;
+        }
         if (excludeVendedores.length && row.vendedor_nome && excludeVendedores.includes(row.vendedor_nome)) return false;
         if (excludeFamilias.length && row.familia_produto && excludeFamilias.includes(row.familia_produto)) return false;
         if (excludeMarcas.length && row.marca && excludeMarcas.includes(row.marca)) return false;
-        if (hideDanielLoja && matchesDanielLoja(row.vendedor_nome)) return false;
+        if (hideDanielLoja && matchesDanielLoja(row.vendedor_nome) && !overrideDanielLoja.has(row.vendedor_nome ?? '')) return false;
         return true;
       })
       .map(row => ({
@@ -539,7 +543,7 @@ export default function Gerencial() {
         lucro_parsed: parseMoneyBR(row.lucros_reais),
         margem_parsed: parsePctBR(row.margem_percentual),
       }));
-  }, [vendasRows, getFilial, hideCanais, excludeVendedores, excludeFamilias, excludeMarcas, hideDanielLoja]);
+  }, [vendasRows, getFilial, hideCanais, excludeVendedores, excludeFamilias, excludeMarcas, hideDanielLoja, overrideCanaisVendedores, overrideCanaisFamilias, overrideDanielLoja]);
 
   const handleFilterChange = (setter: (v: string) => void) => (v: string) => {
     setter(v);
