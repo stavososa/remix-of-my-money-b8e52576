@@ -930,14 +930,119 @@ export default function Gerencial() {
                 <div className="text-xs text-muted-foreground text-center py-6">Nenhum vendedor encontrado.</div>
               ) : (
                 <ul className="divide-y divide-border">
-                  {vendedoresPorFilialFiltrados.map(v => (
-                    <li key={v.nome} className="flex items-center justify-between gap-2 py-2">
-                      <span className="text-sm text-foreground truncate" title={v.nome}>{v.nome}</span>
-                      <Badge variant="secondary" className="shrink-0">
-                        {v.count} {v.count === 1 ? 'venda' : 'vendas'}
-                      </Badge>
-                    </li>
-                  ))}
+                  {vendedoresPorFilialFiltrados.map(v => {
+                    const motivos = motivosExclusaoVendedor(v.nome);
+                    const excluido = motivos.length > 0;
+                    return (
+                      <li key={v.nome} className={`flex items-center justify-between gap-2 py-2 ${excluido ? 'opacity-70' : ''}`}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`text-sm truncate ${excluido ? 'text-destructive' : 'text-foreground'}`} title={v.nome}>{v.nome}</span>
+                          {excluido && (
+                            <Badge variant="destructive" className="shrink-0 text-[10px] py-0 px-1.5">
+                              Excluído ({motivos.join(', ')})
+                            </Badge>
+                          )}
+                        </div>
+                        <Badge variant="secondary" className="shrink-0">
+                          {v.count} {v.count === 1 ? 'venda' : 'vendas'}
+                        </Badge>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Famílias da filial dialog */}
+        <Dialog open={familiasFilialOpen} onOpenChange={(open) => { setFamiliasFilialOpen(open); if (!open) setBuscaFamiliasFilial(''); }}>
+          <DialogContent className="max-w-md rounded-lg">
+            <DialogHeader>
+              <DialogTitle className="text-sm">
+                Famílias — {filiaisAtivasParaVendedores.join(', ') || '—'}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="text-xs text-muted-foreground">
+              {familiasPorFilial.length} família{familiasPorFilial.length === 1 ? '' : 's'} no período
+            </div>
+            <Input
+              placeholder="Buscar família..."
+              value={buscaFamiliasFilial}
+              onChange={(e) => setBuscaFamiliasFilial(e.target.value)}
+              className="h-9 text-sm"
+            />
+            <div className="max-h-[55vh] overflow-y-auto -mx-2 px-2">
+              {familiasPorFilialFiltrados.length === 0 ? (
+                <div className="text-xs text-muted-foreground text-center py-6">Nenhuma família encontrada.</div>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {familiasPorFilialFiltrados.map(f => {
+                    const motivos = motivosExclusaoFamilia(f.nome, f.sampleDescricao);
+                    const excluido = motivos.length > 0;
+                    return (
+                      <li key={f.nome} className={`flex items-center justify-between gap-2 py-2 ${excluido ? 'opacity-70' : ''}`}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`text-sm truncate ${excluido ? 'text-destructive' : 'text-foreground'}`} title={f.nome}>{f.nome}</span>
+                          {excluido && (
+                            <Badge variant="destructive" className="shrink-0 text-[10px] py-0 px-1.5">
+                              Excluído ({motivos.join(', ')})
+                            </Badge>
+                          )}
+                        </div>
+                        <Badge variant="secondary" className="shrink-0">
+                          {f.count} {f.count === 1 ? 'venda' : 'vendas'}
+                        </Badge>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Marcas da filial dialog */}
+        <Dialog open={marcasFilialOpen} onOpenChange={(open) => { setMarcasFilialOpen(open); if (!open) setBuscaMarcasFilial(''); }}>
+          <DialogContent className="max-w-md rounded-lg">
+            <DialogHeader>
+              <DialogTitle className="text-sm">
+                Marcas — {filiaisAtivasParaVendedores.join(', ') || '—'}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="text-xs text-muted-foreground">
+              {marcasPorFilial.length} marca{marcasPorFilial.length === 1 ? '' : 's'} no período
+            </div>
+            <Input
+              placeholder="Buscar marca..."
+              value={buscaMarcasFilial}
+              onChange={(e) => setBuscaMarcasFilial(e.target.value)}
+              className="h-9 text-sm"
+            />
+            <div className="max-h-[55vh] overflow-y-auto -mx-2 px-2">
+              {marcasPorFilialFiltrados.length === 0 ? (
+                <div className="text-xs text-muted-foreground text-center py-6">Nenhuma marca encontrada.</div>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {marcasPorFilialFiltrados.map(m => {
+                    const motivos = motivosExclusaoMarca(m.nome);
+                    const excluido = motivos.length > 0;
+                    return (
+                      <li key={m.nome} className={`flex items-center justify-between gap-2 py-2 ${excluido ? 'opacity-70' : ''}`}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`text-sm truncate ${excluido ? 'text-destructive' : 'text-foreground'}`} title={m.nome}>{m.nome}</span>
+                          {excluido && (
+                            <Badge variant="destructive" className="shrink-0 text-[10px] py-0 px-1.5">
+                              Excluído ({motivos.join(', ')})
+                            </Badge>
+                          )}
+                        </div>
+                        <Badge variant="secondary" className="shrink-0">
+                          {m.count} {m.count === 1 ? 'venda' : 'vendas'}
+                        </Badge>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>
