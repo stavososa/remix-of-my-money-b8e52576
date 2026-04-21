@@ -721,6 +721,46 @@ export default function Gerencial() {
                 )}
               </UITooltip>
             </TooltipProvider>
+            <TooltipProvider delayDuration={150}>
+              <UITooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <button
+                      type="button"
+                      onClick={() => setFamiliasFilialOpen(true)}
+                      disabled={filiaisAtivasParaVendedores.length === 0}
+                      className="inline-flex items-center gap-1.5 text-xs sm:text-sm bg-secondary/50 border border-border rounded-md px-3 py-2 text-foreground hover:bg-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Package className="h-3.5 w-3.5" />
+                      Famílias da filial
+                    </button>
+                  </span>
+                </TooltipTrigger>
+                {filiaisAtivasParaVendedores.length === 0 && (
+                  <TooltipContent side="bottom"><p className="text-xs">Selecione uma filial</p></TooltipContent>
+                )}
+              </UITooltip>
+            </TooltipProvider>
+            <TooltipProvider delayDuration={150}>
+              <UITooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <button
+                      type="button"
+                      onClick={() => setMarcasFilialOpen(true)}
+                      disabled={filiaisAtivasParaVendedores.length === 0}
+                      className="inline-flex items-center gap-1.5 text-xs sm:text-sm bg-secondary/50 border border-border rounded-md px-3 py-2 text-foreground hover:bg-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Tag className="h-3.5 w-3.5" />
+                      Marcas da filial
+                    </button>
+                  </span>
+                </TooltipTrigger>
+                {filiaisAtivasParaVendedores.length === 0 && (
+                  <TooltipContent side="bottom"><p className="text-xs">Selecione uma filial</p></TooltipContent>
+                )}
+              </UITooltip>
+            </TooltipProvider>
             <div className="flex items-center gap-2 bg-secondary/50 border border-border rounded-md px-3 py-2">
               <Switch id="hide-canais" checked={hideCanais} onCheckedChange={setHideCanais} />
               <label htmlFor="hide-canais" className="text-xs sm:text-sm text-foreground cursor-pointer select-none">
