@@ -54,12 +54,14 @@ export async function auditNomesNovaIguacu() {
     total_com_desconto: number | null;
     lucros_reais: number | null;
     nota_fiscal: string | null;
+    descricao_produto: string | null;
+    familia_produto: string | null;
   }> = [];
 
   while (true) {
     const { data, error } = await supabase
       .from('vendas')
-      .select('vendedor_nome,total_com_desconto,lucros_reais,nota_fiscal')
+      .select('vendedor_nome,total_com_desconto,lucros_reais,nota_fiscal,descricao_produto,familia_produto')
       .gte('data_emissao', '2026-02-01')
       .lte('data_emissao', '2026-02-28')
       .in('cnpj_empresa', cnpjs)
