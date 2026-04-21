@@ -93,6 +93,10 @@ export default function Gerencial() {
   const [excludeVendedores, setExcludeVendedores] = useState<string[]>([]);
   const [excludeFamilias, setExcludeFamilias] = useState<string[]>([]);
   const [excludeMarcas, setExcludeMarcas] = useState<string[]>([]);
+  // Overrides: vendedores/famílias que o usuário "soltou" individualmente, mesmo com toggle ativo
+  const [overrideCanaisVendedores, setOverrideCanaisVendedores] = useState<Set<string>>(new Set());
+  const [overrideCanaisFamilias, setOverrideCanaisFamilias] = useState<Set<string>>(new Set());
+  const [overrideDanielLoja, setOverrideDanielLoja] = useState<Set<string>>(new Set());
   const [buscaTabela, setBuscaTabela] = useState('');
   const [searchDebounced, setSearchDebounced] = useState('');
   const [tabelaPagina, setTabelaPagina] = useState(1);
