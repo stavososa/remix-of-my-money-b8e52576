@@ -1,67 +1,48 @@
 
 
-## Investigação: vendas de fevereiro (Nova Iguaçu) atribuídas a nomes "estranhos"
+## Adicionar exclusão de produtos com "%" na descrição (taxas de cartão / canais externos)
 
-### Problema
-Listar todos os `vendedor_nome` distintos em **fevereiro/2026**, filial **NOVA IGUAÇU**, que **não** estejam:
-- Na lista oficial (13 nomes informados)
-- Nem cobertos pelos padrões de canais externos (`src/lib/canaisExternos.ts`)
+### Contexto
+Hoje `src/lib/canaisExternos.ts` filtra apenas pelo `vendedor_nome` (iFood, Mercado Livre, AVARIA, BONIFICAÇÃO, etc). Você quer que também sejam tratadas como "canal externo / não-comissionável" as linhas cuja `descricao_produto` contenha um percentual (ex.: `TAXA IFOOD 12%`, `REPASSE SHOPEE 7%`, `TAXA CARTÃO 4%`) — tipicamente taxas de marketplaces e adquirentes que aparecem como item da nota.
 
-### Limitação técnica
-O banco de dados real do app está em uma instância Supabase externa (`tdbuhbppxztuloncplqj`) que **não é acessível** pelas ferramentas `supabase--read_query` daqui (que apontam para `efgcrtsxpfqmqhajaurh`, vazio). Portanto preciso de uma das duas vias abaixo.
+### Comportamento desejado
+Uma venda é "canal externo" se **qualquer uma** for verdadeira:
+1. `vendedor_nome` casa com os regex já existentes em `PADROES_CANAIS_EXTERNOS`.
+2. **NOVO:** `descricao_produto` contém um padrão de porcentagem (ex.: `4%`, `10%`, `12,5%`, `7 %`).
 
-### Via A — Você roda esta query no SQL Editor do Supabase externo
-
-```sql
-WITH lista_oficial AS (
-  SELECT UPPER(TRIM(nome)) AS nome FROM (VALUES
-    ('BEATRIZ AGUIAR'),('CARLS HENRIQUE'),('CAROLINE LACERDA'),
-    ('CHECK OUT VISTA ALEGRE'),('CHECKOUT NOVA IGUAÇU'),
-    ('Devi PDV_01'),('Devi PDV_02'),('Devi PDV_03'),('Devi PDV_04'),
-    ('KELLY ANNE'),('LUCAS VILLAR'),('LUIS FELIPE'),
-    ('ORLANDO MARINHO'),('WALLACE OLIVEIRA')
-  ) t(nome)
-),
-cnpj_ni AS (
-  SELECT cnpj_empresa FROM unidades
-  WHERE UPPER(nome) LIKE '%NOVA%IGUA%'
-)
-SELECT
-  v.vendedor_nome,
-  COUNT(*) AS qtd_linhas,
-  COUNT(DISTINCT v.nota_fiscal) AS qtd_nfs,
-  ROUND(SUM(v.total_com_desconto)::numeric, 2) AS faturamento,
-  ROUND(SUM(v.lucros_reais)::numeric, 2) AS lucro
-FROM vendas v
-WHERE v.data_emissao BETWEEN '2026-02-01' AND '2026-02-28'
-  AND v.cnpj_empresa IN (SELECT cnpj_empresa FROM cnpj_ni)
-  AND UPPER(TRIM(v.vendedor_nome)) NOT IN (SELECT nome FROM lista_oficial)
-  -- Exclui canais externos (mesmos regex do front)
-  AND NOT (
-    v.vendedor_nome ~* '\bIFOOD\b|MERCADO\s*LIVRE|\bSHOPEE\b|MAGAZINE\s*LUIZA|\bMAGALU\b|LOJA\s*INTEGRADA|TIK\s*TOK|TIKTOK'
-    OR v.vendedor_nome ~* '^\s*SITE\b|\bAVARIA\b|BONIFICA[ÇC][ÃA]O|\bBRINDES?\b|DEGUSTA[ÇC][ÃA]O|PROMOTOR|PARCERIA|\bCOLLAB\b|INFLUENCER|\bRESGATE\b'
-  )
-GROUP BY v.vendedor_nome
-ORDER BY faturamento DESC NULLS LAST;
+Regex proposto para o item 2:
 ```
+/\d+([.,]\d+)?\s*%/
+```
+Casa: `4%`, `10%`, `12,5%`, `7 %`, `TAXA 3.5%`. Não casa: textos sem dígito antes do `%` (improvável em descrição real).
 
-Cola o resultado no chat e eu interpreto (quais são erros de digitação dos oficiais, quais são canais externos novos a adicionar no regex, quais são realmente pessoas faltando na lista).
+### Mudanças
 
-### Via B — Eu te entrego um script TS executável no app
+**1. `src/lib/canaisExternos.ts`**
+- Adicionar constante `PADRAO_DESCRICAO_PERCENTUAL = /\d+([.,]\d+)?\s*%/`.
+- Trocar a assinatura de `isCanalExterno` para aceitar também a descrição:
+  ```ts
+  isCanalExterno(vendedorNome, descricaoProduto?)
+  ```
+  Mantém compatibilidade (descrição opcional). Se a descrição for passada e casar com o regex de %, retorna `true`.
+- Adicionar entrada no `PADROES_CANAIS_EXTERNOS_LABEL`: `"Produtos com % na descrição (ex: TAXA 4%, 10%)"`.
 
-Crio um arquivo temporário `src/debug/auditNomesNovaIguacu.ts` que:
-1. Busca via `supabase` client todos os `vendedor_nome` distintos do período/filial.
-2. Aplica o mesmo filtro de canais externos do `src/lib/canaisExternos.ts`.
-3. Exclui a lista oficial.
-4. Loga o resultado no console do navegador (`console.table`).
+**2. Ajustar todos os call sites de `isCanalExterno`**
+Passar `descricao_produto` junto. Vou localizar com `rg "isCanalExterno"` e atualizar cada chamada (provavelmente em `Gerencial.tsx`, `RankingComissoes.tsx`, `Ranking.tsx`, `MeuPainel.tsx`, e o debug `auditNomesNovaIguacu.ts`). Em cada um, garantir que o `select` já traz `descricao_produto` (a maioria já traz; onde não trouxer, adicionar ao `.select(...)`).
 
-Você abre `/gerencial`, abre o devtools e cola o resultado aqui.
+**3. `src/debug/auditNomesNovaIguacu.ts`**
+Atualizar para usar a nova assinatura — passa a classificar também como `CANAL_EXTERNO` linhas com `%` na descrição, mesmo que o `vendedor_nome` seja "estranho".
 
-### Recomendação
-**Via A** é mais rápida e direta. Sem mudança de código.
+### Onde NÃO mexo
+- Não altero o RPC SQL (`sql/rpc_gerencial.sql`) — o filtro continua client-side, consistente com o padrão atual.
+- Não altero o motor de comissão (`resolverRegra.ts`) — ele já tem suas próprias exclusões em `base-comissionavel-e-exclusoes`. Se quiser estender lá também, é outro passo (me avisa).
+- Não toco em KPIs nem em layout.
 
-### Fora de escopo
-- Não altero `canaisExternos.ts` ainda.
-- Não mexo no Gerencial.
-- Decisão sobre adicionar/remover nomes vem **depois** do resultado.
+### Risco / observações
+- Se houver produto **legítimo** cuja descrição contenha `%` (ex.: `LEITE 0% LACTOSE`, `WHEY 100%`), ele será excluído indevidamente. Se isso for um problema, a gente refina o regex pra exigir contexto (ex.: palavras `TAXA|REPASSE|COMISS|IFOOD|SHOPEE` próximas do `%`). **Pergunta implícita:** posso seguir com o regex amplo (`\d+%`) ou prefere uma versão mais conservadora exigindo palavra-chave junto?
+
+### Arquivos editados
+- `src/lib/canaisExternos.ts`
+- `src/debug/auditNomesNovaIguacu.ts`
+- Páginas que chamam `isCanalExterno` (a confirmar via busca no momento da implementação).
 
