@@ -1,60 +1,43 @@
 
 
-## Botões "Famílias" e "Marcas" da filial + indicação visual de exclusões
+## Sincronizar toggles "Ocultar canais externos" e "Remover Daniel/Loja" com filtros de exclusão
 
 ### Objetivo
-Estender o padrão do botão "Vendedores da filial" para também listar **Famílias** e **Marcas** presentes nas filiais selecionadas, e fazer com que cada item dos três modais (Vendedores, Famílias, Marcas) sinalize visualmente, em **vermelho com tag "Excluído via filtro"**, quando estiver sendo removido por algum filtro de exclusão ativo (filtro negativo, "Ocultar canais externos" ou "Remover Daniel Cohen / Daniel Loja / Desenho Loja").
+Quando o usuário ativar os toggles **"Ocultar canais externos"** ou **"Remover Daniel Cohen, Daniel Loja e Desenho Loja"**, os itens correspondentes devem aparecer **automaticamente marcados (checados)** nos respectivos dropdowns de filtros de exclusão (Excluir Vendedor / Excluir Família / Excluir Marca), refletindo visualmente que estão sendo excluídos. Ao desativar o toggle, os itens são desmarcados.
 
 ### Comportamento
 
-**Novos botões na linha 2 dos filtros (ao lado de "Vendedores da filial"):**
-- **Famílias da filial** (ícone `Package`) — abre modal com `familia_produto` distintos.
-- **Marcas da filial** (ícone `Tag`) — abre modal com `marca_produto` distintos.
-- Mesma regra de habilitação/tooltip do botão de vendedores (precisa ter filial selecionada; gerente sempre habilitado).
+**"Ocultar canais externos"** ativado:
+- Marca em **Excluir Vendedor**: todos os `vendedor_nome` de `filterOptions.vendedores` que satisfaçam `isCanalExterno(nome, null, null)`.
+- Marca em **Excluir Família**: famílias `ATACADO` (sempre) e `OUTROS` se houver linha com descrição contendo `%`. Para simplificar e garantir consistência: marca todas as famílias presentes em `filterOptions.familias` que estejam em `FAMILIAS_CANAL_EXTERNO_TOTAL` (`ATACADO`) ou `FAMILIAS_CANAL_EXTERNO_COM_PCT` (`OUTROS`) — assim o usuário vê claramente o que está sendo afetado.
+- Não toca em Marca (canais externos não atuam por marca).
 
-**Modais (mesmo layout dos Vendedores):**
-- Título: `Famílias — {filiais}` / `Marcas — {filiais}`.
-- Subtítulo com contagem total.
-- `Input` de busca local.
-- Lista ordenada por nº de ocorrências desc, depois alfabética.
-- Cada linha: nome + `Badge` com nº de vendas.
+**"Remover Daniel..."** ativado:
+- Marca em **Excluir Vendedor**: `DANIEL COHEN`, `DANIEL LOJA`, `DESENHO LOJA` (apenas os que existirem em `filterOptions.vendedores`, comparação case-insensitive devolvendo o valor original do option).
 
-**Sinalização visual de exclusão (nos 3 modais):**
-Para cada item da lista, avalia se ele seria removido pelos filtros de exclusão ativos:
-- Filtro negativo (`exclVendedores` / `exclFamilias` / `exclMarcas`).
-- `hideCanais` → marca itens detectados por `isCanalExterno` (aplicável principalmente em Vendedores; Famílias `ATACADO` e `OUTROS` com % também).
-- `hideDanielLoja` → marca `DANIEL COHEN`, `DANIEL LOJA`, `DESENHO LOJA` no modal de Vendedores.
+**Ao desativar o toggle**:
+- Remove dos arrays de exclusão exatamente os itens que esse toggle havia adicionado (calculado pelo mesmo predicado), preservando o que o usuário marcou manualmente.
 
-Quando excluído:
-- Nome em **vermelho** (`text-destructive`).
-- `Badge` extra `variant="destructive"` ao lado do nome com texto curto indicando o motivo: `Excluído (filtro negativo)`, `Excluído (canais externos)` ou `Excluído (Daniel/Loja)`. Se mais de um motivo, concatena (ex.: `Excluído (canais externos, filtro negativo)`).
-- Linha levemente esmaecida (`opacity-70`).
+**Importante**:
+- A exclusão funcional já acontece via filtros de exclusão. Os toggles continuam existindo como atalhos visuais e mantêm a flag `hideCanais`/`hideDanielLoja` (usada pelos chips vermelhos e pela detecção em `motivosExclusaoVendedor` etc.).
+- Para evitar dupla exclusão sem efeito (já filtrado por nome + ainda por flag), nada muda — o filtro `excludeVendedores.includes(nome)` apenas evita que o item passe; ter o toggle simultaneamente é redundante mas não quebra.
+- Os chips individuais `Excluir Vendedor: X` continuam aparecendo na linha de "Filtros ativos" (comportamento esperado: o usuário vê tudo que está excluído).
 
-**Refletir toggles nos filtros positivos:**
-Logo abaixo dos chips de status atuais (linha de "Filtros ativos"), quando `hideCanais` ou `hideDanielLoja` estiverem ativos, exibir chips em **vermelho** (`bg-destructive/15 text-destructive border-destructive/40`) com:
-- `Canais externos ocultos` (X remove → desativa toggle).
-- `Daniel Cohen / Daniel Loja / Desenho Loja ocultos` (X remove → desativa toggle).
-
-Hoje esses chips são âmbar; passam a vermelho para reforçar que são exclusões.
-
-### Fonte de dados
-Reutiliza `allVendas` filtrado **somente** por filial (sem aplicar exclusões), igual à lógica atual de `vendedoresPorFilial`. Cria dois novos `useMemo`:
-- `familiasPorFilial`: agrega `familia_produto` (ignora vazios).
-- `marcasPorFilial`: agrega `marca_produto` (ignora vazios).
-
-A flag de "está excluído" é calculada por linha do modal usando os mesmos predicados já existentes (`matchesNegativos`, `isCanalExterno`, `matchesDanielLoja`).
-
-### Mudanças em `src/pages/Gerencial.tsx` (único arquivo)
-1. Estados: `familiasFilialOpen`, `marcasFilialOpen`, `buscaFamiliasFilial`, `buscaMarcasFilial`.
-2. `useMemo` `familiasPorFilial` e `marcasPorFilial` (mesmo padrão de `vendedoresPorFilial`).
-3. Helper `motivosExclusaoVendedor(nome)`, `motivosExclusaoFamilia(familia)`, `motivosExclusaoMarca(marca)` retornando array de strings de motivo.
-4. Refatorar a lista do modal de Vendedores para também usar os motivos (já que hoje não marca exclusão).
-5. Dois novos botões na linha de filtros + dois novos `<Dialog>` no final do JSX.
-6. Trocar variante visual dos chips de "Canais externos ocultos" e "Daniel..." de âmbar para vermelho/destructive.
+### Implementação em `src/pages/Gerencial.tsx`
+1. Helper `getCanaisExternosFromOptions()` → retorna `{ vendedores: string[], familias: string[] }` com base em `filterOptions`.
+2. Helper `getDanielLojaFromOptions()` → retorna `string[]` (os 3 nomes que existirem em `filterOptions.vendedores`).
+3. Substituir `setHideCanais`/`setHideDanielLoja` diretos por **handlers** `handleToggleHideCanais(checked)` e `handleToggleHideDanielLoja(checked)` que:
+   - Atualizam o estado do toggle (e o localStorage segue via `useEffect` existente).
+   - Se `checked=true`: união dos itens nos arrays `excludeVendedores`/`excludeFamilias`.
+   - Se `checked=false`: remove desses arrays os itens calculados pelo predicado.
+4. Aplicar `handleToggleHideCanais(false)` no clique dos chips vermelhos (`X`) e no `Switch` `onCheckedChange`. Idem para o outro toggle.
+5. **Não** disparar o efeito quando `filterOptions` ainda não estiver pronto: os handlers usam o snapshot atual; basta o usuário clicar com a página carregada (já é o caso do botão visível).
+6. Ajustar `clearAllFilters` para também desligar os dois toggles? **Não** — o usuário não pediu isso e mantém comportamento atual.
 
 ### O que NÃO muda
-- KPIs, gráfico, tabela, motor de comissão, filtros positivos e demais páginas.
-- Lógica dos toggles em si — apenas a aparência dos chips muda.
+- KPIs, gráfico, tabela, motor de comissão.
+- Lógica dos modais e chips visuais.
+- Lógica de `filteredAll` / `mappedRows` (continuam aplicando ambos: toggles e exclusões).
 
 ### Arquivo
 - `src/pages/Gerencial.tsx`
