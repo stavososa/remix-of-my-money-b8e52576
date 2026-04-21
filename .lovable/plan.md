@@ -1,60 +1,38 @@
 
 
-## Adicionar "Filtro Negativo" (excluir vendedor / família / marca) no Gerencial
+## Botão "Ver Vendedores da Filial" no Gerencial
 
 ### Objetivo
-Painel passa a ter, ao lado dos filtros positivos atuais, um bloco de **filtros negativos multisseletivos** (exclusão) para Vendedor, Família e Marca. Toggle "Ocultar canais externos" sai da linha superior e vai **abaixo** dos dois grupos.
+Adicionar um botão ao lado dos filtros que abre um modal listando todos os `vendedor_nome` distintos que tiveram venda nas filiais atualmente selecionadas (no período vigente). Não lista as vendas — apenas a relação única de vendedores, com a contagem de vendas de cada um.
 
-### Layout
+### Comportamento
+- Botão **"Vendedores da filial"** (ícone Users) ao lado do botão "Limpar filtros" (linha 2 dos filtros).
+- Habilitado quando houver **pelo menos uma filial selecionada** (ou quando for `gerente`, que já tem filial fixa). Desabilitado caso contrário, com tooltip "Selecione uma filial".
+- Ao clicar abre um `Dialog` com:
+  - Título: `Vendedores — {filiais selecionadas}` (ex.: "Vendedores — BOTAFOGO" ou "Vendedores — BOTAFOGO, NOVA IGUAÇU").
+  - Subtítulo com contagem total: `N vendedores no período`.
+  - Campo de busca local (filtra a lista por nome).
+  - Lista (scroll) com cada linha mostrando: **Nome do vendedor** + badge com **nº de vendas** (linhas em `vendas`).
+  - Ordenação: por nº de vendas desc, depois alfabética.
 
-```text
-┌───────────────────────────── linha 1 ─────────────────────────────┐
-│ [Filial] [Vendedor] [Família] [Marca]   │   [Excluir Vendedor]   │
-│  ← positivos (esquerda)                 │  [Excluir Família]      │
-│                                         │  [Excluir Marca]        │
-│                                         │  ← negativos (direita)  │
-├───────────────────────────── linha 2 ─────────────────────────────┤
-│ [⨯ Limpar filtros]      [◐ Ocultar canais externos] (ⓘ)           │
-└────────────────────────────────────────────────────────────────────┘
-```
+### Fonte de dados
+Reutiliza o `allVendas` já carregado e o `filteredAll` parcialmente — mas **ignora** os filtros de Vendedor/Família/Marca/Exclusões para responder estritamente "quem vendeu nesta filial". Aplica:
+- Filtro de filial atual (`filtroUnidade` ou `filial_gerente`).
+- Toggle `hideCanais` se ativo (respeita preferência atual).
+- Período já vem implícito de `allVendas`.
 
-- Em desktop: positivos à esquerda, negativos agrupados à direita (`ml-auto`).
-- Em mobile: empilha naturalmente (cada bloco em sua linha), toggle por último.
-- Cada filtro negativo usa o mesmo padrão visual do `MultiFilterSelect` já existente (Popover + Checkbox), com label `Excluir Vendedor`, etc., e placeholder `Nenhum excluído` / `N excluídos`.
+Agrega via `useMemo` em `Map<vendedor_nome, count>`.
 
-### Mudanças em `src/pages/Gerencial.tsx`
-
-1. **Estado novo:**
-   ```ts
-   const [excludeVendedores, setExcludeVendedores] = useState<string[]>([]);
-   const [excludeFamilias,  setExcludeFamilias]  = useState<string[]>([]);
-   const [excludeMarcas,    setExcludeMarcas]    = useState<string[]>([]);
-   ```
-   Reset junto com os demais filtros nos `useEffect` de período e em `clearAllFilters`.
-
-2. **`filteredAll` (linha ~272):** após os filtros positivos atuais, adicionar:
-   ```ts
-   if (excludeVendedores.length && row.vendedor_nome && excludeVendedores.includes(row.vendedor_nome)) return false;
-   if (excludeFamilias.length   && row.familia_produto && excludeFamilias.includes(row.familia_produto)) return false;
-   if (excludeMarcas.length     && row.marca && excludeMarcas.includes(row.marca)) return false;
-   ```
-   Atualizar deps do `useMemo`.
-
-3. **Query da tabela paginada (`gerencial-vendas`):** aplicar exclusão via `.not('vendedor_nome','in',`(...)`)` etc., **ou** (mais simples e consistente com hideCanais já feito client-side em outros pontos) aplicar a exclusão como pós-filtro client-side no `mappedRows`. → Vou usar `.not(col, 'in', '("a","b")')` no Supabase para manter a paginação correta. Adicionar as 3 listas à `queryKey`.
-
-4. **Reutilizar `MultiFilterSelect`** já existente — sem precisar de novo componente. As opções vêm de `filterOptions.vendedores / familias / marcas`.
-
-5. **Reorganizar JSX dos filtros** (linhas ~499-538):
-   - Linha 1: dois grupos lado a lado.
-   - Linha 2 (nova): "Limpar filtros" + bloco do toggle "Ocultar canais externos" (movido pra cá).
-
-6. **Chips de filtros ativos** (`activeFilters`, linha ~453): adicionar chips para cada item excluído, ex.: `Excluir Vendedor: FULANO` (ícone X remove só aquele item da lista de exclusão). Mantém o chip âmbar de "Canais externos ocultos".
+### Mudanças em `src/pages/Gerencial.tsx` (único arquivo)
+1. Novo estado `const [vendedoresFilialOpen, setVendedoresFilialOpen] = useState(false)` e `const [buscaVendedoresFilial, setBuscaVendedoresFilial] = useState('')`.
+2. Novo `useMemo` `vendedoresPorFilial` que percorre `allVendas`, filtra por `filtroUnidade`/`filial_gerente` (+ `hideCanais` opcional) e devolve array `{ nome, count }[]` ordenado.
+3. Novo botão (`Button` variant outline) na linha 2 dos filtros, ao lado de "Limpar filtros".
+4. Novo `<Dialog>` no final do JSX (próximo ao `selectedVenda` dialog) renderizando a lista com `Input` de busca e linhas com nome + `Badge` de contagem.
 
 ### O que NÃO muda
-- Lógica de KPIs, gráfico, motor de comissão, outras páginas.
-- Toggle `hideCanais` continua funcionando exatamente como hoje (apenas muda de posição).
-- Filtros positivos atuais (Filial / Vendedor / Família / Marca) intocados.
+- KPIs, gráfico, tabela paginada, motor de comissão, demais filtros e toggles.
+- Demais páginas.
 
 ### Arquivo
-- `src/pages/Gerencial.tsx` (única alteração)
+- `src/pages/Gerencial.tsx`
 
