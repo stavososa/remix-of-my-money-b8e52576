@@ -79,22 +79,43 @@ export async function auditNomesNovaIguacu() {
 
   console.log(`Total de linhas Nova Iguaçu fev/2026: ${all.length}`);
 
-  // Agrupa por vendedor
-  const map = new Map<
-    string,
-    { qtd_linhas: number; faturamento: number; lucro: number; nfs: Set<string> }
-  >();
+  // Agrupa por vendedor — separando linhas "canal externo por descrição (%)"
+  type Agg = {
+    qtd_linhas: number;
+    faturamento: number;
+    lucro: number;
+    nfs: Set<string>;
+    qtd_linhas_pct_desc: number; // linhas excluídas por % na descrição
+    fat_pct_desc: number;
+  };
+  const map = new Map<string, Agg>();
 
   for (const r of all) {
     const nome = (r.vendedor_nome ?? '(sem nome)').trim();
     if (!map.has(nome)) {
-      map.set(nome, { qtd_linhas: 0, faturamento: 0, lucro: 0, nfs: new Set() });
+      map.set(nome, {
+        qtd_linhas: 0,
+        faturamento: 0,
+        lucro: 0,
+        nfs: new Set(),
+        qtd_linhas_pct_desc: 0,
+        fat_pct_desc: 0,
+      });
     }
     const agg = map.get(nome)!;
-    agg.qtd_linhas += 1;
-    agg.faturamento += Number(r.total_com_desconto) || 0;
-    agg.lucro += Number(r.lucros_reais) || 0;
-    if (r.nota_fiscal) agg.nfs.add(r.nota_fiscal);
+    const fat = Number(r.total_com_desconto) || 0;
+    const lucro = Number(r.lucros_reais) || 0;
+    const isPctDesc = isCanalExterno(null, r.descricao_produto);
+
+    if (isPctDesc) {
+      agg.qtd_linhas_pct_desc += 1;
+      agg.fat_pct_desc += fat;
+    } else {
+      agg.qtd_linhas += 1;
+      agg.faturamento += fat;
+      agg.lucro += lucro;
+      if (r.nota_fiscal) agg.nfs.add(r.nota_fiscal);
+    }
   }
 
   type Row = {
@@ -103,6 +124,8 @@ export async function auditNomesNovaIguacu() {
     qtd_nfs: number;
     faturamento: string;
     lucro: string;
+    linhas_pct_desc: number;
+    fat_pct_desc: string;
     classificacao: 'OFICIAL' | 'CANAL_EXTERNO' | 'ESTRANHO';
   };
 
@@ -119,6 +142,8 @@ export async function auditNomesNovaIguacu() {
       qtd_nfs: agg.nfs.size,
       faturamento: agg.faturamento.toFixed(2),
       lucro: agg.lucro.toFixed(2),
+      linhas_pct_desc: agg.qtd_linhas_pct_desc,
+      fat_pct_desc: agg.fat_pct_desc.toFixed(2),
       classificacao,
     });
   }
