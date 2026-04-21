@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Switch } from '@/components/ui/switch';
 import { Tooltip as UITooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { Info } from 'lucide-react';
-import { isCanalExterno, PADROES_CANAIS_EXTERNOS_LABEL } from '@/lib/canaisExternos';
+import { isCanalExterno, PADROES_CANAIS_EXTERNOS_LABEL, FAMILIAS_CANAL_EXTERNO_TOTAL, FAMILIAS_CANAL_EXTERNO_COM_PCT } from '@/lib/canaisExternos';
 import {
   ResponsiveContainer, AreaChart, Area,
   XAxis, YAxis, Tooltip, CartesianGrid,
