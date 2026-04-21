@@ -303,7 +303,7 @@ export default function Gerencial() {
       if (excludeVendedores.length && row.vendedor_nome && excludeVendedores.includes(row.vendedor_nome)) return false;
       if (excludeFamilias.length && row.familia_produto && excludeFamilias.includes(row.familia_produto)) return false;
       if (excludeMarcas.length && row.marca && excludeMarcas.includes(row.marca)) return false;
-      if (hideDanielLoja && matchesDanielLoja(row.vendedor_nome, row.familia_produto)) return false;
+      if (hideDanielLoja && matchesDanielLoja(row.vendedor_nome)) return false;
       return true;
     });
   }, [allVendas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, excludeVendedores, excludeFamilias, excludeMarcas, getFilial, hideCanais, hideDanielLoja]);
@@ -478,7 +478,7 @@ export default function Gerencial() {
         if (excludeVendedores.length && row.vendedor_nome && excludeVendedores.includes(row.vendedor_nome)) return false;
         if (excludeFamilias.length && row.familia_produto && excludeFamilias.includes(row.familia_produto)) return false;
         if (excludeMarcas.length && row.marca && excludeMarcas.includes(row.marca)) return false;
-        if (hideDanielLoja && matchesDanielLoja(row.vendedor_nome, row.familia_produto)) return false;
+        if (hideDanielLoja && matchesDanielLoja(row.vendedor_nome)) return false;
         return true;
       })
       .map(row => ({
