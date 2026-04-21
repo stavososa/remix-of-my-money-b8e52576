@@ -89,6 +89,9 @@ export default function Gerencial() {
   const [filtroVendedor, setFiltroVendedor] = useState<string>('all');
   const [filtroFamilia, setFiltroFamilia] = useState<string>('all');
   const [filtroMarca, setFiltroMarca] = useState<string>('all');
+  const [excludeVendedores, setExcludeVendedores] = useState<string[]>([]);
+  const [excludeFamilias, setExcludeFamilias] = useState<string[]>([]);
+  const [excludeMarcas, setExcludeMarcas] = useState<string[]>([]);
   const [buscaTabela, setBuscaTabela] = useState('');
   const [searchDebounced, setSearchDebounced] = useState('');
   const [tabelaPagina, setTabelaPagina] = useState(1);
