@@ -827,7 +827,7 @@ export default function Gerencial() {
               </TooltipProvider>
             </div>
             <div className="flex items-center gap-2 bg-secondary/50 border border-border rounded-md px-3 py-2">
-              <Switch id="hide-daniel-loja" checked={hideDanielLoja} onCheckedChange={setHideDanielLoja} />
+              <Switch id="hide-daniel-loja" checked={hideDanielLoja} onCheckedChange={handleToggleHideDanielLoja} />
               <label htmlFor="hide-daniel-loja" className="text-xs sm:text-sm text-foreground cursor-pointer select-none">
                 Remover Daniel Cohen, Daniel Loja e Desenho Loja
               </label>
