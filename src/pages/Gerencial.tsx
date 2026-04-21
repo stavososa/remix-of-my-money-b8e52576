@@ -425,6 +425,17 @@ export default function Gerencial() {
       if (filtroFamilia !== 'all') query = query.eq('familia_produto', filtroFamilia);
       if (filtroMarca !== 'all') query = query.eq('marca', filtroMarca);
 
+      const escapeForIn = (v: string) => `"${v.replace(/"/g, '\\"')}"`;
+      if (excludeVendedores.length > 0) {
+        query = query.not('vendedor_nome', 'in', `(${excludeVendedores.map(escapeForIn).join(',')})`);
+      }
+      if (excludeFamilias.length > 0) {
+        query = query.not('familia_produto', 'in', `(${excludeFamilias.map(escapeForIn).join(',')})`);
+      }
+      if (excludeMarcas.length > 0) {
+        query = query.not('marca', 'in', `(${excludeMarcas.map(escapeForIn).join(',')})`);
+      }
+
       if (searchDebounced) {
         const term = `%${searchDebounced}%`;
         query = query.or(
