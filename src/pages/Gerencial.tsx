@@ -116,15 +116,11 @@ export default function Gerencial() {
     }
   }, [hideDanielLoja]);
 
-  // Alvos do switch "Remover Daniel Cohen, Loja e Desenho Loja"
-  const DANIEL_LOJA_VENDEDORES = ['DANIEL COHEN'];
-  const DANIEL_LOJA_FAMILIAS = ['LOJA', 'DESENHO LOJA'];
-  const matchesDanielLoja = (vendedor?: string | null, familia?: string | null) => {
+  // Alvos do switch "Remover Daniel Cohen, Daniel Loja e Desenho Loja" (todos vendedores)
+  const DANIEL_LOJA_VENDEDORES = ['DANIEL COHEN', 'DANIEL LOJA', 'DESENHO LOJA'];
+  const matchesDanielLoja = (vendedor?: string | null) => {
     const v = (vendedor ?? '').trim().toUpperCase();
-    const f = (familia ?? '').trim().toUpperCase();
-    if (v && DANIEL_LOJA_VENDEDORES.includes(v)) return true;
-    if (f && DANIEL_LOJA_FAMILIAS.includes(f)) return true;
-    return false;
+    return !!v && DANIEL_LOJA_VENDEDORES.includes(v);
   };
 
 
@@ -307,7 +303,7 @@ export default function Gerencial() {
       if (excludeVendedores.length && row.vendedor_nome && excludeVendedores.includes(row.vendedor_nome)) return false;
       if (excludeFamilias.length && row.familia_produto && excludeFamilias.includes(row.familia_produto)) return false;
       if (excludeMarcas.length && row.marca && excludeMarcas.includes(row.marca)) return false;
-      if (hideDanielLoja && matchesDanielLoja(row.vendedor_nome, row.familia_produto)) return false;
+      if (hideDanielLoja && matchesDanielLoja(row.vendedor_nome)) return false;
       return true;
     });
   }, [allVendas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, excludeVendedores, excludeFamilias, excludeMarcas, getFilial, hideCanais, hideDanielLoja]);
@@ -482,7 +478,7 @@ export default function Gerencial() {
         if (excludeVendedores.length && row.vendedor_nome && excludeVendedores.includes(row.vendedor_nome)) return false;
         if (excludeFamilias.length && row.familia_produto && excludeFamilias.includes(row.familia_produto)) return false;
         if (excludeMarcas.length && row.marca && excludeMarcas.includes(row.marca)) return false;
-        if (hideDanielLoja && matchesDanielLoja(row.vendedor_nome, row.familia_produto)) return false;
+        if (hideDanielLoja && matchesDanielLoja(row.vendedor_nome)) return false;
         return true;
       })
       .map(row => ({
@@ -633,7 +629,7 @@ export default function Gerencial() {
             <div className="flex items-center gap-2 bg-secondary/50 border border-border rounded-md px-3 py-2">
               <Switch id="hide-daniel-loja" checked={hideDanielLoja} onCheckedChange={setHideDanielLoja} />
               <label htmlFor="hide-daniel-loja" className="text-xs sm:text-sm text-foreground cursor-pointer select-none">
-                Remover Daniel Cohen, Loja e Desenho Loja
+                Remover Daniel Cohen, Daniel Loja e Desenho Loja
               </label>
             </div>
           </div>
@@ -654,7 +650,7 @@ export default function Gerencial() {
                 className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
                 style={{ backgroundColor: 'hsl(38 90% 55% / 0.15)', color: 'hsl(38 90% 55%)' }}
               >
-                Daniel Cohen, Loja e Desenho Loja ocultos
+                Daniel Cohen, Daniel Loja e Desenho Loja ocultos
               </span>
             )}
             {activeFilters.map(f => (
