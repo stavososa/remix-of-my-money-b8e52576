@@ -437,7 +437,7 @@ export default function Gerencial() {
 
   const mappedRows = useMemo(() => {
     return vendasRows
-      .filter(row => !(hideCanais && isCanalExterno(row.vendedor_nome)))
+      .filter(row => !(hideCanais && isCanalExterno(row.vendedor_nome, row.descricao_produto, row.familia_produto)))
       .map(row => ({
         ...row,
         unidade_nome: getFilial(row.cnpj_empresa),
