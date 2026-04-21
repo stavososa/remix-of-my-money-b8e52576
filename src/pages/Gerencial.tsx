@@ -768,26 +768,35 @@ function FilterSelect({ label, value, onChange, options, allLabel }: {
   );
 }
 
-function MultiFilterSelect({ label, selected, onChange, options, allLabel }: {
+function MultiFilterSelect({ label, selected, onChange, options, allLabel, itemLabel = 'itens', excludeStyle = false }: {
   label: string;
   selected: string[];
   onChange: (v: string[]) => void;
   options: string[];
   allLabel: string;
+  itemLabel?: string;
+  excludeStyle?: boolean;
 }) {
   const toggle = (val: string) => {
     onChange(selected.includes(val) ? selected.filter(x => x !== val) : [...selected, val]);
   };
 
+  const triggerBase = "border rounded-md px-2 sm:px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-ring w-full sm:w-auto sm:min-w-[140px] sm:max-w-[220px] flex items-center justify-between gap-1";
+  const triggerStyle = excludeStyle && selected.length > 0
+    ? "bg-destructive/10 border-destructive/40 text-destructive"
+    : excludeStyle
+      ? "bg-secondary/40 border-dashed border-border text-muted-foreground hover:text-foreground"
+      : "bg-secondary border-border text-foreground";
+
   return (
     <Popover>
       <PopoverTrigger asChild>
         <button
-          className="bg-secondary border border-border rounded-md px-2 sm:px-3 py-2 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring w-full sm:w-auto sm:min-w-[140px] sm:max-w-[220px] flex items-center justify-between gap-1"
+          className={`${triggerBase} ${triggerStyle}`}
           title={label}
         >
           <span className="truncate">
-            {selected.length === 0 ? allLabel : selected.length === 1 ? selected[0] : `${selected.length} filiais`}
+            {selected.length === 0 ? allLabel : selected.length === 1 ? (excludeStyle ? `≠ ${selected[0]}` : selected[0]) : `${selected.length} ${itemLabel}`}
           </span>
           <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
         </button>
@@ -804,7 +813,7 @@ function MultiFilterSelect({ label, selected, onChange, options, allLabel }: {
             <span className="truncate">{opt}</span>
           </label>
         ))}
-        {options.length === 0 && <p className="text-xs text-muted-foreground px-2 py-2">Nenhuma filial encontrada</p>}
+        {options.length === 0 && <p className="text-xs text-muted-foreground px-2 py-2">Nenhum item encontrado</p>}
       </PopoverContent>
     </Popover>
   );
