@@ -99,12 +99,33 @@ export default function Gerencial() {
     if (typeof window === 'undefined') return false;
     return window.localStorage.getItem('gerencial.hideCanais') === '1';
   });
+  const [hideDanielLoja, setHideDanielLoja] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem('gerencial.hideDanielLoja') === '1';
+  });
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
       window.localStorage.setItem('gerencial.hideCanais', hideCanais ? '1' : '0');
     }
   }, [hideCanais]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('gerencial.hideDanielLoja', hideDanielLoja ? '1' : '0');
+    }
+  }, [hideDanielLoja]);
+
+  // Alvos do switch "Remover Daniel Cohen, Loja e Desenho Loja"
+  const DANIEL_LOJA_VENDEDORES = ['DANIEL COHEN'];
+  const DANIEL_LOJA_FAMILIAS = ['LOJA', 'DESENHO LOJA'];
+  const matchesDanielLoja = (vendedor?: string | null, familia?: string | null) => {
+    const v = (vendedor ?? '').trim().toUpperCase();
+    const f = (familia ?? '').trim().toUpperCase();
+    if (v && DANIEL_LOJA_VENDEDORES.includes(v)) return true;
+    if (f && DANIEL_LOJA_FAMILIAS.includes(f)) return true;
+    return false;
+  };
 
 
   useEffect(() => {
