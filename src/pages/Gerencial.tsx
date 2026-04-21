@@ -300,7 +300,11 @@ export default function Gerencial() {
   const filteredAll = useMemo(() => {
     if (!allVendas) return [];
     return allVendas.filter(row => {
-      if (hideCanais && isCanalExterno(row.vendedor_nome, row.descricao_produto, row.familia_produto)) return false;
+      if (hideCanais && isCanalExterno(row.vendedor_nome, row.descricao_produto, row.familia_produto)) {
+        const v = row.vendedor_nome ?? '';
+        const f = row.familia_produto ?? '';
+        if (!overrideCanaisVendedores.has(v) && !overrideCanaisFamilias.has(f)) return false;
+      }
       if (filtroUnidade.length > 0 && !filtroUnidade.includes(getFilial(row.cnpj_empresa))) return false;
       if (filtroVendedor !== 'all' && row.vendedor_nome !== filtroVendedor) return false;
       if (filtroFamilia !== 'all' && row.familia_produto !== filtroFamilia) return false;
@@ -308,10 +312,10 @@ export default function Gerencial() {
       if (excludeVendedores.length && row.vendedor_nome && excludeVendedores.includes(row.vendedor_nome)) return false;
       if (excludeFamilias.length && row.familia_produto && excludeFamilias.includes(row.familia_produto)) return false;
       if (excludeMarcas.length && row.marca && excludeMarcas.includes(row.marca)) return false;
-      if (hideDanielLoja && matchesDanielLoja(row.vendedor_nome)) return false;
+      if (hideDanielLoja && matchesDanielLoja(row.vendedor_nome) && !overrideDanielLoja.has(row.vendedor_nome ?? '')) return false;
       return true;
     });
-  }, [allVendas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, excludeVendedores, excludeFamilias, excludeMarcas, getFilial, hideCanais, hideDanielLoja]);
+  }, [allVendas, filtroUnidade, filtroVendedor, filtroFamilia, filtroMarca, excludeVendedores, excludeFamilias, excludeMarcas, getFilial, hideCanais, hideDanielLoja, overrideCanaisVendedores, overrideCanaisFamilias, overrideDanielLoja]);
 
   // ===== KPIs (soma direta, espelha SQL/planilha) =====
   const kpis = useMemo(() => {
