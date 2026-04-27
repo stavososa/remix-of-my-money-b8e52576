@@ -6,7 +6,7 @@ import { usePeriod } from '@/contexts/PeriodContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, X, Search, Copy, AlertTriangle, History, Wand2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Search, Copy, AlertTriangle, History, Wand2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
 const MESES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
