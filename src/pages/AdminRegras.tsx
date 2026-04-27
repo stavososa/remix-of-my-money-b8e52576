@@ -720,7 +720,7 @@ export default function AdminRegras() {
     },
     {
       key: 'percentual' as const, label: '%', align: 'right' as const,
-      render: (v: number) => <span className="text-primary font-bold text-lg">{Number(v).toFixed(1)}%</span>,
+      render: (v: number) => <span className="text-primary font-bold text-lg">{Number(v).toFixed(2)}%</span>,
     },
     {
       key: 'prioridade' as const, label: 'Prioridade',
