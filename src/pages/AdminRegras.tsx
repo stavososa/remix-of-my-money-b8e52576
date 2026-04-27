@@ -249,6 +249,12 @@ export default function AdminRegras() {
   const [dupTarget, setDupTarget] = useState({ ano: periodoAno, mes: periodoMes });
   const [iaPrompt, setIaPrompt] = useState('');
   const [iaLoading, setIaLoading] = useState(false);
+  // Importação em lote via IA
+  const [showLoteModal, setShowLoteModal] = useState(false);
+  const [lotePrompt, setLotePrompt] = useState('');
+  const [loteLoading, setLoteLoading] = useState(false);
+  const [loteRegras, setLoteRegras] = useState<RegraForm[] | null>(null);
+  const [loteSaving, setLoteSaving] = useState(false);
 
 
   // Fetch unidades for filial multi-select (with fallback when table is empty/missing)
