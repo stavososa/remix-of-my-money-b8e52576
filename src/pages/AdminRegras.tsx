@@ -784,6 +784,51 @@ export default function AdminRegras() {
   const prioridadePreview = modal ? calcPrioridade(modal) : 0;
   const prioLabel = PRIORIDADE_LABELS[prioridadePreview] ?? PRIORIDADE_LABELS[0];
 
+  const gerarComIA = async () => {
+    if (!modal) return;
+    const prompt = iaPrompt.trim();
+    if (!prompt) {
+      toast.error('Descreva a regra antes de usar a IA');
+      return;
+    }
+    setIaLoading(true);
+    try {
+      const contexto = {
+        familias: autocompleteData?.familias ?? [],
+        marcas: autocompleteData?.marcas ?? [],
+        produtos: (produtosOptions as string[]).slice(0, 200),
+        unidades: unidades.map(u => u.nome),
+      };
+      const { data, error } = await supabase.functions.invoke('gerar-regra-ia', {
+        body: { prompt, contexto },
+      });
+      if (error) throw new Error(error.message || 'Falha ao chamar a IA');
+      if (!data?.ok) throw new Error(data?.error || 'A IA não retornou dados');
+      const sug = data.data as Partial<RegraForm>;
+      setModal(prev => prev ? {
+        ...prev,
+        nome: sug.nome ?? prev.nome,
+        regime: sug.regime ?? prev.regime,
+        tipo_unidade: sug.tipo_unidade ?? null,
+        familia_produto: sug.familia_produto ?? null,
+        marca: sug.marca ?? null,
+        produto: sug.produto ?? null,
+        percentual: typeof sug.percentual === 'number' ? sug.percentual : prev.percentual,
+        min_faturamento: sug.min_faturamento ?? null,
+        ativo: sug.ativo ?? prev.ativo,
+        periodo_ano: prev.periodo_ano,
+        periodo_mes: prev.periodo_mes,
+      } : prev);
+      toast.success('Campos preenchidos pela IA. Revise antes de salvar.');
+    } catch (e: any) {
+      console.error('IA erro', e);
+      toast.error(e?.message || 'Erro ao gerar com IA');
+    } finally {
+      setIaLoading(false);
+    }
+  };
+
+
   return (
     <AppShell title="Regras de Comissão">
       <div className="space-y-6">
