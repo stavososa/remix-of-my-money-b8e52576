@@ -1408,6 +1408,178 @@ export default function AdminRegras() {
           </div>
         </div>
       )}
+
+      {/* Importar lote via IA */}
+      {showLoteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => !loteSaving && setShowLoteModal(false)} />
+          <div className="relative bg-card border border-border rounded-xl p-6 w-full max-w-4xl shadow-card space-y-4 max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <Sparkles className="h-5 w-5 text-primary" />
+                <h3 className="text-lg font-bold text-foreground">
+                  Importar regras em lote (IA) — {MESES[periodoMes]}/{periodoAno}
+                </h3>
+              </div>
+              <button onClick={() => !loteSaving && setShowLoteModal(false)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+            </div>
+
+            {!loteRegras ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Cole o texto completo (mensagem do WhatsApp, comunicado etc). A IA vai extrair várias regras de uma vez. Você revisa e salva todas.
+                </p>
+                <textarea
+                  value={lotePrompt}
+                  onChange={e => setLotePrompt(e.target.value)}
+                  rows={14}
+                  disabled={loteLoading}
+                  placeholder="Ex: 5% – Ares, Diuretic, TESTO1000... | 4% – Marcas Próprias DCX, Grow Up... | 1,25% – Outras marcas..."
+                  className="w-full px-3 py-2 rounded-md bg-secondary border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-y font-mono"
+                />
+                <div className="flex justify-end gap-3">
+                  <button onClick={() => setShowLoteModal(false)} className="px-4 py-2 rounded-lg text-sm text-secondary-foreground hover:bg-secondary">Cancelar</button>
+                  <button
+                    onClick={analisarLoteIA}
+                    disabled={loteLoading || !lotePrompt.trim()}
+                    className="px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    {loteLoading ? 'Analisando...' : 'Analisar com IA'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm text-secondary-foreground">
+                    <strong className="text-primary">{loteRegras.length} regras</strong> extraídas. Edite o que precisar e salve. Use <Trash2 className="inline h-3 w-3" /> para remover linhas indesejadas.
+                  </p>
+                  <button
+                    onClick={() => setLoteRegras(null)}
+                    className="text-xs text-muted-foreground hover:text-foreground underline"
+                  >
+                    ← voltar e re-analisar
+                  </button>
+                </div>
+
+                <div className="overflow-y-auto flex-1 border border-border rounded-lg">
+                  <table className="w-full text-sm">
+                    <thead className="bg-secondary sticky top-0">
+                      <tr className="text-left text-xs uppercase text-muted-foreground">
+                        <th className="px-2 py-2">Nome</th>
+                        <th className="px-2 py-2">Reg.</th>
+                        <th className="px-2 py-2">Filiais</th>
+                        <th className="px-2 py-2">Família</th>
+                        <th className="px-2 py-2">Marca</th>
+                        <th className="px-2 py-2">Produto</th>
+                        <th className="px-2 py-2 text-right">%</th>
+                        <th className="px-2 py-2 text-right">Min Fat.</th>
+                        <th className="px-2 py-2"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loteRegras.map((r, idx) => (
+                        <tr key={idx} className="border-t border-border hover:bg-secondary/30">
+                          <td className="px-2 py-1">
+                            <input
+                              value={r.nome}
+                              onChange={e => setLoteRegras(prev => prev!.map((x, i) => i === idx ? { ...x, nome: e.target.value } : x))}
+                              className="w-full bg-transparent border border-transparent hover:border-border focus:border-primary rounded px-1 py-0.5 text-xs"
+                            />
+                          </td>
+                          <td className="px-2 py-1">
+                            <select
+                              value={r.regime}
+                              onChange={e => setLoteRegras(prev => prev!.map((x, i) => i === idx ? { ...x, regime: e.target.value } : x))}
+                              className="bg-secondary border border-border rounded px-1 py-0.5 text-xs"
+                            >
+                              <option value="PJ">PJ</option>
+                              <option value="CLT">CLT</option>
+                            </select>
+                          </td>
+                          <td className="px-2 py-1">
+                            <input
+                              value={r.tipo_unidade ?? ''}
+                              placeholder="Todas"
+                              onChange={e => setLoteRegras(prev => prev!.map((x, i) => i === idx ? { ...x, tipo_unidade: e.target.value || null } : x))}
+                              className="w-24 bg-transparent border border-transparent hover:border-border focus:border-primary rounded px-1 py-0.5 text-xs"
+                            />
+                          </td>
+                          <td className="px-2 py-1">
+                            <input
+                              value={r.familia_produto ?? ''}
+                              placeholder="—"
+                              onChange={e => setLoteRegras(prev => prev!.map((x, i) => i === idx ? { ...x, familia_produto: e.target.value || null } : x))}
+                              className="w-28 bg-transparent border border-transparent hover:border-border focus:border-primary rounded px-1 py-0.5 text-xs"
+                            />
+                          </td>
+                          <td className="px-2 py-1">
+                            <input
+                              value={r.marca ?? ''}
+                              placeholder="—"
+                              onChange={e => setLoteRegras(prev => prev!.map((x, i) => i === idx ? { ...x, marca: e.target.value || null } : x))}
+                              className="w-28 bg-transparent border border-transparent hover:border-border focus:border-primary rounded px-1 py-0.5 text-xs"
+                            />
+                          </td>
+                          <td className="px-2 py-1">
+                            <input
+                              value={r.produto ?? ''}
+                              placeholder="—"
+                              onChange={e => setLoteRegras(prev => prev!.map((x, i) => i === idx ? { ...x, produto: e.target.value || null } : x))}
+                              className="w-32 bg-transparent border border-transparent hover:border-border focus:border-primary rounded px-1 py-0.5 text-xs"
+                            />
+                          </td>
+                          <td className="px-2 py-1 text-right">
+                            <input
+                              type="number"
+                              step="0.05"
+                              value={r.percentual}
+                              onChange={e => setLoteRegras(prev => prev!.map((x, i) => i === idx ? { ...x, percentual: parseFloat(e.target.value) || 0 } : x))}
+                              className="w-20 text-right bg-secondary border border-border rounded px-1 py-0.5 text-xs text-primary font-bold"
+                            />
+                          </td>
+                          <td className="px-2 py-1 text-right">
+                            <input
+                              type="number"
+                              step="100"
+                              value={r.min_faturamento ?? ''}
+                              placeholder="—"
+                              onChange={e => setLoteRegras(prev => prev!.map((x, i) => i === idx ? { ...x, min_faturamento: e.target.value ? parseFloat(e.target.value) : null } : x))}
+                              className="w-24 text-right bg-transparent border border-transparent hover:border-border focus:border-primary rounded px-1 py-0.5 text-xs"
+                            />
+                          </td>
+                          <td className="px-2 py-1">
+                            <button
+                              onClick={() => setLoteRegras(prev => prev!.filter((_, i) => i !== idx))}
+                              className="p-1 text-muted-foreground hover:text-destructive"
+                              title="Remover"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2 border-t border-border">
+                  <button onClick={() => setShowLoteModal(false)} disabled={loteSaving} className="px-4 py-2 rounded-lg text-sm text-secondary-foreground hover:bg-secondary disabled:opacity-50">Cancelar</button>
+                  <button
+                    onClick={salvarLote}
+                    disabled={loteSaving || loteRegras.length === 0}
+                    className="px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    {loteSaving ? 'Salvando...' : `Salvar ${loteRegras.length} regras`}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }
