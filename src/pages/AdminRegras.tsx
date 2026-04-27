@@ -960,6 +960,12 @@ export default function AdminRegras() {
               </>
             )}
             <button
+              onClick={() => { setLoteRegras(null); setLotePrompt(''); setShowLoteModal(true); }}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-primary/40 text-primary font-semibold text-sm hover:bg-primary/10 transition-colors"
+            >
+              <Sparkles className="h-4 w-4" /> Importar lote (IA)
+            </button>
+            <button
               onClick={() => setModal(empty(periodoAno, periodoMes))}
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors"
             >
