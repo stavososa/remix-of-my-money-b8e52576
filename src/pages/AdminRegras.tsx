@@ -835,6 +835,99 @@ export default function AdminRegras() {
   };
 
 
+  const analisarLoteIA = async () => {
+    const prompt = lotePrompt.trim();
+    if (!prompt) {
+      toast.error('Cole o texto com as regras antes de analisar');
+      return;
+    }
+    setLoteLoading(true);
+    try {
+      const contexto = {
+        familias: autocompleteData?.familias ?? [],
+        marcas: autocompleteData?.marcas ?? [],
+        produtos: (produtosOptions as string[]).slice(0, 500),
+        unidades: unidades.map(u => u.nome),
+      };
+      const { data, error } = await supabase.functions.invoke('gerar-regras-lote', {
+        body: { prompt, contexto },
+      });
+      if (error) throw new Error(error.message || 'Falha ao chamar a IA');
+      if (!data?.ok) throw new Error(data?.error || 'A IA não retornou dados');
+      const regrasArr: any[] = Array.isArray(data.regras) ? data.regras : [];
+      if (regrasArr.length === 0) {
+        toast.warning('A IA não conseguiu extrair nenhuma regra do texto');
+        return;
+      }
+      const formatadas: RegraForm[] = regrasArr.map(r => ({
+        nome: (r.nome ?? 'Regra IA').toString(),
+        regime: r.regime === 'CLT' ? 'CLT' : 'PJ',
+        tipo_unidade: r.tipo_unidade ?? null,
+        familia_produto: r.familia_produto ?? null,
+        marca: r.marca ?? null,
+        produto: r.produto ?? null,
+        percentual: typeof r.percentual === 'number' ? r.percentual : parseFloat(r.percentual) || 0,
+        min_faturamento: r.min_faturamento ?? null,
+        periodo_ano: periodoAno,
+        periodo_mes: periodoMes,
+        ativo: true,
+      }));
+      setLoteRegras(formatadas);
+      toast.success(`${formatadas.length} regras extraídas. Revise e salve.`);
+    } catch (e: any) {
+      console.error('IA lote erro', e);
+      toast.error(e?.message || 'Erro ao analisar com IA');
+    } finally {
+      setLoteLoading(false);
+    }
+  };
+
+  const salvarLote = async () => {
+    if (!loteRegras || loteRegras.length === 0) return;
+    setLoteSaving(true);
+    try {
+      const inserts = loteRegras
+        .filter(r => r.nome.trim() && r.percentual > 0)
+        .map(r => ({
+          nome: r.nome.trim(),
+          regime: r.regime,
+          tipo_unidade: r.tipo_unidade || null,
+          familia_produto: r.familia_produto || null,
+          marca: r.marca || null,
+          produto: r.produto || null,
+          percentual: r.percentual,
+          min_faturamento: r.min_faturamento || null,
+          periodo_ano: periodoAno,
+          periodo_mes: periodoMes,
+          ativo: r.ativo,
+          criado_por: user?.id,
+          criado_em: new Date().toISOString(),
+        }));
+      if (inserts.length === 0) {
+        toast.error('Nenhuma regra válida para salvar');
+        return;
+      }
+      const { error } = await (supabase as any).from('comissoes').insert(inserts);
+      if (error) throw error;
+      await logAudit('criou', null, {
+        acao: 'importou_lote_ia',
+        periodo: `${MESES[periodoMes]}/${periodoAno}`,
+        quantidade: inserts.length,
+      });
+      toast.success(`${inserts.length} regras importadas com sucesso`);
+      qc.invalidateQueries({ queryKey: ['regras'] });
+      qc.invalidateQueries({ queryKey: ['audit-log'] });
+      setShowLoteModal(false);
+      setLoteRegras(null);
+      setLotePrompt('');
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao salvar lote');
+    } finally {
+      setLoteSaving(false);
+    }
+  };
+
+
   return (
     <AppShell title="Regras de Comissão">
       <div className="space-y-6">
