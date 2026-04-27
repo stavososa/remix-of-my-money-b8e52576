@@ -860,7 +860,7 @@ export default function AdminRegras() {
                           </div>
                         )}
                       </div>
-                      <span className="text-primary font-bold text-xl">{Number(r.percentual).toFixed(1)}%</span>
+                      <span className="text-primary font-bold text-xl">{Number(r.percentual).toFixed(2)}%</span>
                     </div>
                     <div className="flex items-center justify-between mt-3">
                       <button
