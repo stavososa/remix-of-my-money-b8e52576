@@ -946,6 +946,34 @@ export default function AdminRegras() {
             </div>
 
             <div className="space-y-3">
+              {/* Bloco IA: preencher campos automaticamente */}
+              <div className="border border-primary/30 bg-primary/5 rounded-lg p-3 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                  <Sparkles className="h-4 w-4" />
+                  Preencher com IA
+                </div>
+                <textarea
+                  value={iaPrompt}
+                  onChange={e => setIaPrompt(e.target.value)}
+                  rows={2}
+                  className="w-full px-3 py-2 rounded-md bg-secondary border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+                  placeholder='Ex.: 1,25% para família SUPLEMENTOS marca GROWTH no DELIVERY, regime PJ'
+                  disabled={iaLoading}
+                />
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-xs text-muted-foreground">A IA usa apenas valores existentes no banco. Revise antes de salvar.</span>
+                  <button
+                    type="button"
+                    onClick={gerarComIA}
+                    disabled={iaLoading || !iaPrompt.trim()}
+                    className="px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 whitespace-nowrap"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    {iaLoading ? 'Gerando...' : 'Gerar'}
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <label className="text-sm text-secondary-foreground">Nome</label>
                 <input
