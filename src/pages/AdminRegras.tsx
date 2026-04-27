@@ -247,6 +247,9 @@ export default function AdminRegras() {
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [showAuditLog, setShowAuditLog] = useState(false);
   const [dupTarget, setDupTarget] = useState({ ano: periodoAno, mes: periodoMes });
+  const [iaPrompt, setIaPrompt] = useState('');
+  const [iaLoading, setIaLoading] = useState(false);
+
 
   // Fetch unidades for filial multi-select (with fallback when table is empty/missing)
   const UNIDADES_FALLBACK: { id: string; nome: string; tipo: string }[] = [
