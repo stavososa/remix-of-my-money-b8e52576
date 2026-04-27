@@ -720,7 +720,7 @@ export default function AdminRegras() {
     },
     {
       key: 'percentual' as const, label: '%', align: 'right' as const,
-      render: (v: number) => <span className="text-primary font-bold text-lg">{Number(v).toFixed(1)}%</span>,
+      render: (v: number) => <span className="text-primary font-bold text-lg">{Number(v).toFixed(2)}%</span>,
     },
     {
       key: 'prioridade' as const, label: 'Prioridade',
@@ -860,7 +860,7 @@ export default function AdminRegras() {
                           </div>
                         )}
                       </div>
-                      <span className="text-primary font-bold text-xl">{Number(r.percentual).toFixed(1)}%</span>
+                      <span className="text-primary font-bold text-xl">{Number(r.percentual).toFixed(2)}%</span>
                     </div>
                     <div className="flex items-center justify-between mt-3">
                       <button
