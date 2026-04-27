@@ -849,18 +849,10 @@ export default function AdminRegras() {
         produtos: (produtosOptions as string[]).slice(0, 500),
         unidades: unidades.map(u => u.nome),
       };
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gerar-regras-lote`;
-      const resp = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        },
-        body: JSON.stringify({ prompt, contexto }),
+      const { data, error } = await supabase.functions.invoke('gerar-regras-lote', {
+        body: { prompt, contexto },
       });
-      const data = await resp.json().catch(() => ({}));
-      if (!resp.ok) throw new Error(data?.error || `Erro ${resp.status}`);
+      if (error) throw new Error(error.message || 'Falha ao chamar a IA');
       if (!data?.ok) throw new Error(data?.error || 'A IA não retornou dados');
       const regrasArr: any[] = Array.isArray(data.regras) ? data.regras : [];
       if (regrasArr.length === 0) {
