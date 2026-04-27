@@ -6,7 +6,7 @@ import { usePeriod } from '@/contexts/PeriodContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, X, Search, Copy, AlertTriangle, History, Wand2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Search, Copy, AlertTriangle, History, Wand2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
 const MESES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -247,6 +247,9 @@ export default function AdminRegras() {
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [showAuditLog, setShowAuditLog] = useState(false);
   const [dupTarget, setDupTarget] = useState({ ano: periodoAno, mes: periodoMes });
+  const [iaPrompt, setIaPrompt] = useState('');
+  const [iaLoading, setIaLoading] = useState(false);
+
 
   // Fetch unidades for filial multi-select (with fallback when table is empty/missing)
   const UNIDADES_FALLBACK: { id: string; nome: string; tipo: string }[] = [
@@ -781,6 +784,51 @@ export default function AdminRegras() {
   const prioridadePreview = modal ? calcPrioridade(modal) : 0;
   const prioLabel = PRIORIDADE_LABELS[prioridadePreview] ?? PRIORIDADE_LABELS[0];
 
+  const gerarComIA = async () => {
+    if (!modal) return;
+    const prompt = iaPrompt.trim();
+    if (!prompt) {
+      toast.error('Descreva a regra antes de usar a IA');
+      return;
+    }
+    setIaLoading(true);
+    try {
+      const contexto = {
+        familias: autocompleteData?.familias ?? [],
+        marcas: autocompleteData?.marcas ?? [],
+        produtos: (produtosOptions as string[]).slice(0, 200),
+        unidades: unidades.map(u => u.nome),
+      };
+      const { data, error } = await supabase.functions.invoke('gerar-regra-ia', {
+        body: { prompt, contexto },
+      });
+      if (error) throw new Error(error.message || 'Falha ao chamar a IA');
+      if (!data?.ok) throw new Error(data?.error || 'A IA não retornou dados');
+      const sug = data.data as Partial<RegraForm>;
+      setModal(prev => prev ? {
+        ...prev,
+        nome: sug.nome ?? prev.nome,
+        regime: sug.regime ?? prev.regime,
+        tipo_unidade: sug.tipo_unidade ?? null,
+        familia_produto: sug.familia_produto ?? null,
+        marca: sug.marca ?? null,
+        produto: sug.produto ?? null,
+        percentual: typeof sug.percentual === 'number' ? sug.percentual : prev.percentual,
+        min_faturamento: sug.min_faturamento ?? null,
+        ativo: sug.ativo ?? prev.ativo,
+        periodo_ano: prev.periodo_ano,
+        periodo_mes: prev.periodo_mes,
+      } : prev);
+      toast.success('Campos preenchidos pela IA. Revise antes de salvar.');
+    } catch (e: any) {
+      console.error('IA erro', e);
+      toast.error(e?.message || 'Erro ao gerar com IA');
+    } finally {
+      setIaLoading(false);
+    }
+  };
+
+
   return (
     <AppShell title="Regras de Comissão">
       <div className="space-y-6">
@@ -898,6 +946,34 @@ export default function AdminRegras() {
             </div>
 
             <div className="space-y-3">
+              {/* Bloco IA: preencher campos automaticamente */}
+              <div className="border border-primary/30 bg-primary/5 rounded-lg p-3 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                  <Sparkles className="h-4 w-4" />
+                  Preencher com IA
+                </div>
+                <textarea
+                  value={iaPrompt}
+                  onChange={e => setIaPrompt(e.target.value)}
+                  rows={2}
+                  className="w-full px-3 py-2 rounded-md bg-secondary border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+                  placeholder='Ex.: 1,25% para família SUPLEMENTOS marca GROWTH no DELIVERY, regime PJ'
+                  disabled={iaLoading}
+                />
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-xs text-muted-foreground">A IA usa apenas valores existentes no banco. Revise antes de salvar.</span>
+                  <button
+                    type="button"
+                    onClick={gerarComIA}
+                    disabled={iaLoading || !iaPrompt.trim()}
+                    className="px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 whitespace-nowrap"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    {iaLoading ? 'Gerando...' : 'Gerar'}
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <label className="text-sm text-secondary-foreground">Nome</label>
                 <input
