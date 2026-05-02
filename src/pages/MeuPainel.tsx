@@ -26,6 +26,8 @@ const parseMoneyBR = (str: unknown): number => {
   return isNaN(val) ? 0 : val;
 };
 
+
+
 const parsePctBR = (str: unknown): number => {
   if (str == null) return 0;
   if (typeof str === 'number') return str * 100;
@@ -97,11 +99,23 @@ export default function MeuPainel() {
   const [showAllVendas, setShowAllVendas] = useState(false);
   const [showAllProdutos, setShowAllProdutos] = useState(false);
   const [filtroFilial, setFiltroFilial] = useState('all');
+  const [filtroCnpj, setFiltroCnpj] = useState('44.578.137/0001-01');
 
   // Reset filtro ao trocar período
   useEffect(() => {
     setFiltroFilial('all');
   }, [periodoAno, periodoMes]);
+
+  const cnpjsDisponiveis = [
+    { value: 'all', label: 'Todos os CNPJs' },
+    { value: '44.578.137/0001-01', label: '44.578.137/0001-01 (Matriz)' },
+    { value: '44.578.137/0011-75', label: '44.578.137/0011-75' },
+    { value: '44.578.137/0013-37', label: '44.578.137/0013-37' },
+    { value: '44.578.137/0016-80', label: '44.578.137/0016-80' },
+    { value: '44.578.137/0014-18', label: '44.578.137/0014-18' },
+    { value: '44.578.137/0010-94', label: '44.578.137/0010-94' },
+    { value: '44.578.137/0012-56', label: '44.578.137/0012-56' },
+  ];
 
   // ── controle_pj (vendedor_nome → unidade) for filial mapping ──
   const { data: controlePjFilial } = useQuery({
@@ -172,12 +186,16 @@ export default function MeuPainel() {
   }, [controlePj]);
 
   const { data: vendasCountRaw } = useQuery({
-    queryKey: ['vendas-count-pj', [...nomeVendasList].sort().join(',')],
+    queryKey: ['vendas-count-pj', [...nomeVendasList].sort().join(','), filtroCnpj],
     enabled: nomeVendasList.length > 0,
     queryFn: async () => {
-      const { data } = await supabase
+      let q = supabase
         .from('vendas')
         .select('vendedor_nome, total_com_desconto');
+      if (filtroCnpj !== 'all') {
+        q = q.eq('cnpj_empresa', filtroCnpj);
+      }
+      const { data } = await q;
       return data ?? [];
     },
     staleTime: Infinity,
@@ -185,37 +203,134 @@ export default function MeuPainel() {
 
   // Vendas com data (para gráfico cronológico)
   const { data: vendasComDataRaw } = useQuery({
-    queryKey: ['vendas-com-data'],
+    queryKey: ['vendas-com-data', filtroCnpj, periodoAno, periodoMes],
     queryFn: async () => {
-      const { data } = await supabase
+      // Formata dataInicio e dataFim baseados no periodoAno e periodoMes
+      const dataInicio = `${periodoAno}-${String(periodoMes).padStart(2, '0')}-01`;
+      const ultimoDia = new Date(periodoAno, periodoMes, 0).getDate();
+      const dataFim = `${periodoAno}-${String(periodoMes).padStart(2, '0')}-${ultimoDia}`;
+
+      let q = supabase
         .from('vendas')
         .select('data_emissao, total_mercadoria, vendedor_nome')
+        .gte('data_emissao', dataInicio)
+        .lte('data_emissao', dataFim)
         .order('data_emissao', { ascending: true });
+      
+      if (filtroCnpj !== 'all') {
+        q = q.eq('cnpj_empresa', filtroCnpj);
+      }
+      const { data } = await q;
       return (data ?? []).filter(r => r.data_emissao);
     },
     staleTime: Infinity,
   });
 
   const { data: vendasGeraisRaw } = useQuery({
-    queryKey: ['vendas-gerais'],
+    queryKey: ['vendas-gerais', filtroCnpj, periodoAno, periodoMes],
     queryFn: async () => {
-      const { data } = await supabase.from('vendas_gerais').select('total_mercadoria');
-      return data ?? [];
+      const dataInicio = `${periodoAno}-${String(periodoMes).padStart(2, '0')}-01`;
+      const ultimoDia = new Date(periodoAno, periodoMes, 0).getDate();
+      const dataFim = `${periodoAno}-${String(periodoMes).padStart(2, '0')}-${ultimoDia}`;
+
+      let countQuery = supabase
+        .from('vendas')
+        .select('*', { count: 'exact', head: true })
+        .gte('data_emissao', dataInicio)
+        .lte('data_emissao', dataFim);
+      
+      if (filtroCnpj !== 'all') {
+        countQuery = countQuery.eq('cnpj_empresa', filtroCnpj);
+      }
+
+      const { count, error: countErr } = await countQuery;
+      if (countErr) throw countErr;
+      if (!count || count === 0) return [];
+
+      const step = 1000;
+      const totalPages = Math.ceil(count / step);
+      let allData: any[] = [];
+      const concurrency = 5;
+
+      for (let i = 0; i < totalPages; i += concurrency) {
+        const batch = [];
+        for (let j = 0; j < concurrency && i + j < totalPages; j++) {
+          const from = (i + j) * step;
+          let q = supabase
+            .from('vendas')
+            .select('total_mercadoria')
+            .gte('data_emissao', dataInicio)
+            .lte('data_emissao', dataFim)
+            .range(from, from + step - 1);
+          if (filtroCnpj !== 'all') {
+            q = q.eq('cnpj_empresa', filtroCnpj);
+          }
+          batch.push(q);
+        }
+
+        const results = await Promise.all(batch);
+        for (const res of results) {
+          if (res.error) throw res.error;
+          if (res.data) allData = allData.concat(res.data);
+        }
+      }
+      return allData;
     },
     staleTime: Infinity,
   });
 
   // ── Admin: all sales ──
-  const { data: allVendas } = useQuery({
-    queryKey: ['vendas-all-admin'],
+  const { data: allVendas, isLoading: loadAll } = useQuery({
+    queryKey: ['vendas-all-admin', filtroCnpj, periodoAno, periodoMes],
     enabled: isAdmin,
     queryFn: async () => {
-      const { data } = await supabase
+      const dataInicio = `${periodoAno}-${String(periodoMes).padStart(2, '0')}-01`;
+      const ultimoDia = new Date(periodoAno, periodoMes, 0).getDate();
+      const dataFim = `${periodoAno}-${String(periodoMes).padStart(2, '0')}-${ultimoDia}`;
+
+      let countQuery = supabase
         .from('vendas')
-        .select('data_emissao, total_com_desconto, lucros_reais, margem_percentual, nota_fiscal, vendedor_nome, descricao_produto, marca, quantidade, cnpj_empresa')
-        .order('data_emissao', { ascending: false })
-        .limit(5000);
-      return data ?? [];
+        .select('*', { count: 'exact', head: true })
+        .gte('data_emissao', dataInicio)
+        .lte('data_emissao', dataFim);
+      
+      if (filtroCnpj !== 'all') {
+        countQuery = countQuery.eq('cnpj_empresa', filtroCnpj);
+      }
+
+      const { count, error: countErr } = await countQuery;
+      if (countErr) throw countErr;
+      if (!count || count === 0) return [];
+
+      const step = 1000;
+      const totalPages = Math.ceil(count / step);
+      let allData: any[] = [];
+      const concurrency = 5;
+
+      for (let i = 0; i < totalPages; i += concurrency) {
+        const batch = [];
+        for (let j = 0; j < concurrency && i + j < totalPages; j++) {
+          const from = (i + j) * step;
+          let q = supabase
+            .from('vendas')
+            .select('data_emissao, total_com_desconto, lucros_reais, margem_percentual, nota_fiscal, vendedor_nome, descricao_produto, marca, quantidade, cnpj_empresa')
+            .gte('data_emissao', dataInicio)
+            .lte('data_emissao', dataFim)
+            .order('id', { ascending: true })
+            .range(from, from + step - 1);
+          if (filtroCnpj !== 'all') {
+            q = q.eq('cnpj_empresa', filtroCnpj);
+          }
+          batch.push(q);
+        }
+
+        const results = await Promise.all(batch);
+        for (const res of results) {
+          if (res.error) throw res.error;
+          if (res.data) allData = allData.concat(res.data);
+        }
+      }
+      return allData;
     },
     staleTime: Infinity,
   });
@@ -373,7 +488,7 @@ export default function MeuPainel() {
     quantidade: r.quantidade ?? '—',
     total: r.total_com_desconto ?? '—',
     margem: r.margem_percentual ?? '—',
-    lucro: r.lucros_reais ?? '—',
+    lucro: parseMoneyBR(r.lucros_reais) ?? '—',
     ...(isAdmin ? { vendedor: r.vendedor_nome ?? '—' } : {}),
   }));
 
@@ -434,11 +549,12 @@ export default function MeuPainel() {
   const displayedProdutos = showAllProdutos ? topProdutos : topProdutos.slice(0, 10);
   const remainingProdutos = topProdutos.length - 10;
 
-  if (isLoading) {
+  if (isLoading || loadAll) {
     return (
       <AppShell title="Meu Painel">
-        <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="flex items-center justify-center min-h-[50vh] flex-col gap-4">
           <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
+          <p className="text-sm text-muted-foreground">Carregando painel...</p>
         </div>
       </AppShell>
     );
@@ -477,19 +593,34 @@ export default function MeuPainel() {
                 <p className="text-xs text-muted-foreground">{mesNome(periodoMes)} / {periodoAno}</p>
               </div>
               {isAdmin && filialOptions.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                  <Select value={filtroFilial} onValueChange={setFiltroFilial}>
-                    <SelectTrigger className="w-[200px] bg-background/50 border-border">
-                      <SelectValue placeholder="Todas as Filiais" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas as Filiais</SelectItem>
-                      {filialOptions.map(f => (
-                        <SelectItem key={f} value={f}>{f}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-2">
+                    <Store className="h-4 w-4 text-muted-foreground" />
+                    <Select value={filtroCnpj} onValueChange={setFiltroCnpj}>
+                      <SelectTrigger className="w-[220px] bg-background/50 border-border">
+                        <SelectValue placeholder="Todos os CNPJs" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {cnpjsDisponiveis.map(c => (
+                          <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                    <Select value={filtroFilial} onValueChange={setFiltroFilial}>
+                      <SelectTrigger className="w-[220px] bg-background/50 border-border">
+                        <SelectValue placeholder="Todas as Filiais" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas as Filiais</SelectItem>
+                        {filialOptions.map(f => (
+                          <SelectItem key={f} value={f}>{f}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               )}
               {!isAdmin && (

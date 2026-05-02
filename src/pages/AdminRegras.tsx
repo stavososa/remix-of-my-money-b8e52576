@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, X, Search, Copy, AlertTriangle, History, Wand2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
+import { gerarRegraIA, gerarRegrasLoteIA } from '@/lib/openai';
 
 const MESES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
@@ -805,12 +806,9 @@ export default function AdminRegras() {
         produtos: (produtosOptions as string[]).slice(0, 200),
         unidades: unidades.map(u => u.nome),
       };
-      const { data, error } = await supabase.functions.invoke('gerar-regra-ia', {
-        body: { prompt, contexto },
-      });
-      if (error) throw new Error(error.message || 'Falha ao chamar a IA');
-      if (!data?.ok) throw new Error(data?.error || 'A IA não retornou dados');
-      const sug = data.data as Partial<RegraForm>;
+      
+      const sug = await gerarRegraIA(prompt, contexto);
+
       setModal(prev => prev ? {
         ...prev,
         nome: sug.nome ?? prev.nome,
@@ -849,17 +847,14 @@ export default function AdminRegras() {
         produtos: (produtosOptions as string[]).slice(0, 500),
         unidades: unidades.map(u => u.nome),
       };
-      const { data, error } = await supabase.functions.invoke('gerar-regras-lote', {
-        body: { prompt, contexto },
-      });
-      if (error) throw new Error(error.message || 'Falha ao chamar a IA');
-      if (!data?.ok) throw new Error(data?.error || 'A IA não retornou dados');
-      const regrasArr: any[] = Array.isArray(data.regras) ? data.regras : [];
+
+      const regrasArr = await gerarRegrasLoteIA(prompt, contexto);
+      
       if (regrasArr.length === 0) {
         toast.warning('A IA não conseguiu extrair nenhuma regra do texto');
         return;
       }
-      const formatadas: RegraForm[] = regrasArr.map(r => ({
+      const formatadas: RegraForm[] = regrasArr.map((r: any) => ({
         nome: (r.nome ?? 'Regra IA').toString(),
         regime: r.regime === 'CLT' ? 'CLT' : 'PJ',
         tipo_unidade: r.tipo_unidade ?? null,

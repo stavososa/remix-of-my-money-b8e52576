@@ -32,6 +32,8 @@ const parseMoneyBR = (str: unknown): number => {
   return isNaN(val) ? 0 : val;
 };
 
+
+
 const parsePctBR = (str: unknown): number => {
   if (str == null) return 0;
   if (typeof str === 'number') return str * 100;
@@ -268,28 +270,31 @@ export default function Gerencial() {
 
       const step = 1000;
       const totalPages = Math.ceil(count / step);
-      const promises = [];
-
-      for (let i = 0; i < totalPages; i++) {
-        const from = i * step;
-        let q = supabase
-          .from('vendas')
-          .select('data_emissao, vendedor_nome, total_com_desconto, lucros_reais, margem_percentual, familia_produto, descricao_produto, marca, nota_fiscal, cnpj_empresa')
-          .gte('data_emissao', startDate)
-          .lte('data_emissao', endDate)
-          .order('id', { ascending: true })
-          .range(from, from + step - 1);
-        if (isGerente && gerenteCnpjs.length > 0) {
-          q = q.in('cnpj_empresa', gerenteCnpjs);
-        }
-        promises.push(q);
-      }
-
-      const results = await Promise.all(promises);
       let allData: VendaRow[] = [];
-      for (const res of results) {
-        if (res.error) throw res.error;
-        if (res.data) allData = allData.concat(res.data as VendaRow[]);
+      const concurrency = 5;
+
+      for (let i = 0; i < totalPages; i += concurrency) {
+        const batch = [];
+        for (let j = 0; j < concurrency && i + j < totalPages; j++) {
+          const from = (i + j) * step;
+          let q = supabase
+            .from('vendas')
+            .select('data_emissao, vendedor_nome, total_com_desconto, lucros_reais, margem_percentual, familia_produto, descricao_produto, marca, nota_fiscal, cnpj_empresa')
+            .gte('data_emissao', startDate)
+            .lte('data_emissao', endDate)
+            .order('id', { ascending: true })
+            .range(from, from + step - 1);
+          if (isGerente && gerenteCnpjs.length > 0) {
+            q = q.in('cnpj_empresa', gerenteCnpjs);
+          }
+          batch.push(q);
+        }
+
+        const results = await Promise.all(batch);
+        for (const res of results) {
+          if (res.error) throw res.error;
+          if (res.data) allData = allData.concat(res.data as VendaRow[]);
+        }
       }
       return allData;
     },
