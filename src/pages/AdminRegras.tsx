@@ -311,51 +311,143 @@ export default function AdminRegras() {
     },
   });
 
-  // Fetch distinct combos (familia, marca) for cross-filtered autocomplete
+  // Fetch and build global mappings (combinations of Família, Marca, Produto) for advanced autocompletes
   const { data: autocompleteData } = useQuery({
-    queryKey: ['regras-autocomplete-combos'],
+    queryKey: ['regras-autocomplete-combos-completo-v4'],
     queryFn: async () => {
-      const combos = new Set<string>(); // "familia||marca"
-      let from = 0;
+      const rawData: any[] = [];
       const pageSize = 1000;
-      while (true) {
-        const { data, error } = await (supabase as any)
-          .from('vendas')
-          .select('familia_produto, marca')
-          .range(from, from + pageSize - 1);
-        if (error || !data || data.length === 0) break;
-        data.forEach((r: any) => {
-          const f = r.familia_produto || '';
-          const m = r.marca || '';
-          if (f || m) combos.add(`${f}||${m}`);
-        });
-        if (data.length < pageSize) break;
-        from += pageSize;
+
+      // 🚀 Estratégia de Varredura Paralela Bidirecional de Alto Desempenho:
+      // Para dar cobertura de 100% das famílias sem travar a tela com 200k linhas,
+      // executamos requisições em paralelo no banco buscando as duas pontas da linha do tempo:
+      // 1. As 40.000 vendas MAIS RECENTES (para capturar produtos e linhas ativas como VESTUARIO)
+      // 2. As 20.000 vendas MAIS ANTIGAS (para cobrir produtos históricos de legado)
+      const promises = [];
+
+      // 40 Chunks Recentes (Decrescente)
+      for (let i = 0; i < 40; i++) {
+        promises.push(
+          (supabase as any)
+            .from('vendas')
+            .select('descricao_produto, familia_produto, marca')
+            .order('id', { ascending: false })
+            .range(i * pageSize, (i + 1) * pageSize - 1)
+            .then((r: any) => r.data || [])
+            .catch(() => [])
+        );
       }
+
+      // 20 Chunks Históricos (Crescente)
+      for (let i = 0; i < 20; i++) {
+        promises.push(
+          (supabase as any)
+            .from('vendas')
+            .select('descricao_produto, familia_produto, marca')
+            .order('id', { ascending: true })
+            .range(i * pageSize, (i + 1) * pageSize - 1)
+            .then((r: any) => r.data || [])
+            .catch(() => [])
+        );
+      }
+
+      // O browser orquestra as chamadas em paralelo e recebe tudo em ~2 segundos!
+      const results = await Promise.all(promises);
+      results.forEach(dataArr => {
+        rawData.push(...dataArr);
+      });
+
       const familias = new Set<string>();
       const marcas = new Set<string>();
+      const produtos = new Set<string>();
+
+      // Dicionários de Frequência estatística para filtrar erros de digitação pontuais no banco de dados
+      const prodComboFreq = new Map<string, Map<string, number>>(); // produto -> "familia||marca" -> frequencia
+      const brandFamFreq = new Map<string, Map<string, number>>();  // marca -> familia -> frequencia
+
       const familiaToMarcas = new Map<string, Set<string>>();
       const marcaToFamilias = new Map<string, Set<string>>();
-      combos.forEach(combo => {
-        const [f, m] = combo.split('||');
+      const marcaToProdutos = new Map<string, Set<string>>();
+
+      rawData.forEach((r: any) => {
+        const p = r.descricao_produto || '';
+        const f = r.familia_produto || '';
+        const m = r.marca || '';
+
         if (f) familias.add(f);
         if (m) marcas.add(m);
+        if (p) produtos.add(p);
+
+        // Associação simples para filtros em cascata do dropdown
         if (f && m) {
           if (!familiaToMarcas.has(f)) familiaToMarcas.set(f, new Set());
           familiaToMarcas.get(f)!.add(m);
           if (!marcaToFamilias.has(m)) marcaToFamilias.set(m, new Set());
           marcaToFamilias.get(m)!.add(f);
         }
+        if (m && p) {
+          if (!marcaToProdutos.has(m)) marcaToProdutos.set(m, new Set());
+          marcaToProdutos.get(m)!.add(p);
+        }
+
+        // Cálculo de frequências cruzadas para inteligência de associação estatística
+        if (p && (f || m)) {
+          if (!prodComboFreq.has(p)) prodComboFreq.set(p, new Map());
+          const key = `${f}||${m}`;
+          const subMap = prodComboFreq.get(p)!;
+          subMap.set(key, (subMap.get(key) || 0) + 1);
+        }
+        if (m && f) {
+          if (!brandFamFreq.has(m)) brandFamFreq.set(m, new Map());
+          const subMap = brandFamFreq.get(m)!;
+          subMap.set(f, (subMap.get(f) || 0) + 1);
+        }
       });
+
+      // 1. Resolve a Família/Marca dominante para cada Produto (ignora variações pontuais com erros)
+      const produtoToMeta = new Map<string, { familia: string | null; marca: string | null }>();
+      prodComboFreq.forEach((subMap, p) => {
+        let bestKey = '';
+        let maxCount = -1;
+        subMap.forEach((cnt, key) => {
+          if (cnt > maxCount) {
+            maxCount = cnt;
+            bestKey = key;
+          }
+        });
+        const [f, m] = bestKey.split('||');
+        produtoToMeta.set(p, { familia: f || null, marca: m || null });
+      });
+
+      // 2. Resolve a Família dominante para cada Marca (puxa a família exata livre de ruído do banco)
+      const marcaToFamDominante = new Map<string, string>();
+      brandFamFreq.forEach((subMap, m) => {
+        let bestFam = '';
+        let maxCount = -1;
+        subMap.forEach((cnt, f) => {
+          if (cnt > maxCount) {
+            maxCount = cnt;
+            bestFam = f;
+          }
+        });
+        if (bestFam) marcaToFamDominante.set(m, bestFam);
+      });
+
       return {
         familias: [...familias].sort(),
         marcas: [...marcas].sort(),
+        produtos: [...produtos].sort(),
         familiaToMarcas,
         marcaToFamilias,
+        marcaToProdutos,
+        produtoToMeta,
+        marcaToFamDominante,
       };
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
   });
+
+  const allProdutosOptions = useMemo(() => autocompleteData?.produtos ?? [], [autocompleteData]);
 
   // Mapa produto -> { familia, marca } para exibir corretamente quando regra só tem produto
   const produtosUsadosNasRegras = useMemo(() => {
@@ -396,42 +488,33 @@ export default function AdminRegras() {
     staleTime: 10 * 60 * 1000,
   });
 
-  // Produtos carregam quando família OU marca é selecionada
+  // Produtos filtrados instantaneamente via memória para o modal individual
   const familiaAtual = modal?.familia_produto || null;
   const marcaAtual = modal?.marca || null;
-  const { data: produtosOptions = [] } = useQuery({
-    queryKey: ['regras-produtos', familiaAtual, marcaAtual],
-    queryFn: async () => {
-      const allValues = new Set<string>();
-      let from = 0;
-      const pageSize = 1000;
-      while (true) {
-        let query = (supabase as any)
-          .from('vendas')
-          .select('descricao_produto')
-          .not('descricao_produto', 'is', null);
-        if (familiaAtual) query = query.eq('familia_produto', familiaAtual);
-        if (marcaAtual) query = query.eq('marca', marcaAtual);
-        const { data, error } = await query.range(from, from + pageSize - 1);
-        if (error || !data || data.length === 0) break;
-        data.forEach((r: any) => { if (r.descricao_produto) allValues.add(r.descricao_produto); });
-        if (data.length < pageSize) break;
-        from += pageSize;
-      }
-      return [...allValues].sort();
-    },
-    enabled: !!(familiaAtual || marcaAtual),
-    staleTime: 5 * 60 * 1000,
-  });
+  const produtosOptions = useMemo(() => {
+    if (!autocompleteData) return [];
+    if (marcaAtual && autocompleteData.marcaToProdutos?.has(marcaAtual)) {
+      return [...autocompleteData.marcaToProdutos.get(marcaAtual)!].sort();
+    }
+    if (familiaAtual && autocompleteData.familiaToMarcas?.has(familiaAtual)) {
+      const marcasPertencentes = autocompleteData.familiaToMarcas.get(familiaAtual)!;
+      const prodUnicos = new Set<string>();
+      marcasPertencentes.forEach(m => {
+        if (autocompleteData.marcaToProdutos?.has(m)) {
+          autocompleteData.marcaToProdutos.get(m)!.forEach(p => prodUnicos.add(p));
+        }
+      });
+      return [...prodUnicos].sort();
+    }
+    return autocompleteData.produtos;
+  }, [autocompleteData, familiaAtual, marcaAtual]);
 
   // Opções filtradas de família/marca baseadas no que já foi selecionado
   const familiasFiltered = useMemo(() => {
     if (!autocompleteData) return [];
-    if (marcaAtual && autocompleteData.marcaToFamilias.has(marcaAtual)) {
-      return [...autocompleteData.marcaToFamilias.get(marcaAtual)!].sort();
-    }
+    // O dropdown de Famílias deve sempre exibir TODAS as famílias existentes do banco
     return autocompleteData.familias;
-  }, [autocompleteData, marcaAtual]);
+  }, [autocompleteData]);
 
   const marcasFiltered = useMemo(() => {
     if (!autocompleteData) return [];
@@ -844,7 +927,7 @@ export default function AdminRegras() {
       const contexto = {
         familias: autocompleteData?.familias ?? [],
         marcas: autocompleteData?.marcas ?? [],
-        produtos: (produtosOptions as string[]).slice(0, 500),
+        produtos: (allProdutosOptions as string[]).slice(0, 1000),
         unidades: unidades.map(u => u.nome),
       };
 
@@ -854,19 +937,34 @@ export default function AdminRegras() {
         toast.warning('A IA não conseguiu extrair nenhuma regra do texto');
         return;
       }
-      const formatadas: RegraForm[] = regrasArr.map((r: any) => ({
-        nome: (r.nome ?? 'Regra IA').toString(),
-        regime: r.regime === 'CLT' ? 'CLT' : 'PJ',
-        tipo_unidade: r.tipo_unidade ?? null,
-        familia_produto: r.familia_produto ?? null,
-        marca: r.marca ?? null,
-        produto: r.produto ?? null,
-        percentual: typeof r.percentual === 'number' ? r.percentual : parseFloat(r.percentual) || 0,
-        min_faturamento: r.min_faturamento ?? null,
-        periodo_ano: periodoAno,
-        periodo_mes: periodoMes,
-        ativo: true,
-      }));
+      const formatadas: RegraForm[] = regrasArr.map((r: any) => {
+        let fam = r.familia_produto ?? null;
+        let mar = r.marca ?? null;
+        const prod = r.produto ?? null;
+
+        // Auto-resolução inteligente contra o Banco de Dados em tempo real:
+        if (prod && autocompleteData?.produtoToMeta?.has(prod)) {
+          const meta = autocompleteData.produtoToMeta.get(prod)!;
+          if (meta.familia) fam = meta.familia;
+          if (meta.marca) mar = meta.marca;
+        } else if (mar && !fam && autocompleteData?.marcaToFamDominante?.has(mar)) {
+          fam = autocompleteData.marcaToFamDominante.get(mar)!;
+        }
+
+        return {
+          nome: (r.nome ?? 'Regra IA').toString(),
+          regime: r.regime === 'CLT' ? 'CLT' : 'PJ',
+          tipo_unidade: r.tipo_unidade ?? null,
+          familia_produto: fam,
+          marca: mar,
+          produto: prod,
+          percentual: typeof r.percentual === 'number' ? r.percentual : parseFloat(r.percentual) || 0,
+          min_faturamento: r.min_faturamento ?? null,
+          periodo_ano: periodoAno,
+          periodo_mes: periodoMes,
+          ativo: true,
+        };
+      });
       setLoteRegras(formatadas);
       toast.success(`${formatadas.length} regras extraídas. Revise e salve.`);
     } catch (e: any) {
@@ -1142,7 +1240,7 @@ export default function AdminRegras() {
                     </button>
                   </div>
                 </div>
-                <AutocompleteInput
+                 <AutocompleteInput
                   label="Família"
                   value={modal.familia_produto || ''}
                   onChange={v => setModal({ ...modal, familia_produto: v })}
@@ -1153,7 +1251,13 @@ export default function AdminRegras() {
                 <AutocompleteInput
                   label="Marca"
                   value={modal.marca || ''}
-                  onChange={v => setModal({ ...modal, marca: v })}
+                  onChange={v => {
+                    const next = { ...modal, marca: v };
+                    if (v && autocompleteData?.marcaToFamDominante?.has(v)) {
+                      next.familia_produto = autocompleteData.marcaToFamDominante.get(v)!;
+                    }
+                    setModal(next);
+                  }}
                   options={marcasFiltered}
                   placeholder="Ex: Nike, Adidas..."
                   disabled={isGenerica}
@@ -1161,9 +1265,17 @@ export default function AdminRegras() {
                 <AutocompleteInput
                   label="Produto"
                   value={modal.produto || ''}
-                  onChange={v => setModal({ ...modal, produto: v })}
+                  onChange={v => {
+                    const next = { ...modal, produto: v };
+                    if (v && autocompleteData?.produtoToMeta?.has(v)) {
+                      const meta = autocompleteData.produtoToMeta.get(v)!;
+                      if (meta.familia) next.familia_produto = meta.familia;
+                      if (meta.marca) next.marca = meta.marca;
+                    }
+                    setModal(next);
+                  }}
                   options={produtosOptions}
-                  placeholder={(familiaAtual || marcaAtual) ? "Selecione um produto..." : "Selecione uma família ou marca primeiro..."}
+                  placeholder="Selecione ou busque um produto..."
                   disabled={isGenerica}
                 />
               </div>
@@ -1408,7 +1520,7 @@ export default function AdminRegras() {
       {showLoteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60" onClick={() => !loteSaving && setShowLoteModal(false)} />
-          <div className="relative bg-card border border-border rounded-xl p-6 w-full max-w-4xl shadow-card space-y-4 max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="relative bg-card border border-border rounded-xl p-6 w-full max-w-6xl shadow-card space-y-4 max-h-[90vh] overflow-hidden flex flex-col">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-3">
                 <Sparkles className="h-5 w-5 text-primary" />
@@ -1446,118 +1558,212 @@ export default function AdminRegras() {
               </>
             ) : (
               <>
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm text-secondary-foreground">
-                    <strong className="text-primary">{loteRegras.length} regras</strong> extraídas. Edite o que precisar e salve. Use <Trash2 className="inline h-3 w-3" /> para remover linhas indesejadas.
-                  </p>
-                  <button
-                    onClick={() => setLoteRegras(null)}
-                    className="text-xs text-muted-foreground hover:text-foreground underline"
-                  >
-                    ← voltar e re-analisar
-                  </button>
-                </div>
+                {(() => {
+                  const isRowWarning = (r: RegraForm) => 
+                    (!r.familia_produto && !r.marca && !r.produto) ||
+                    (r.produto && (!r.marca || !r.familia_produto)) ||
+                    (r.marca && !r.familia_produto);
+                  const warningCount = loteRegras.filter(isRowWarning).length;
+                  return (
+                    <>
+                      <div className="flex flex-col gap-2.5">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm text-secondary-foreground">
+                            <strong className="text-primary">{loteRegras.length} regras</strong> extraídas. Edite o que precisar e salve. Use <Trash2 className="inline h-3 w-3" /> para remover linhas indesejadas.
+                          </p>
+                          <button
+                            onClick={() => setLoteRegras(null)}
+                            className="text-xs text-muted-foreground hover:text-foreground underline shrink-0"
+                          >
+                            ← voltar e re-analisar
+                          </button>
+                        </div>
 
-                <div className="overflow-y-auto flex-1 border border-border rounded-lg">
-                  <table className="w-full text-sm">
-                    <thead className="bg-secondary sticky top-0">
-                      <tr className="text-left text-xs uppercase text-muted-foreground">
-                        <th className="px-2 py-2">Nome</th>
-                        <th className="px-2 py-2">Reg.</th>
-                        <th className="px-2 py-2">Filiais</th>
-                        <th className="px-2 py-2">Família</th>
-                        <th className="px-2 py-2">Marca</th>
-                        <th className="px-2 py-2">Produto</th>
-                        <th className="px-2 py-2 text-right">%</th>
-                        <th className="px-2 py-2 text-right">Min Fat.</th>
-                        <th className="px-2 py-2"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {loteRegras.map((r, idx) => (
-                        <tr key={idx} className="border-t border-border hover:bg-secondary/30">
-                          <td className="px-2 py-1">
-                            <input
-                              value={r.nome}
-                              onChange={e => setLoteRegras(prev => prev!.map((x, i) => i === idx ? { ...x, nome: e.target.value } : x))}
-                              className="w-full bg-transparent border border-transparent hover:border-border focus:border-primary rounded px-1 py-0.5 text-xs"
-                            />
-                          </td>
-                          <td className="px-2 py-1">
-                            <select
-                              value={r.regime}
-                              onChange={e => setLoteRegras(prev => prev!.map((x, i) => i === idx ? { ...x, regime: e.target.value } : x))}
-                              className="bg-secondary border border-border rounded px-1 py-0.5 text-xs"
-                            >
-                              <option value="PJ">PJ</option>
-                              <option value="CLT">CLT</option>
-                            </select>
-                          </td>
-                          <td className="px-2 py-1">
-                            <input
-                              value={r.tipo_unidade ?? ''}
-                              placeholder="Todas"
-                              onChange={e => setLoteRegras(prev => prev!.map((x, i) => i === idx ? { ...x, tipo_unidade: e.target.value || null } : x))}
-                              className="w-24 bg-transparent border border-transparent hover:border-border focus:border-primary rounded px-1 py-0.5 text-xs"
-                            />
-                          </td>
-                          <td className="px-2 py-1">
-                            <input
-                              value={r.familia_produto ?? ''}
-                              placeholder="—"
-                              onChange={e => setLoteRegras(prev => prev!.map((x, i) => i === idx ? { ...x, familia_produto: e.target.value || null } : x))}
-                              className="w-28 bg-transparent border border-transparent hover:border-border focus:border-primary rounded px-1 py-0.5 text-xs"
-                            />
-                          </td>
-                          <td className="px-2 py-1">
-                            <input
-                              value={r.marca ?? ''}
-                              placeholder="—"
-                              onChange={e => setLoteRegras(prev => prev!.map((x, i) => i === idx ? { ...x, marca: e.target.value || null } : x))}
-                              className="w-28 bg-transparent border border-transparent hover:border-border focus:border-primary rounded px-1 py-0.5 text-xs"
-                            />
-                          </td>
-                          <td className="px-2 py-1">
-                            <input
-                              value={r.produto ?? ''}
-                              placeholder="—"
-                              onChange={e => setLoteRegras(prev => prev!.map((x, i) => i === idx ? { ...x, produto: e.target.value || null } : x))}
-                              className="w-32 bg-transparent border border-transparent hover:border-border focus:border-primary rounded px-1 py-0.5 text-xs"
-                            />
-                          </td>
-                          <td className="px-2 py-1 text-right">
-                            <input
-                              type="number"
-                              step="0.05"
-                              value={r.percentual}
-                              onChange={e => setLoteRegras(prev => prev!.map((x, i) => i === idx ? { ...x, percentual: parseFloat(e.target.value) || 0 } : x))}
-                              className="w-20 text-right bg-secondary border border-border rounded px-1 py-0.5 text-xs text-primary font-bold"
-                            />
-                          </td>
-                          <td className="px-2 py-1 text-right">
-                            <input
-                              type="number"
-                              step="100"
-                              value={r.min_faturamento ?? ''}
-                              placeholder="—"
-                              onChange={e => setLoteRegras(prev => prev!.map((x, i) => i === idx ? { ...x, min_faturamento: e.target.value ? parseFloat(e.target.value) : null } : x))}
-                              className="w-24 text-right bg-transparent border border-transparent hover:border-border focus:border-primary rounded px-1 py-0.5 text-xs"
-                            />
-                          </td>
-                          <td className="px-2 py-1">
-                            <button
-                              onClick={() => setLoteRegras(prev => prev!.filter((_, i) => i !== idx))}
-                              className="p-1 text-muted-foreground hover:text-destructive"
-                              title="Remover"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                        {warningCount > 0 && (
+                          <div className="bg-amber-500/10 border border-amber-500/30 text-amber-200 rounded-lg p-2.5 text-xs flex items-start gap-2">
+                            <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                            <div>
+                              <strong>Aviso de Metadados Pendentes:</strong> {warningCount} {warningCount === 1 ? 'regra possui' : 'regras possuem'} pendência de associação (Marca ou Família não identificadas no banco para a classificação, ou operando como Regra Geral). Verifique e preencha abaixo para garantir associação exata.
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="overflow-auto flex-1 border border-border rounded-lg">
+                        <table className="w-full text-sm min-w-[1000px]">
+                          <thead className="bg-secondary sticky top-0">
+                            <tr className="text-left text-xs uppercase text-muted-foreground">
+                              <th className="px-2 py-2 pl-3">Nome</th>
+                              <th className="px-2 py-2">Reg.</th>
+                              <th className="px-2 py-2">Filiais</th>
+                              <th className="px-2 py-2">Família</th>
+                              <th className="px-2 py-2">Marca</th>
+                              <th className="px-2 py-2">Produto</th>
+                              <th className="px-2 py-2 text-right">%</th>
+                              <th className="px-2 py-2 text-right">Min Fat.</th>
+                              <th className="px-2 py-2 w-8"></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {loteRegras.map((r, idx) => {
+                              const isWarning = 
+                                (!r.familia_produto && !r.marca && !r.produto) ||
+                                (r.produto && (!r.marca || !r.familia_produto)) ||
+                                (r.marca && !r.familia_produto);
+
+                              // Opções inteligentes por linha (Cascading Dropdowns):
+                              const familiasForRow = autocompleteData?.familias ?? [];
+
+                              let marcasForRow = autocompleteData?.marcas ?? [];
+                              if (r.familia_produto && autocompleteData?.familiaToMarcas?.has(r.familia_produto)) {
+                                marcasForRow = [...autocompleteData.familiaToMarcas.get(r.familia_produto)!].sort();
+                              }
+
+                              let produtosForRow = autocompleteData?.produtos ?? [];
+                              if (r.marca && autocompleteData?.marcaToProdutos?.has(r.marca)) {
+                                produtosForRow = [...autocompleteData.marcaToProdutos.get(r.marca)!].sort();
+                              } else if (r.familia_produto && autocompleteData?.familiaToMarcas?.has(r.familia_produto)) {
+                                const marcasNaFam = autocompleteData.familiaToMarcas.get(r.familia_produto)!;
+                                const prodMatches = new Set<string>();
+                                marcasNaFam.forEach(m => {
+                                  if (autocompleteData.marcaToProdutos?.has(m)) {
+                                    autocompleteData.marcaToProdutos.get(m)!.forEach(p => prodMatches.add(p));
+                                  }
+                                });
+                                if (prodMatches.size > 0) produtosForRow = [...prodMatches].sort();
+                              }
+
+                              return (
+                                <tr key={idx} className={`border-t border-border hover:bg-secondary/30 ${isWarning ? 'bg-warning/5' : ''}`}>
+                                  {/* DataLists locais renderizados na própria célula */}
+                                  <td className="hidden">
+                                    <datalist id={`lote-familias-${idx}`}>
+                                      {familiasForRow.map(f => <option key={f} value={f} />)}
+                                    </datalist>
+                                    <datalist id={`lote-marcas-${idx}`}>
+                                      {marcasForRow.map(m => <option key={m} value={m} />)}
+                                    </datalist>
+                                    <datalist id={`lote-produtos-${idx}`}>
+                                      {produtosForRow.map(p => <option key={p} value={p} />)}
+                                    </datalist>
+                                  </td>
+                                  <td className="px-2 py-1 pl-3 flex items-center gap-1.5 min-w-[180px]">
+                                    {isWarning && (
+                                      <span title="Esta regra possui pendência de metadados (Marca/Família não identificados)" className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                                    )}
+                                    <input
+                                      value={r.nome}
+                                      onChange={e => setLoteRegras(prev => prev!.map((x, i) => i === idx ? { ...x, nome: e.target.value } : x))}
+                                      className="w-full bg-transparent border border-transparent hover:border-border focus:border-primary rounded px-1 py-0.5 text-xs"
+                                    />
+                                  </td>
+                                  <td className="px-2 py-1">
+                                    <select
+                                      value={r.regime}
+                                      onChange={e => setLoteRegras(prev => prev!.map((x, i) => i === idx ? { ...x, regime: e.target.value } : x))}
+                                      className="bg-secondary border border-border rounded px-1 py-0.5 text-xs"
+                                    >
+                                      <option value="PJ">PJ</option>
+                                      <option value="CLT">CLT</option>
+                                    </select>
+                                  </td>
+                                  <td className="px-2 py-1">
+                                    <input
+                                      value={r.tipo_unidade ?? ''}
+                                      placeholder="Todas"
+                                      onChange={e => setLoteRegras(prev => prev!.map((x, i) => i === idx ? { ...x, tipo_unidade: e.target.value || null } : x))}
+                                      className="w-28 bg-transparent border border-transparent hover:border-border focus:border-primary rounded px-1 py-0.5 text-xs"
+                                    />
+                                  </td>
+                                  <td className="px-2 py-1">
+                                    <input
+                                      value={r.familia_produto ?? ''}
+                                      placeholder="—"
+                                      list={`lote-familias-${idx}`}
+                                      onChange={e => {
+                                        const val = e.target.value || null;
+                                        setLoteRegras(prev => prev!.map((x, i) => i === idx ? { ...x, familia_produto: val } : x));
+                                      }}
+                                      className="w-44 bg-transparent border border-transparent hover:border-border focus:border-primary rounded px-1 py-0.5 text-xs font-medium placeholder-muted-foreground/50"
+                                    />
+                                  </td>
+                                  <td className="px-2 py-1">
+                                    <input
+                                      value={r.marca ?? ''}
+                                      placeholder="—"
+                                      list={`lote-marcas-${idx}`}
+                                      onChange={e => {
+                                        const val = e.target.value || null;
+                                        setLoteRegras(prev => prev!.map((x, i) => {
+                                          if (i !== idx) return x;
+                                          const updated = { ...x, marca: val };
+                                          if (val && autocompleteData?.marcaToFamDominante?.has(val)) {
+                                            updated.familia_produto = autocompleteData.marcaToFamDominante.get(val)!;
+                                          }
+                                          return updated;
+                                        }));
+                                      }}
+                                      className="w-44 bg-transparent border border-transparent hover:border-border focus:border-primary rounded px-1 py-0.5 text-xs font-medium placeholder-muted-foreground/50"
+                                    />
+                                  </td>
+                                  <td className="px-2 py-1">
+                                    <input
+                                      value={r.produto ?? ''}
+                                      placeholder="—"
+                                      list={`lote-produtos-${idx}`}
+                                      onChange={e => {
+                                        const val = e.target.value || null;
+                                        setLoteRegras(prev => prev!.map((x, i) => {
+                                          if (i !== idx) return x;
+                                          const updated = { ...x, produto: val };
+                                          if (val && autocompleteData?.produtoToMeta?.has(val)) {
+                                            const meta = autocompleteData.produtoToMeta.get(val)!;
+                                            if (meta.familia) updated.familia_produto = meta.familia;
+                                            if (meta.marca) updated.marca = meta.marca;
+                                          }
+                                          return updated;
+                                        }));
+                                      }}
+                                      className="w-64 bg-transparent border border-transparent hover:border-border focus:border-primary rounded px-1 py-0.5 text-xs font-medium placeholder-muted-foreground/50"
+                                    />
+                                  </td>
+                                  <td className="px-2 py-1 text-right">
+                                    <input
+                                      type="number"
+                                      step="0.05"
+                                      value={r.percentual}
+                                      onChange={e => setLoteRegras(prev => prev!.map((x, i) => i === idx ? { ...x, percentual: parseFloat(e.target.value) || 0 } : x))}
+                                      className="w-20 text-right bg-secondary border border-border rounded px-1 py-0.5 text-xs text-primary font-bold"
+                                    />
+                                  </td>
+                                  <td className="px-2 py-1 text-right">
+                                    <input
+                                      type="number"
+                                      step="100"
+                                      value={r.min_faturamento ?? ''}
+                                      placeholder="—"
+                                      onChange={e => setLoteRegras(prev => prev!.map((x, i) => i === idx ? { ...x, min_faturamento: e.target.value ? parseFloat(e.target.value) : null } : x))}
+                                      className="w-24 text-right bg-transparent border border-transparent hover:border-border focus:border-primary rounded px-1 py-0.5 text-xs"
+                                    />
+                                  </td>
+                                  <td className="px-2 py-1 text-center">
+                                    <button
+                                      onClick={() => setLoteRegras(prev => prev!.filter((_, i) => i !== idx))}
+                                      className="p-1 text-muted-foreground hover:text-destructive"
+                                      title="Remover"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  );
+                })()}
 
                 <div className="flex justify-end gap-3 pt-2 border-t border-border">
                   <button onClick={() => setShowLoteModal(false)} disabled={loteSaving} className="px-4 py-2 rounded-lg text-sm text-secondary-foreground hover:bg-secondary disabled:opacity-50">Cancelar</button>

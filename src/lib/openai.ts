@@ -114,22 +114,22 @@ REGRAS OBRIGATÓRIAS POR ITEM:
 - "percentual": número decimal (ex.: 1.25 para "1,25%"). Nunca string. Sem símbolo %.
 - "regime": "PJ" ou "CLT". Default "PJ".
 - "tipo_unidade": null para regra geral (todas as filiais). Se citar filiais específicas, use os nomes EXATOS da lista de unidades em maiúsculas, separados por vírgula. Se citar entrega/delivery, use "DELIVERY".
-- "familia_produto": preencha SOMENTE se houver match (case-insensitive) com a lista de famílias do contexto. Caso contrário null.
-- "marca": preencha SOMENTE se houver match (case-insensitive) com a lista de marcas. Caso contrário null.
-- "produto": preencha SOMENTE se o texto citar um nome de produto que tenha match (substring case-insensitive) com a lista de produtos. Caso contrário null.
+- "familia_produto": Se o item citado for compatível com a lista de Famílias, utilize o NOME EXATO da lista de Famílias. NUNCA INVENTE nomes, siglas ou abreviações (por exemplo, NUNCA invente "vf" ou qualquer sigla não existente). Se não tiver correspondência EXATA na lista do contexto, você DEVE retornar null.
+- "marca": Se houver correspondência, utilize o NOME EXATO da lista de marcas do contexto. NUNCA INVENTE. Se não estiver na lista, retorne null.
+- "produto": Se houver correspondência clara (substring), use o NOME EXATO da lista de produtos do contexto. Caso contrário, retorne null.
 - "min_faturamento": número em reais SE o texto disser "se passar de R$ X" ou similar; senão null.
 - "nome": curto e descritivo (ex: "Beta Alanina 10% (>80 unid)", "Marcas Próprias DCX 4%", "Roupas/Tênis 3%").
 - "ativo": sempre true.
 
-EXPANSÃO DE LISTAS:
+EXPANSÃO DE LISTAS E FALLBACKS:
 - Se o texto listar vários produtos/marcas com o MESMO percentual ("5% – Ares, Diuretic, TESTO1000..."), gere UMA regra por item.
 - Se citar "marcas próprias DCX, GrowUp, Synthesize" com percentual X, gere UMA regra por marca (uma por DCX, uma por GrowUp, uma por Synthesize).
-- Para escalas de margem ("margem 77% = 9% comissão"), gere UMA regra por linha da escala se possível identificar o produto.
+- IMPORTANTE: Se houver um item ou conjunto sem correspondência nas listas de Família/Marca/Produto do banco (ex.: roupas e acessórios que não estão no banco), gere a regra com o "nome" descrevendo o item, mas retorne null para familia_produto, marca e produto (não invente!).
 - Para regras genéricas ("Todos os itens de outras marcas 1,25%"), gere UMA regra com tudo null exceto percentual.
 - Para "Toda linha [Marca]", gere uma regra com marca=Marca e os outros campos null.
 
 QUALIDADE:
-- Se houver dúvida sobre família/marca/produto, prefira null em vez de inventar.
+- Se houver a menor dúvida sobre família/marca/produto, prefira null em vez de inventar algo diferente do contexto.
 - Não duplique regras idênticas.
 - Limite a 60 regras por chamada.
 
