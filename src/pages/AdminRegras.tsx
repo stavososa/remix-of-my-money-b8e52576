@@ -8,7 +8,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, X, Search, Copy, AlertTriangle, History, Wand2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
-import { gerarRegraIA, gerarRegrasLoteIA } from '@/lib/openai';
 
 const MESES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
@@ -890,7 +889,14 @@ export default function AdminRegras() {
         unidades: unidades.map(u => u.nome),
       };
       
-      const sug = await gerarRegraIA(prompt, contexto);
+      const { data: res, error } = await supabase.functions.invoke('gerar-regra-ia', {
+        body: { prompt, contexto }
+      });
+
+      if (error) throw error;
+      if (!res?.ok) throw new Error(res?.error || 'Erro ao gerar com IA');
+
+      const sug = res.data;
 
       setModal(prev => prev ? {
         ...prev,
@@ -931,7 +937,14 @@ export default function AdminRegras() {
         unidades: unidades.map(u => u.nome),
       };
 
-      const regrasArr = await gerarRegrasLoteIA(prompt, contexto);
+      const { data: res, error } = await supabase.functions.invoke('gerar-regras-lote', {
+        body: { prompt, contexto }
+      });
+
+      if (error) throw error;
+      if (!res?.ok) throw new Error(res?.error || 'Erro ao analisar lote com IA');
+
+      const regrasArr = res.regras || [];
       
       if (regrasArr.length === 0) {
         toast.warning('A IA não conseguiu extrair nenhuma regra do texto');
