@@ -159,7 +159,7 @@ export default function Gerencial() {
   const endDate = dataFim;
 
   // ===== unidades (nome + cnpj for dropdown and mapping) =====
-  const { data: unidadesList, isLoading: loadUnidades } = useQuery({
+  const { data: unidadesList, isLoading: loadUnidades, error: errorUnidades } = useQuery({
     queryKey: ['unidades-nomes-cnpj'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -239,7 +239,7 @@ export default function Gerencial() {
     },
   });
 
-  const { data: allVendas, isLoading: loadAll, isFetching: fetchingAll } = useQuery({
+  const { data: allVendas, isLoading: loadAll, isFetching: fetchingAll, error: errorAll } = useQuery({
     queryKey: ['gerencial-all-vendas', startDate, endDate, gerenteCnpjs],
     enabled: !isGerente || gerenteCnpjs.length > 0,
     queryFn: async () => {
@@ -349,7 +349,10 @@ export default function Gerencial() {
     return set.size;
   }, [filteredAll]);
 
-  const isBusy = loadAll || fetchingAll || loadUnidades || !unidadesList;
+  if (errorUnidades) console.error("Error loading unidades:", errorUnidades);
+  if (errorAll) console.error("Error loading allVendas:", errorAll);
+
+  const isBusy = loadAll || fetchingAll || loadUnidades || (!unidadesList && !errorUnidades);
 
   // ===== Chart: Faturamento por Dia =====
   // Mostra todos os dias do dia 1 do mês até o último dia com venda no período.
