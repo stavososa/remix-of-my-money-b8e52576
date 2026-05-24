@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { AppShell } from '@/components/AppShell';
 import { DataTable } from '@/components/DataTable';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -6,7 +7,7 @@ import { usePeriod } from '@/contexts/PeriodContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, X, Search, Copy, AlertTriangle, History, Wand2, Sparkles } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Search, Copy, AlertTriangle, History, Wand2, Sparkles, Upload, FileSpreadsheet, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 
 const MESES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -255,7 +256,12 @@ export default function AdminRegras() {
   const [loteLoading, setLoteLoading] = useState(false);
   const [loteRegras, setLoteRegras] = useState<RegraForm[] | null>(null);
   const [loteSaving, setLoteSaving] = useState(false);
-
+  // Estados para upload de planilha
+  const [loteTab, setLoteTab] = useState<'texto' | 'planilha'>('texto');
+  const [planilhaFile, setPlanilhaFile] = useState<File | null>(null);
+  const [planilhaRows, setPlanilhaRows] = useState<Record<string, string>[]>([]);
+  const [planilhaHeaders, setPlanilhaHeaders] = useState<string[]>([]);
+  const [isParsingPlanilha, setIsParsingPlanilha] = useState(false);
 
   // Fetch unidades for filial multi-select (with fallback when table is empty/missing)
   const UNIDADES_FALLBACK: { id: string; nome: string; tipo: string }[] = [
@@ -988,6 +994,86 @@ export default function AdminRegras() {
     }
   };
 
+  const handlePlanilhaUpload = async (file: File) => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, { raw: false, defval: '' });
+      const rawHeaders = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1 })[0] ?? [];
+      setPlanilhaHeaders(rawHeaders.map(String));
+      setPlanilhaRows(rows);
+      setPlanilhaFile(file);
+    } catch (e: any) {
+      toast.error('Erro ao ler o arquivo: ' + (e?.message || 'formato não suportado'));
+    }
+  };
+
+  const analisarPlanilhaIA = async () => {
+    if (planilhaRows.length === 0) {
+      toast.error('Selecione uma planilha antes de analisar');
+      return;
+    }
+    setIsParsingPlanilha(true);
+    try {
+      const contexto = {
+        familias: autocompleteData?.familias ?? [],
+        marcas: autocompleteData?.marcas ?? [],
+        produtos: (allProdutosOptions as string[]).slice(0, 1000),
+        unidades: unidades.map(u => u.nome),
+      };
+
+      const { data: res, error } = await supabase.functions.invoke('interpretar-planilha-regras', {
+        body: { headers: planilhaHeaders, rows: planilhaRows.slice(0, 200), contexto },
+      });
+
+      if (error) throw error;
+      if (!res?.ok) throw new Error(res?.error || 'Erro ao interpretar planilha com IA');
+
+      const regrasArr = res.regras || [];
+      if (regrasArr.length === 0) {
+        toast.warning('A IA não conseguiu extrair nenhuma regra da planilha');
+        return;
+      }
+
+      const formatadas: RegraForm[] = regrasArr.map((r: any) => {
+        let fam = r.familia_produto ?? null;
+        let mar = r.marca ?? null;
+        const prod = r.produto ?? null;
+
+        if (prod && autocompleteData?.produtoToMeta?.has(prod)) {
+          const meta = autocompleteData.produtoToMeta.get(prod)!;
+          if (meta.familia) fam = meta.familia;
+          if (meta.marca) mar = meta.marca;
+        } else if (mar && !fam && autocompleteData?.marcaToFamDominante?.has(mar)) {
+          fam = autocompleteData.marcaToFamDominante.get(mar)!;
+        }
+
+        return {
+          nome: (r.nome ?? 'Regra IA').toString(),
+          regime: r.regime === 'CLT' ? 'CLT' : 'PJ',
+          tipo_unidade: r.tipo_unidade ?? null,
+          familia_produto: fam,
+          marca: mar,
+          produto: prod,
+          percentual: typeof r.percentual === 'number' ? r.percentual : parseFloat(r.percentual) || 0,
+          min_faturamento: r.min_faturamento ?? null,
+          periodo_ano: periodoAno,
+          periodo_mes: periodoMes,
+          ativo: true,
+        };
+      });
+
+      setLoteRegras(formatadas);
+      toast.success(`${formatadas.length} regras extraídas da planilha. Revise e salve.`);
+    } catch (e: any) {
+      console.error('IA planilha erro', e);
+      toast.error(e?.message || 'Erro ao interpretar planilha com IA');
+    } finally {
+      setIsParsingPlanilha(false);
+    }
+  };
+
   const salvarLote = async () => {
     if (!loteRegras || loteRegras.length === 0) return;
     setLoteSaving(true);
@@ -1026,6 +1112,10 @@ export default function AdminRegras() {
       setShowLoteModal(false);
       setLoteRegras(null);
       setLotePrompt('');
+      setLoteTab('texto');
+      setPlanilhaFile(null);
+      setPlanilhaRows([]);
+      setPlanilhaHeaders([]);
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao salvar lote');
     } finally {
@@ -1066,7 +1156,7 @@ export default function AdminRegras() {
               </>
             )}
             <button
-              onClick={() => { setLoteRegras(null); setLotePrompt(''); setShowLoteModal(true); }}
+              onClick={() => { setLoteRegras(null); setLotePrompt(''); setLoteTab('texto'); setPlanilhaFile(null); setPlanilhaRows([]); setPlanilhaHeaders([]); setShowLoteModal(true); }}
               className="flex items-center gap-2 px-4 py-2 rounded-lg border border-primary/40 text-primary font-semibold text-sm hover:bg-primary/10 transition-colors"
             >
               <Sparkles className="h-4 w-4" /> Importar lote (IA)
@@ -1546,28 +1636,141 @@ export default function AdminRegras() {
 
             {!loteRegras ? (
               <>
-                <p className="text-sm text-muted-foreground">
-                  Cole o texto completo (mensagem do WhatsApp, comunicado etc). A IA vai extrair várias regras de uma vez. Você revisa e salva todas.
-                </p>
-                <textarea
-                  value={lotePrompt}
-                  onChange={e => setLotePrompt(e.target.value)}
-                  rows={14}
-                  disabled={loteLoading}
-                  placeholder="Ex: 5% – Ares, Diuretic, TESTO1000... | 4% – Marcas Próprias DCX, Grow Up... | 1,25% – Outras marcas..."
-                  className="w-full px-3 py-2 rounded-md bg-secondary border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-y font-mono"
-                />
-                <div className="flex justify-end gap-3">
-                  <button onClick={() => setShowLoteModal(false)} className="px-4 py-2 rounded-lg text-sm text-secondary-foreground hover:bg-secondary">Cancelar</button>
+                {/* Seletor de modo: Texto ou Planilha */}
+                <div className="flex gap-1 bg-secondary/50 rounded-lg p-1 w-fit">
                   <button
-                    onClick={analisarLoteIA}
-                    disabled={loteLoading || !lotePrompt.trim()}
-                    className="px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
+                    type="button"
+                    onClick={() => setLoteTab('texto')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${loteTab === 'texto' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                   >
-                    <Sparkles className="h-4 w-4" />
-                    {loteLoading ? 'Analisando...' : 'Analisar com IA'}
+                    <MessageSquare className="h-4 w-4" />
+                    Texto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLoteTab('planilha')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${loteTab === 'planilha' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                  >
+                    <FileSpreadsheet className="h-4 w-4" />
+                    Planilha
                   </button>
                 </div>
+
+                {loteTab === 'texto' ? (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      Cole o texto completo (mensagem do WhatsApp, comunicado etc). A IA vai extrair várias regras de uma vez. Você revisa e salva todas.
+                    </p>
+                    <textarea
+                      value={lotePrompt}
+                      onChange={e => setLotePrompt(e.target.value)}
+                      rows={14}
+                      disabled={loteLoading}
+                      placeholder="Ex: 5% – Ares, Diuretic, TESTO1000... | 4% – Marcas Próprias DCX, Grow Up... | 1,25% – Outras marcas..."
+                      className="w-full px-3 py-2 rounded-md bg-secondary border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-y font-mono"
+                    />
+                    <div className="flex justify-end gap-3">
+                      <button onClick={() => setShowLoteModal(false)} className="px-4 py-2 rounded-lg text-sm text-secondary-foreground hover:bg-secondary">Cancelar</button>
+                      <button
+                        onClick={analisarLoteIA}
+                        disabled={loteLoading || !lotePrompt.trim()}
+                        className="px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
+                      >
+                        <Sparkles className="h-4 w-4" />
+                        {loteLoading ? 'Analisando...' : 'Analisar com IA'}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      Envie uma planilha (.csv, .xlsx, .xls) com as regras de comissão. A IA interpreta as colunas automaticamente — você revisa e salva.
+                    </p>
+
+                    {/* Zona de upload com drag-and-drop */}
+                    <label
+                      htmlFor="planilha-upload"
+                      onDragOver={e => e.preventDefault()}
+                      onDrop={e => {
+                        e.preventDefault();
+                        const f = e.dataTransfer.files?.[0];
+                        if (f && /\.(csv|xlsx|xls)$/i.test(f.name)) handlePlanilhaUpload(f);
+                        else if (f) toast.error('Formato não suportado. Use .csv, .xlsx ou .xls');
+                      }}
+                      className={`flex flex-col items-center justify-center gap-3 border-2 border-dashed rounded-xl p-10 cursor-pointer transition-colors ${planilhaFile ? 'border-primary/50 bg-primary/5' : 'border-border hover:border-primary/40 hover:bg-secondary/50'}`}
+                    >
+                      {planilhaFile ? (
+                        <>
+                          <FileSpreadsheet className="h-8 w-8 text-primary" />
+                          <div className="text-center">
+                            <p className="text-sm font-medium text-foreground">{planilhaFile.name}</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {planilhaRows.length} linha{planilhaRows.length !== 1 ? 's' : ''} encontrada{planilhaRows.length !== 1 ? 's' : ''}
+                            </p>
+                          </div>
+                          <p className="text-xs text-primary underline">Clique para trocar o arquivo</p>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-8 w-8 text-muted-foreground" />
+                          <div className="text-center">
+                            <p className="text-sm font-medium text-foreground">Arraste o arquivo ou clique para selecionar</p>
+                            <p className="text-xs text-muted-foreground mt-1">Aceita .csv, .xlsx, .xls</p>
+                          </div>
+                        </>
+                      )}
+                      <input
+                        id="planilha-upload"
+                        type="file"
+                        accept=".csv,.xlsx,.xls"
+                        className="hidden"
+                        onChange={e => { const f = e.target.files?.[0]; if (f) handlePlanilhaUpload(f); e.target.value = ''; }}
+                      />
+                    </label>
+
+                    {/* Mini-prévia das primeiras 3 linhas */}
+                    {planilhaRows.length > 0 && planilhaHeaders.length > 0 && (
+                      <div className="border border-border rounded-lg overflow-hidden">
+                        <div className="bg-secondary/50 px-3 py-2 flex items-center justify-between">
+                          <span className="text-xs font-medium text-muted-foreground">Prévia da planilha</span>
+                          <span className="text-xs text-muted-foreground">{planilhaHeaders.length} coluna{planilhaHeaders.length !== 1 ? 's' : ''} detectada{planilhaHeaders.length !== 1 ? 's' : ''}</span>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="border-b border-border">
+                                {planilhaHeaders.map(h => (
+                                  <th key={h} className="px-3 py-2 text-left font-medium text-muted-foreground truncate max-w-[140px] whitespace-nowrap">{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {planilhaRows.slice(0, 3).map((row, i) => (
+                                <tr key={i} className="border-b border-border/50 last:border-0">
+                                  {planilhaHeaders.map(h => (
+                                    <td key={h} className="px-3 py-1.5 text-foreground truncate max-w-[140px] whitespace-nowrap">{(row as any)[h] ?? ''}</td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex justify-end gap-3">
+                      <button onClick={() => setShowLoteModal(false)} className="px-4 py-2 rounded-lg text-sm text-secondary-foreground hover:bg-secondary">Cancelar</button>
+                      <button
+                        onClick={analisarPlanilhaIA}
+                        disabled={isParsingPlanilha || planilhaRows.length === 0}
+                        className="px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
+                      >
+                        <Sparkles className="h-4 w-4" />
+                        {isParsingPlanilha ? 'Interpretando...' : 'Analisar com IA'}
+                      </button>
+                    </div>
+                  </>
+                )}
               </>
             ) : (
               <>

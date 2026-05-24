@@ -3,7 +3,7 @@ import logoImg from '@/assets/logo-atacadao-maromba.png';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { PeriodFilter } from '@/components/PeriodFilter';
-import { Trophy, User, BarChart3, FileText, Download, LogOut, Menu, X, Gift, DollarSign } from 'lucide-react';
+import { Trophy, BarChart3, FileText, Download, LogOut, Menu, X, Gift, DollarSign } from 'lucide-react';
 import { CustomBadge } from '@/components/StatusBadge';
 
 interface NavItem {
@@ -15,8 +15,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: 'Ranking', to: '/ranking', icon: Trophy, roles: ['admin', 'vendedor', 'gerente'] },
-  { label: 'Meu Painel', to: '/meu-painel', icon: User, roles: ['admin', 'vendedor'] },
-  { label: 'Gerencial', to: '/gerencial', icon: BarChart3, roles: ['admin', 'gerente'] },
+  { label: 'Gerencial', to: '/gerencial', icon: BarChart3, roles: ['admin', 'vendedor', 'gerente'] },
 ];
 
 const adminItems: NavItem[] = [

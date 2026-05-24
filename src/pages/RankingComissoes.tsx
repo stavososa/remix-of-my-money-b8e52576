@@ -7,14 +7,24 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { usePeriod } from '@/contexts/PeriodContext';
 import { resolverRegra, RegraComissao, VendaParaRegra } from '@/lib/resolverRegra';
-import { DollarSign, Users, Building2, Package, Layers, Tag, Crown, Trophy, ChevronDown, X, AlertTriangle, Eye, FileSpreadsheet, Search } from 'lucide-react';
+import { DollarSign, Users, Building2, Package, Layers, Tag, Crown, Trophy, ChevronDown, X, AlertTriangle, Eye, FileSpreadsheet, Search, Gift } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 const MESES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+interface Bonificacao {
+  id: string;
+  titulo: string;
+  descricao: string | null;
+  imagem_url: string | null;
+  qtd_premiados: number;
+  ativo: boolean;
+}
 
 const parseMoneyBR = (str: unknown): number => {
   if (str == null) return 0;
@@ -224,6 +234,7 @@ export default function RankingComissoes() {
   const isGerente = role === 'gerente';
   const { periodoAno, periodoMes, dataInicio, dataFim, loading: loadingPeriodo } = usePeriod();
   const [filtroFilial, setFiltroFilial] = useState<string[]>([]);
+  const [selectedBonificacao, setSelectedBonificacao] = useState<Bonificacao | null>(null);
   const [filtroVendedor, setFiltroVendedor] = useState<string[]>([]);
   const [filtroFamilia, setFiltroFamilia] = useState<string[]>([]);
   const [filtroMarca, setFiltroMarca] = useState<string[]>([]);
@@ -342,6 +353,24 @@ export default function RankingComissoes() {
     refetchOnMount: true,
   });
 
+  // Fetch bonificações ativas
+  const { data: bonificacoes = [] } = useQuery<Bonificacao[]>({
+    queryKey: ['bonificacoes-ativas'],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('bonificacoes')
+        .select('*')
+        .eq('ativo', true)
+        .order('created_at', { ascending: false });
+      if (error) {
+        console.warn('Bonificações não disponíveis:', error.message);
+        return [];
+      }
+      return data ?? [];
+    },
+    staleTime: 5 * 60 * 1000, // 5 min
+  });
+
   // Calculate commissions
   // Non-commissionable vendors/channels
   const EXCLUIR_VENDEDORES = new Set([
@@ -448,21 +477,35 @@ export default function RankingComissoes() {
   const byMarca = useMemo(() => aggregate(filtered, c => c.marca), [filtered]);
 
   // Filter options
-  const filiais = useMemo(() => [...new Set(comissoesCalculadas.map(c => c.filial))].sort(), [comissoesCalculadas]);
+  // Opções de filtro: incluem vendas COM e SEM regra do período selecionado
+  const filiais = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of comissoesCalculadas) set.add(c.filial);
+    for (const c of vendasSemRegra) set.add(c.filial);
+    return [...set].sort();
+  }, [comissoesCalculadas, vendasSemRegra]);
+
   const vendedores = useMemo(() => {
+    const allData = [...comissoesCalculadas, ...vendasSemRegra];
     const source = filtroFilial.length > 0
-      ? comissoesCalculadas.filter(c => filtroFilial.includes(c.filial))
-      : comissoesCalculadas;
+      ? allData.filter(c => filtroFilial.includes(c.filial))
+      : allData;
     return [...new Set(source.map(c => c.vendedor))].sort();
-  }, [comissoesCalculadas, filtroFilial]);
+  }, [comissoesCalculadas, vendasSemRegra, filtroFilial]);
 
   const familias = useMemo(() => {
-    return [...new Set(comissoesCalculadas.map(c => c.familia_produto))].sort();
-  }, [comissoesCalculadas]);
+    const set = new Set<string>();
+    for (const c of comissoesCalculadas) set.add(c.familia_produto);
+    for (const c of vendasSemRegra) set.add(c.familia_produto);
+    return [...set].sort();
+  }, [comissoesCalculadas, vendasSemRegra]);
 
   const marcas = useMemo(() => {
-    return [...new Set(comissoesCalculadas.map(c => c.marca))].sort();
-  }, [comissoesCalculadas]);
+    const set = new Set<string>();
+    for (const c of comissoesCalculadas) set.add(c.marca);
+    for (const c of vendasSemRegra) set.add(c.marca);
+    return [...set].sort();
+  }, [comissoesCalculadas, vendasSemRegra]);
 
   const isLoading = loadingPeriodo || loadVendas || loadRegras;
 
@@ -628,6 +671,78 @@ export default function RankingComissoes() {
         </div>
       ) : (
         <div className="space-y-6">
+          {/* Bonificações Ativas */}
+          {bonificacoes.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Gift className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-bold text-foreground">Premiações do Mês</h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {bonificacoes.map((b) => (
+                  <Card
+                    key={b.id}
+                    className="overflow-hidden border-primary/20 bg-gradient-to-br from-primary/5 to-card cursor-pointer hover:border-primary/40 hover:shadow-md transition-all duration-200"
+                    onClick={() => setSelectedBonificacao(b)}
+                  >
+                    {b.imagem_url && (
+                      <div className="h-40 w-full overflow-hidden">
+                        <img src={b.imagem_url} alt={b.titulo} className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                    <CardContent className="p-4 space-y-2">
+                      <h3 className="font-bold text-foreground">{b.titulo}</h3>
+                      {b.descricao && <p className="text-sm text-muted-foreground line-clamp-2">{b.descricao}</p>}
+                      <div className="flex items-center gap-2 text-sm">
+                        <Crown className="h-4 w-4 text-primary" />
+                        <span className="font-semibold text-primary">Top {b.qtd_premiados}</span>
+                        <span className="text-muted-foreground">do ranking serão premiados</span>
+                      </div>
+                      <p className="text-xs text-primary/70 mt-1">Clique para ver detalhes →</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Dialog de detalhes da bonificação */}
+              <Dialog open={!!selectedBonificacao} onOpenChange={(open) => !open && setSelectedBonificacao(null)}>
+                <DialogContent className="sm:max-w-lg">
+                  {selectedBonificacao && (
+                    <>
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                          <Gift className="h-5 w-5 text-primary" />
+                          {selectedBonificacao.titulo}
+                        </DialogTitle>
+                      </DialogHeader>
+                      {selectedBonificacao.imagem_url && (
+                        <div className="w-full max-h-64 overflow-hidden rounded-lg">
+                          <img
+                            src={selectedBonificacao.imagem_url}
+                            alt={selectedBonificacao.titulo}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+                      {selectedBonificacao.descricao && (
+                        <DialogDescription className="text-sm text-muted-foreground whitespace-pre-wrap">
+                          {selectedBonificacao.descricao}
+                        </DialogDescription>
+                      )}
+                      <div className="flex items-center gap-3 p-4 rounded-lg bg-primary/10 border border-primary/20">
+                        <Crown className="h-6 w-6 text-primary" />
+                        <div>
+                          <p className="font-bold text-foreground">Top {selectedBonificacao.qtd_premiados} premiados</p>
+                          <p className="text-sm text-muted-foreground">Os {selectedBonificacao.qtd_premiados} primeiros do ranking serão contemplados com esta premiação.</p>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </DialogContent>
+              </Dialog>
+            </div>
+          )}
+
           {/* Avisos de cobertura de regras */}
           {(!coberturaRegras.cobreDelivery || !coberturaRegras.cobreLoja) && (
             <div className="rounded-lg border border-primary/40 bg-primary/10 p-3 flex items-start gap-3">

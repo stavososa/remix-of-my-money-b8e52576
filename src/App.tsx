@@ -10,7 +10,6 @@ import { RequireAuth, RequireAdmin, RequireAdminOrGerente, RedirectByRole } from
 // Lazy loaded pages — code splitting para reduzir bundle inicial
 const Login = lazy(() => import("./pages/Login"));
 const Ranking = lazy(() => import("./pages/Ranking"));
-const MeuPainel = lazy(() => import("./pages/MeuPainel"));
 const Gerencial = lazy(() => import("./pages/Gerencial"));
 const AdminRegras = lazy(() => import("./pages/AdminRegras"));
 const AdminImportar = lazy(() => import("./pages/AdminImportar"));
@@ -55,8 +54,8 @@ const App = () => (
                 <Route path="/login" element={<Login />} />
                 <Route path="/" element={<RequireAuth><RedirectByRole /></RequireAuth>} />
                 <Route path="/ranking" element={<RequireAuth><Ranking /></RequireAuth>} />
-                <Route path="/meu-painel" element={<RequireAuth><MeuPainel /></RequireAuth>} />
-                <Route path="/gerencial" element={<RequireAuth><RequireAdminOrGerente><Gerencial /></RequireAdminOrGerente></RequireAuth>} />
+                <Route path="/meu-painel" element={<RequireAuth><RedirectByRole /></RequireAuth>} />
+                <Route path="/gerencial" element={<RequireAuth><Gerencial /></RequireAuth>} />
                 <Route path="/admin/regras" element={<RequireAuth><RequireAdmin><AdminRegras /></RequireAdmin></RequireAuth>} />
                 <Route path="/admin/importar" element={<RequireAuth><RequireAdmin><AdminImportar /></RequireAdmin></RequireAuth>} />
                 <Route path="/admin/bonificacao" element={<RequireAuth><RequireAdmin><AdminBonificacao /></RequireAdmin></RequireAuth>} />
